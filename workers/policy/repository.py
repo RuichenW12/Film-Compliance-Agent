@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 
 from schemas.policy_snapshot import (
+    OutboxStatus,
     PolicyOutbox,
     PolicyProposal,
     PolicySnapshot,
@@ -116,6 +117,40 @@ class InMemoryPolicyRepository:
             outbox_id: row.model_copy(deep=True)
             for outbox_id, row in self._outbox.items()
         }
+
+    def put_outbox(self, outbox_id: str, outbox: PolicyOutbox) -> None:
+        if outbox_id in self._outbox:
+            raise ValueError(f"outbox already exists: {outbox_id}")
+        self._outbox[outbox_id] = outbox.model_copy(deep=True)
+
+    def list_pending_outbox(self, limit: int) -> list[tuple[str, PolicyOutbox]]:
+        pending = [
+            (outbox_id, row)
+            for outbox_id, row in self._outbox.items()
+            if row.status is OutboxStatus.PENDING
+        ]
+        pending.sort(key=lambda item: (item[1].created_at, item[0]))
+        return [
+            (outbox_id, row.model_copy(deep=True))
+            for outbox_id, row in pending[:limit]
+        ]
+
+    def mark_outbox_sent(
+        self,
+        outbox_id: str,
+        sent_at: datetime,
+        pubsub_message_id: str,
+    ) -> None:
+        row = self._outbox[outbox_id]
+        if row.status is not OutboxStatus.PENDING:
+            raise ValueError("outbox is not pending")
+        row_data = row.model_dump()
+        row_data.update(
+            status=OutboxStatus.SENT,
+            sent_at=sent_at,
+            pubsub_message_id=pubsub_message_id,
+        )
+        self._outbox[outbox_id] = PolicyOutbox.model_validate(row_data)
 
     def commit_publication(
         self,
