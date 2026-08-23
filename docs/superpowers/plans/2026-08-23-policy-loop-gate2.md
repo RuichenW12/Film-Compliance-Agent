@@ -69,6 +69,8 @@ Excluded: FastAPI, admin UI, HTTP, Gemini, Firestore, GCS, Pub/Sub, Cloud Run, S
 
 ### Task 3: Publish or discard proposals atomically in memory
 
+Decision: `p3_tier_thresholds.thresholds_published` is the pack-level source of truth. Publisher mirrors the merged value into `PolicySnapshot.thresholds_published` and `PolicyUpdatedEvent.thresholds_published`; `PolicyProposal` remains unchanged.
+
 **Files:**
 
 - Create: `workers/policy/publish.py`

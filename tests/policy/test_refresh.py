@@ -36,7 +36,9 @@ def build_refresh(tmp_path: Path) -> tuple[
             summary="分类标准由未公布变为正式公布",
             impact=[ImpactNode.D1C],
             effective_from=NOW,
-            draft_pack_updates={PackName.P3_TIER_THRESHOLDS: {"published": True}},
+            draft_pack_updates={
+                PackName.P3_TIER_THRESHOLDS: {"thresholds_published": True}
+            },
         )
     )
     module = PolicyRefreshModule(
