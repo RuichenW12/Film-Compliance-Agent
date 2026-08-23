@@ -95,7 +95,11 @@ def get_run(
             "POLICY_RUN_NOT_FOUND",
             "policy run not found",
         ) from exc
-    return PolicyRunResponse.model_validate(run.model_dump())
+    response = run.model_dump()
+    response["error"] = (
+        "policy refresh failed" if run.status == "failed" else None
+    )
+    return PolicyRunResponse.model_validate(response)
 
 
 @router.get("/proposals", response_model=list[ProposalSummary])

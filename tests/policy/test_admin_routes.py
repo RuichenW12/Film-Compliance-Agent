@@ -114,6 +114,25 @@ def test_run_can_be_read_after_direct_launcher_execution(
     assert response.json()["proposal_id"] == proposal_id
 
 
+def test_failed_run_hides_internal_error_details(
+    api_client: TestClient,
+    policy_state: PolicyApiState,
+) -> None:
+    policy_state.repository.create_run("run_failed", SOURCE_ID, NOW)
+    policy_state.repository.fail_run(
+        "run_failed",
+        "POLICY_REFRESH_FAILED: could not read /private/secret/policy.html",
+        NOW,
+    )
+
+    response = admin_get(api_client, "/v1/admin/policy/runs/run_failed")
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "failed"
+    assert response.json()["error"] == "policy refresh failed"
+    assert "/private/secret/policy.html" not in response.text
+
+
 def test_pending_proposals_are_descending_and_detail_contains_diff(
     api_client: TestClient,
     policy_state: PolicyApiState,
