@@ -2,7 +2,7 @@
 
 Film Compliance Agent is a planned workflow for helping micro-drama creators and licensed institutions prepare compliance reviews and filing materials. The product path combines deterministic gates, evidence-linked AI review, human confirmation, and versioned policy snapshots.
 
-> Repository status: structure and ownership scaffold only. Runtime services, models, UI, infrastructure, and policy data have not been implemented yet.
+> Repository status: Gates 1–3 of Richard's policy loop are implemented for a deterministic local demo: validated contracts and seed data, an offline proposal/publish loop, a FastAPI administration API, and a small Next.js administration UI. Live crawling, model calls, durable storage, authentication, notifications, and cloud deployment remain outside this milestone.
 
 ## Workstreams
 
@@ -37,6 +37,6 @@ The workstreams meet through shared contracts in [`schemas/`](schemas/README.md)
 4. A policy update may mark projects stale and recalculate provisional classifications. It must not rewrite frozen forms, submitted materials, or registration numbers.
 5. Unknown legal, organization, amount, or license fields remain unknown until a source or human confirms them.
 
-## First milestone
+## Implemented local milestone
 
-The first repository milestone is a contract-level handshake: the product workstream can load a validated seed snapshot, while the policy workstream can emit a validated `policy.updated` fixture. No live crawler or cloud deployment is required for that handshake.
+The product workstream can load a validated seed snapshot, while the policy workstream can run a deterministic fixture refresh, review the resulting proposal, publish a new snapshot, and emit a validated `policy.updated` event. The administration flow is exposed through a local API and UI. See [`api/`](api/README.md), [`web/`](web/README.md), and [`tests/`](tests/README.md) for commands and verification boundaries.
