@@ -1,0 +1,53 @@
+version: v1
+published_at: "2026-08-22T00:05:00+08:00"
+effective_from: "2026-08-22T00:00:00+08:00"
+published_by: admin_seed
+packs:
+  p1_form_definition:
+    episode_max_minutes_exclusive: 20
+    continuous_plot_required: true
+  p2_subject_rules:
+    special_subject:
+      subjects:
+        - political
+        - military
+        - diplomatic
+        - national_security
+        - united_front
+        - ethnic
+        - religious
+        - judicial
+        - public_security
+      clear_hit_outcome:
+        tier: T1
+        co_review_required: true
+      operational_basis: partner_strict_rule
+  p3_tier_thresholds:
+    thresholds: null
+  p4_process_templates: {}
+  p5_form_templates: {}
+  p6_legal_clauses:
+    source_name: 国家广播电视总局令第16号《微短剧发展管理办法》
+    clauses:
+      - clause_id: nrta-order-16-article-2
+        title: 第二条
+        text: 本办法所称微短剧，是指单集时长少于二十分钟，主题主线明确、故事情节连续完整、人物角色突出的剧集。
+        source_url: https://www.nrta.gov.cn/art/2026/7/31/art_113_73785.html
+      - clause_id: nrta-order-16-article-5
+        title: 第五条
+        text: 一类微短剧是指投资额度较大或者主要剧情涉及政治、军事、外交、国家安全、统战、民族、宗教、司法、公安等内容的特殊题材（以下简称特殊题材）的微短剧。
+        source_url: https://www.nrta.gov.cn/art/2026/7/31/art_113_73785.html
+      - clause_id: nrta-order-16-article-19
+        title: 第十九条
+        text: 特殊题材的一类微短剧，省、自治区、直辖市以上人民政府广播电视行政主管部门认为确有必要的，应当征求有关主管部门或者有关方面的意见。
+        source_url: https://www.nrta.gov.cn/art/2026/7/31/art_113_73785.html
+      - clause_id: nrta-order-16-article-54
+        title: 第五十四条
+        text: 本办法自2026年9月1日起施行。
+        source_url: https://www.nrta.gov.cn/art/2026/7/31/art_113_73785.html
+diff_from_prev:
+  summary: Initial policy seed for the v1 handshake
+  impact:
+    - D1c
+    - C1-a
+thresholds_published: false

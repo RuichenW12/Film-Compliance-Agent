@@ -2,11 +2,11 @@
 
 This directory will verify the shared boundaries between Workstream A and Workstream B.
 
-The first contract milestone will prove that:
+The Gate 1 contract suite proves that:
 
 - A line can load Richard's validated seed snapshot through SnapshotService;
 - both lines can serialize and deserialize the same `policy.updated` fixture;
 - future-effective snapshots are not selected as the current effective snapshot;
-- policy update handling preserves frozen forms, submitted materials, and registration numbers.
+- the shared proposal, outbox, and recalc-tier messages enforce their frozen shapes.
 
-No contract test or fixture exists in this scaffold.
+Consumer side-effect invariants for frozen forms, submitted materials, and registration numbers belong to the Gate 2 module tests, where those stores and consumers exist.

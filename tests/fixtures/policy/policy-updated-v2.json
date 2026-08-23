@@ -1,0 +1,8 @@
+{
+  "snapshot_version": "v2",
+  "impact": ["D1c"],
+  "thresholds_published": true,
+  "effective_from": "2026-09-01T00:00:00+08:00",
+  "published_at": "2026-09-01T00:05:00+08:00",
+  "idempotency_key": "policy.updated:v2"
+}

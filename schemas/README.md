@@ -11,4 +11,4 @@ Planned contracts include:
 
 Contract changes that affect both workstreams require review from Maxine and Richard. Runtime-specific helper types should remain with their owning module instead of expanding the shared surface.
 
-No schema implementation exists in this scaffold.
+Gate 1 implements the frozen policy handshake in `policy_snapshot.py` and the local YAML-backed `SnapshotService` in `snapshot.py`. Cloud adapters and non-policy shared schemas remain future work.

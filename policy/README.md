@@ -14,4 +14,6 @@ Executable fetching, diffing, proposal generation, publishing, and update consum
 
 Policy facts must retain source and effective-time information. AI-drafted placeholders must remain visibly unconfirmed until reviewed; missing amounts, contacts, or form fields must not be invented.
 
-No policy source file or seed data is included in this scaffold.
+Gate 1 includes `seed-snapshot-v1.yaml`, the reviewed static handshake fixture. Source crawling and generated policy assets are not part of Gate 1.
+
+The seed is repository-level configuration supplied explicitly to `FileSnapshotService`; it is not Python wheel package data.
