@@ -3,21 +3,30 @@
 from __future__ import annotations
 
 import json
+import logging
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, BackgroundTasks, Depends, Query, Response
 from pydantic import ValidationError
 
 from api.deps.policy import PolicyApiState, get_policy_state, require_admin
 from api.errors import PolicyApiError
 from api.models.policy import (
+    CrawlRequest,
+    CrawlResponse,
     PolicyRunResponse,
     ProposalDetail,
     ProposalSummary,
+    PublishResponse,
     SnapshotSummary,
 )
 from schemas.policy_snapshot import PolicyProposal, ProposalStatus
+from workers.policy.launch import PolicyLaunchError
 from workers.policy.models import PolicyDiff
+from workers.policy.publish import PolicyPublishError
+
+
+_LOGGER = logging.getLogger(__name__)
 
 
 router = APIRouter(
@@ -37,6 +46,40 @@ def _proposal_summary(
         effective_from=proposal.effective_from,
         status=proposal.status,
     )
+
+
+def _publish_error(exc: PolicyPublishError) -> PolicyApiError:
+    status_by_code = {
+        "POLICY_PROPOSAL_CONFLICT": 409,
+        "POLICY_NOT_EFFECTIVE": 409,
+        "SNAPSHOT_NOT_FOUND": 503,
+        "POLICY_PROPOSAL_INVALID": 502,
+    }
+    return PolicyApiError(
+        status_by_code.get(exc.code, 500),
+        exc.code,
+        str(exc).partition(": ")[2] or str(exc),
+    )
+
+
+@router.post("/crawl", status_code=202, response_model=CrawlResponse)
+async def crawl(
+    body: CrawlRequest,
+    background_tasks: BackgroundTasks,
+    state: Annotated[PolicyApiState, Depends(get_policy_state)],
+) -> CrawlResponse:
+    now = state.clock()
+    try:
+        run_id = state.launcher.launch(body.source_id, now)
+    except PolicyLaunchError as exc:
+        raise PolicyApiError(404, exc.code, str(exc)) from exc
+    background_tasks.add_task(
+        state.launcher.execute,
+        run_id,
+        body.source_id,
+        now,
+    )
+    return CrawlResponse(run_id=run_id)
 
 
 @router.get("/runs/{run_id}", response_model=PolicyRunResponse)
@@ -105,6 +148,52 @@ def get_proposal(
         draft_pack_updates=proposal.draft_pack_updates,
         published_version=proposal.published_version,
     )
+
+
+@router.post(
+    "/proposals/{proposal_id}/publish",
+    status_code=201,
+    response_model=PublishResponse,
+)
+def publish_proposal(
+    proposal_id: str,
+    state: Annotated[PolicyApiState, Depends(get_policy_state)],
+) -> PublishResponse:
+    try:
+        result = state.publisher.publish(
+            proposal_id,
+            "admin_richard",
+            state.clock(),
+        )
+    except PolicyPublishError as exc:
+        raise _publish_error(exc) from exc
+    try:
+        state.dispatcher.dispatch()
+    except Exception:
+        _LOGGER.exception(
+            "best-effort policy outbox dispatch failed after publish"
+        )
+    return PublishResponse(snapshot_version=result.snapshot_version)
+
+
+@router.post(
+    "/proposals/{proposal_id}/discard",
+    status_code=204,
+    response_class=Response,
+)
+def discard_proposal(
+    proposal_id: str,
+    state: Annotated[PolicyApiState, Depends(get_policy_state)],
+) -> Response:
+    try:
+        state.publisher.discard(
+            proposal_id,
+            "admin_richard",
+            state.clock(),
+        )
+    except PolicyPublishError as exc:
+        raise _publish_error(exc) from exc
+    return Response(status_code=204)
 
 
 @router.get("/snapshots", response_model=list[SnapshotSummary])
