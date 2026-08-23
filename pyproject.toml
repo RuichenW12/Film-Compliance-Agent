@@ -8,6 +8,7 @@ version = "0.1.0"
 description = "Film compliance policy loop"
 requires-python = ">=3.11"
 dependencies = [
+  "beautifulsoup4>=4.13,<5",
   "pydantic>=2.11,<3",
   "PyYAML>=6,<7",
 ]
@@ -22,4 +23,4 @@ addopts = "-q"
 testpaths = ["tests"]
 
 [tool.setuptools.packages.find]
-include = ["schemas*"]
+include = ["schemas*", "workers*"]
