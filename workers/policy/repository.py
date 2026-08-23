@@ -37,6 +37,12 @@ class InMemoryPolicyRepository:
     def get_run(self, run_id: str) -> PolicyRun:
         return self._runs[run_id].model_copy(deep=True)
 
+    def list_runs(self) -> dict[str, PolicyRun]:
+        return {
+            run_id: run.model_copy(deep=True)
+            for run_id, run in self._runs.items()
+        }
+
     def complete_run(
         self,
         run_id: str,
