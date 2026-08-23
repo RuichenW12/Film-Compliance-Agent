@@ -1,6 +1,5 @@
 """Worker-internal policy records that are not shared A/B contracts."""
 
-from datetime import datetime
 from typing import Any, Literal
 
 from pydantic import AwareDatetime, BaseModel, ConfigDict, Field
@@ -20,7 +19,7 @@ class PolicyDiff(InternalModel):
 
 
 class PolicySource(InternalModel):
-    source_id: str = Field(min_length=1)
+    source_id: str = Field(pattern=r"^[a-z][a-z0-9_]*$")
     url: str = Field(pattern=r"^https://")
     content_selector: str = Field(min_length=1)
     enabled: bool

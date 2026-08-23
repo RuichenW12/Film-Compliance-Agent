@@ -3,6 +3,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import pytest
+from pydantic import ValidationError
 
 from schemas.policy_snapshot import ImpactNode, PackName, ProposalStatus
 from workers.policy.refresh import PolicyRefreshError, PolicyRefreshModule
@@ -116,3 +117,116 @@ def test_refresh_failure_preserves_last_known_good_source_state(tmp_path: Path) 
 
     assert repository.get_run("run_002").status == "failed"
     assert repository.get_source_state(SOURCE.source_id) == previous_state
+
+
+def test_changed_refresh_commit_failure_leaves_no_orphan_state(tmp_path: Path) -> None:
+    class FailingCommitRepository(InMemoryPolicyRepository):
+        def commit_refresh_proposal(self, *args, **kwargs):
+            raise RuntimeError("injected commit failure")
+
+    repository = FailingCommitRepository()
+    fetcher = FixtureSourceFetcher({SOURCE.source_id: FIXTURES / "source-v1.html"})
+    proposal_model = FakeProposalModel(
+        ProposalDraft(
+            summary="分类标准由未公布变为正式公布",
+            impact=[ImpactNode.D1C],
+            effective_from=NOW,
+            draft_pack_updates={
+                PackName.P3_TIER_THRESHOLDS: {"thresholds_published": True}
+            },
+        )
+    )
+    module = PolicyRefreshModule(
+        sources={SOURCE.source_id: SOURCE},
+        fetcher=fetcher,
+        blob_store=FileBlobStore(tmp_path / "blobs"),
+        proposal_model=proposal_model,
+        repository=repository,
+    )
+    run_refresh(module, repository, "run_001")
+    previous_state = repository.get_source_state(SOURCE.source_id)
+    fetcher.set_path(SOURCE.source_id, FIXTURES / "source-v2.html")
+    repository.create_run("run_002", SOURCE.source_id, NOW)
+
+    with pytest.raises(PolicyRefreshError):
+        asyncio.run(module.run("run_002", SOURCE.source_id, NOW))
+
+    assert repository.get_source_state(SOURCE.source_id) == previous_state
+    assert repository.list_proposals() == {}
+    assert repository.get_run("run_002").status == "failed"
+
+
+def test_no_change_commit_failure_preserves_last_known_good_state(
+    tmp_path: Path,
+) -> None:
+    class FailingSecondNoChangeCommitRepository(InMemoryPolicyRepository):
+        def __init__(self) -> None:
+            super().__init__()
+            self.no_change_commits = 0
+
+        def commit_refresh_no_change(self, *args, **kwargs):
+            self.no_change_commits += 1
+            if self.no_change_commits == 2:
+                raise RuntimeError("injected no-change commit failure")
+            return super().commit_refresh_no_change(*args, **kwargs)
+
+    repository = FailingSecondNoChangeCommitRepository()
+    fetcher = FixtureSourceFetcher({SOURCE.source_id: FIXTURES / "source-v1.html"})
+    proposal_model = FakeProposalModel(
+        ProposalDraft(
+            summary="unused",
+            impact=[ImpactNode.D1C],
+            effective_from=NOW,
+            draft_pack_updates={
+                PackName.P3_TIER_THRESHOLDS: {"thresholds_published": True}
+            },
+        )
+    )
+    module = PolicyRefreshModule(
+        sources={SOURCE.source_id: SOURCE},
+        fetcher=fetcher,
+        blob_store=FileBlobStore(tmp_path / "blobs"),
+        proposal_model=proposal_model,
+        repository=repository,
+    )
+    run_refresh(module, repository, "run_001")
+    previous_state = repository.get_source_state(SOURCE.source_id)
+    noisy_path = tmp_path / "source-v1-noisy.html"
+    noisy_path.write_bytes(
+        (FIXTURES / "source-v1.html")
+        .read_bytes()
+        .replace(b"noise-v1", b"different-raw-noise")
+    )
+    fetcher.set_path(SOURCE.source_id, noisy_path)
+    repository.create_run("run_002", SOURCE.source_id, NOW)
+
+    with pytest.raises(PolicyRefreshError):
+        asyncio.run(module.run("run_002", SOURCE.source_id, NOW))
+
+    assert repository.get_source_state(SOURCE.source_id) == previous_state
+    assert repository.get_run("run_002").status == "failed"
+
+
+def test_file_blob_store_rejects_source_id_path_traversal(tmp_path: Path) -> None:
+    store = FileBlobStore(tmp_path / "blobs")
+
+    with pytest.raises(ValueError, match="outside"):
+        store.put_raw("../../../escaped", b"content", NOW)
+
+
+def test_file_blob_store_reads_its_own_uri_when_root_has_spaces(tmp_path: Path) -> None:
+    store = FileBlobStore(tmp_path / "blob root with spaces")
+
+    ref = store.put_normalized("safe_source", "normalized text", NOW)
+
+    assert store.read_text(ref.uri) == "normalized text"
+
+
+def test_policy_source_rejects_path_like_identifier() -> None:
+    with pytest.raises(ValidationError):
+        PolicySource(
+            source_id="../escaped",
+            url="https://www.nrta.gov.cn/example",
+            content_selector="#zoom",
+            enabled=True,
+        )

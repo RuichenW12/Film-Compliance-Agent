@@ -56,6 +56,19 @@ class PolicyUpdatedConsumer:
         recalculated = 0
         event_version = int(event.snapshot_version[1:])
         for project in self._repository.list_projects(limit=100):
+            recalc_key = (
+                f"{event.idempotency_key}:{project.project_id}:recalc"
+            )
+            if (
+                self._repository.recalc_status(recalc_key) == "started"
+                and project.policy_snapshot_version == event.snapshot_version
+            ):
+                self._upsert_effect(
+                    event, project.project_id, "tier_recalculated"
+                )
+                self._repository.complete_recalc(recalc_key)
+                recalculated += 1
+                continue
             if int(project.policy_snapshot_version[1:]) >= event_version:
                 continue
             if not self._is_affected(project, event):
@@ -72,6 +85,7 @@ class PolicyUpdatedConsumer:
                 and project.has_classification
                 and project.tier_provisional
             ):
+                self._repository.start_recalc(recalc_key)
                 result = await self._recalc_client.recalc_tier(
                     project.project_id, event.snapshot_version
                 )
@@ -80,6 +94,7 @@ class PolicyUpdatedConsumer:
                     self._upsert_effect(
                         event, project.project_id, "tier_recalculated"
                     )
+                self._repository.complete_recalc(recalc_key)
 
         self._repository.put_receipt(event.idempotency_key)
         return ConsumeResult(

@@ -2,6 +2,7 @@ import asyncio
 from datetime import datetime, timedelta, timezone
 
 import pytest
+from pydantic import ValidationError
 
 from schemas.policy_snapshot import PolicyUpdatedEvent
 from workers.policy.adapters.fake_recalc import FakeRecalcClient, FakeRecalcError
@@ -151,3 +152,46 @@ def test_recalc_failure_keeps_stale_and_does_not_write_receipt() -> None:
         "policy.updated:v2:project_provisional:policy_stale"
         in repository.notifications
     )
+
+
+def test_lost_recalc_response_is_completed_on_replay() -> None:
+    repository = InMemoryProjectRepository()
+    repository.add_project(provisional_project())
+
+    class LostResponseRecalc:
+        def __init__(self) -> None:
+            self.calls = 0
+
+        async def recalc_tier(self, project_id: str, snapshot_version: str):
+            self.calls += 1
+            repository.apply_recalc(project_id, snapshot_version, "T2")
+            raise TimeoutError("response lost after A-line commit")
+
+    recalc = LostResponseRecalc()
+    consumer = PolicyUpdatedConsumer(repository, recalc)
+
+    with pytest.raises(TimeoutError):
+        asyncio.run(consumer.handle(event()))
+    assert repository.has_receipt("policy.updated:v2") is False
+
+    replay = asyncio.run(consumer.handle(event()))
+
+    assert replay.already_processed is False
+    assert recalc.calls == 1
+    assert repository.has_receipt("policy.updated:v2") is True
+    assert (
+        "policy.updated:v2:project_provisional:tier_recalculated"
+        in repository.notifications
+    )
+
+
+def test_invalid_recalc_result_cannot_mutate_project_state() -> None:
+    repository = InMemoryProjectRepository()
+    repository.add_project(provisional_project())
+    before = repository.get_project("project_provisional")
+    recalc = FakeRecalcClient(repository, new_tier="T9")  # type: ignore[arg-type]
+
+    with pytest.raises(ValidationError):
+        asyncio.run(recalc.recalc_tier("project_provisional", "v2"))
+
+    assert repository.get_project("project_provisional") == before

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from datetime import datetime, timezone
+import logging
 from typing import Protocol
 
 from pydantic import BaseModel, ConfigDict
@@ -11,6 +12,9 @@ from pydantic import BaseModel, ConfigDict
 from schemas.policy_snapshot import PolicyUpdatedEvent
 
 from .repository import InMemoryPolicyRepository
+
+
+_LOGGER = logging.getLogger(__name__)
 
 
 class EventPublisher(Protocol):
@@ -50,5 +54,8 @@ class OutboxDispatcher:
                 )
                 sent += 1
             except Exception:
+                _LOGGER.exception(
+                    "policy outbox dispatch failed: outbox_id=%s", outbox_id
+                )
                 failed += 1
         return DispatchSummary(selected=len(pending), sent=sent, failed=failed)

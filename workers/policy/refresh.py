@@ -119,23 +119,19 @@ class PolicyRefreshModule:
                 status=ProposalStatus.PENDING,
                 published_version=None,
             )
-            proposal_id = self._repository.create_proposal(proposal)
-            self._repository.put_source_state(
-                source_id,
-                SourceState(
+            proposal_id = self._repository.commit_refresh_proposal(
+                run_id=run_id,
+                source_id=source_id,
+                proposal=proposal,
+                source_state=SourceState(
                     last_success_at=now,
                     raw_uri=raw_ref.uri,
                     normalized_uri=normalized_ref.uri,
                     normalized_sha256=normalized_ref.sha256,
                 ),
-            )
-            self._repository.complete_run(
-                run_id,
-                status="proposal_created",
                 finished_at=now,
                 previous_sha256=previous_state.normalized_sha256,
                 current_sha256=normalized_ref.sha256,
-                proposal_id=proposal_id,
             )
             return RefreshResult(
                 run_id=run_id,
@@ -158,22 +154,18 @@ class PolicyRefreshModule:
         normalized_ref: BlobRef,
         previous_sha256: str | None,
     ) -> RefreshResult:
-        self._repository.put_source_state(
-            source_id,
-            SourceState(
+        self._repository.commit_refresh_no_change(
+            run_id=run_id,
+            source_id=source_id,
+            source_state=SourceState(
                 last_success_at=now,
                 raw_uri=raw_uri,
                 normalized_uri=normalized_ref.uri,
                 normalized_sha256=normalized_ref.sha256,
             ),
-        )
-        self._repository.complete_run(
-            run_id,
-            status="no_change",
             finished_at=now,
             previous_sha256=previous_sha256,
             current_sha256=normalized_ref.sha256,
-            proposal_id=None,
         )
         return RefreshResult(
             run_id=run_id,

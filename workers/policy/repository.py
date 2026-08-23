@@ -78,6 +78,77 @@ class InMemoryPolicyRepository:
         self._proposals[proposal_id] = proposal.model_copy(deep=True)
         return proposal_id
 
+    def commit_refresh_proposal(
+        self,
+        *,
+        run_id: str,
+        source_id: str,
+        proposal: PolicyProposal,
+        source_state: SourceState,
+        finished_at: datetime,
+        previous_sha256: str,
+        current_sha256: str,
+    ) -> str:
+        run = self._runs[run_id]
+        if run.status != "running":
+            raise ValueError("run is not running")
+
+        proposal_id = f"proposal_{self._proposal_counter + 1:03d}"
+        run_data = run.model_dump()
+        run_data.update(
+            status="proposal_created",
+            finished_at=finished_at,
+            previous_sha256=previous_sha256,
+            current_sha256=current_sha256,
+            proposal_id=proposal_id,
+            error=None,
+        )
+        completed_run = PolicyRun.model_validate(run_data)
+
+        new_runs = dict(self._runs)
+        new_source_states = dict(self._source_states)
+        new_proposals = dict(self._proposals)
+        new_runs[run_id] = completed_run.model_copy(deep=True)
+        new_source_states[source_id] = source_state.model_copy(deep=True)
+        new_proposals[proposal_id] = proposal.model_copy(deep=True)
+        self._runs = new_runs
+        self._source_states = new_source_states
+        self._proposals = new_proposals
+        self._proposal_counter += 1
+        return proposal_id
+
+    def commit_refresh_no_change(
+        self,
+        *,
+        run_id: str,
+        source_id: str,
+        source_state: SourceState,
+        finished_at: datetime,
+        previous_sha256: str | None,
+        current_sha256: str,
+    ) -> None:
+        run = self._runs[run_id]
+        if run.status != "running":
+            raise ValueError("run is not running")
+
+        run_data = run.model_dump()
+        run_data.update(
+            status="no_change",
+            finished_at=finished_at,
+            previous_sha256=previous_sha256,
+            current_sha256=current_sha256,
+            proposal_id=None,
+            error=None,
+        )
+        completed_run = PolicyRun.model_validate(run_data)
+
+        new_runs = dict(self._runs)
+        new_source_states = dict(self._source_states)
+        new_runs[run_id] = completed_run.model_copy(deep=True)
+        new_source_states[source_id] = source_state.model_copy(deep=True)
+        self._runs = new_runs
+        self._source_states = new_source_states
+
     def get_proposal(self, proposal_id: str | None) -> PolicyProposal:
         if proposal_id is None:
             raise KeyError("proposal id is required")

@@ -39,9 +39,10 @@ class FakeRecalcClient:
                 tier_provisional=project.tier_provisional,
                 changed=False,
             )
-        self._repository.apply_recalc(project_id, snapshot_version, self._new_tier)
-        return RecalcResult(
+        result = RecalcResult(
             tier=self._new_tier,
             tier_provisional=False,
             changed=True,
         )
+        self._repository.apply_recalc(project_id, snapshot_version, self._new_tier)
+        return result

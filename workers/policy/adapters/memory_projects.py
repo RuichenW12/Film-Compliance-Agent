@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, StringConstraints
+from pydantic import BaseModel, ConfigDict, StringConstraints
 
 from schemas.policy_snapshot import ImpactNode
 
@@ -44,6 +44,7 @@ class InMemoryProjectRepository:
         self._notifications: dict[str, ProjectEffect] = {}
         self._timeline: dict[str, ProjectEffect] = {}
         self._receipts: set[str] = set()
+        self._recalc_operations: dict[str, Literal["started", "completed"]] = {}
 
     @property
     def notifications(self) -> dict[str, ProjectEffect]:
@@ -81,13 +82,14 @@ class InMemoryProjectRepository:
         self, project_id: str, snapshot_version: str, tier: str
     ) -> None:
         project = self._projects[project_id]
-        self._projects[project_id] = project.model_copy(
-            update={
-                "policy_snapshot_version": snapshot_version,
-                "tier": tier,
-                "tier_provisional": False,
-            }
+        project_data = project.model_dump()
+        project_data.update(
+            policy_snapshot_version=snapshot_version,
+            tier=tier,
+            tier_provisional=False,
         )
+        updated = ProjectPolicyState.model_validate(project_data)
+        self._projects[project_id] = updated.model_copy(deep=True)
 
     def upsert_effect(self, effect: ProjectEffect) -> None:
         copied = effect.model_copy(deep=True)
@@ -99,3 +101,14 @@ class InMemoryProjectRepository:
 
     def put_receipt(self, event_key: str) -> None:
         self._receipts.add(event_key)
+
+    def start_recalc(self, operation_key: str) -> None:
+        self._recalc_operations.setdefault(operation_key, "started")
+
+    def complete_recalc(self, operation_key: str) -> None:
+        self._recalc_operations[operation_key] = "completed"
+
+    def recalc_status(
+        self, operation_key: str
+    ) -> Literal["started", "completed"] | None:
+        return self._recalc_operations.get(operation_key)

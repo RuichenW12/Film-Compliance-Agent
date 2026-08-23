@@ -6,6 +6,7 @@ from datetime import datetime
 from hashlib import sha256
 import json
 from pathlib import Path
+from urllib.parse import unquote, urlparse
 
 from ..models import BlobRef, PolicyDiff
 
@@ -59,6 +60,8 @@ class FileBlobStore:
 
     def _put(self, relative: Path, content: bytes, digest: str) -> BlobRef:
         path = (self._root / relative).resolve()
+        if not path.is_relative_to(self._root):
+            raise ValueError("blob path is outside the configured root")
         path.parent.mkdir(parents=True, exist_ok=True)
         if path.exists():
             if path.read_bytes() != content:
@@ -68,9 +71,10 @@ class FileBlobStore:
         return BlobRef(uri=path.as_uri(), sha256=digest)
 
     def _path_from_uri(self, uri: str) -> Path:
-        if not uri.startswith("file://"):
+        parsed = urlparse(uri)
+        if parsed.scheme != "file" or parsed.netloc not in {"", "localhost"}:
             raise ValueError("FileBlobStore only accepts file:// URIs")
-        path = Path(uri.removeprefix("file://")).resolve()
+        path = Path(unquote(parsed.path)).resolve()
         if not path.is_relative_to(self._root):
             raise ValueError("blob URI is outside the configured root")
         return path
