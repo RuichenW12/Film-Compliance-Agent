@@ -30,6 +30,7 @@ class LocalPolicyLoop:
     policy: InMemoryPolicyRepository
     projects: InMemoryProjectRepository
     fetcher: FixtureSourceFetcher
+    blob_store: FileBlobStore
     proposal_model: FakeProposalModel
     refresh: PolicyRefreshModule
     publisher: PolicyPublisher
@@ -55,11 +56,12 @@ def build_local_policy_loop(
 
     projects = InMemoryProjectRepository()
     fetcher = FixtureSourceFetcher({source.source_id: fixture_path})
+    blob_store = FileBlobStore(blob_root)
     proposal_model = FakeProposalModel(proposal_draft)
     refresh = PolicyRefreshModule(
         sources={source.source_id: source},
         fetcher=fetcher,
-        blob_store=FileBlobStore(blob_root),
+        blob_store=blob_store,
         proposal_model=proposal_model,
         repository=policy,
     )
@@ -74,6 +76,7 @@ def build_local_policy_loop(
         policy=policy,
         projects=projects,
         fetcher=fetcher,
+        blob_store=blob_store,
         proposal_model=proposal_model,
         refresh=refresh,
         publisher=publisher,
