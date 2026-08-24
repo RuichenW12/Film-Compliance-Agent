@@ -18,7 +18,7 @@ from .models import (
     SourceState,
 )
 from .normalize import create_policy_diff, normalize_html
-from .repository import InMemoryPolicyRepository
+from .interfaces import RefreshRepository
 
 
 class SourceFetcher(Protocol):
@@ -59,7 +59,7 @@ class PolicyRefreshModule:
         fetcher: SourceFetcher,
         blob_store: BlobStore,
         proposal_model: ProposalModel,
-        repository: InMemoryPolicyRepository,
+        repository: RefreshRepository,
     ) -> None:
         self._sources = dict(sources)
         self._fetcher = fetcher

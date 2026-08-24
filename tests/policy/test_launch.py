@@ -1,4 +1,5 @@
 import asyncio
+from collections.abc import Callable
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -26,6 +27,8 @@ FIXTURES = Path(__file__).parents[1] / "fixtures" / "policy"
 
 def build_launcher(
     tmp_path: Path,
+    *,
+    run_id_factory: Callable[[], str] | None = None,
 ) -> tuple[PolicyRunLauncher, InMemoryPolicyRepository]:
     repository = InMemoryPolicyRepository()
     refresh = PolicyRefreshModule(
@@ -49,7 +52,12 @@ def build_launcher(
         repository=repository,
     )
     return (
-        PolicyRunLauncher(repository, refresh, {SOURCE.source_id}),
+        PolicyRunLauncher(
+            repository,
+            refresh,
+            {SOURCE.source_id},
+            run_id_factory=run_id_factory,
+        ),
         repository,
     )
 
@@ -71,6 +79,18 @@ def test_launch_ids_are_monotonic(tmp_path: Path) -> None:
 
     assert (first, second) == ("run_001", "run_002")
     assert set(repository.list_runs()) == {"run_001", "run_002"}
+
+
+def test_launcher_uses_injected_run_id_factory(tmp_path: Path) -> None:
+    launcher, repository = build_launcher(
+        tmp_path,
+        run_id_factory=lambda: "run_cloud_abc123",
+    )
+
+    run_id = launcher.launch(SOURCE.source_id, NOW)
+
+    assert run_id == "run_cloud_abc123"
+    assert repository.get_run(run_id).status == "running"
 
 
 def test_execute_completes_the_created_run(tmp_path: Path) -> None:

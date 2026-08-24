@@ -11,7 +11,7 @@ from pydantic import BaseModel, ConfigDict
 
 from schemas.policy_snapshot import PolicyUpdatedEvent
 
-from .repository import InMemoryPolicyRepository
+from .interfaces import OutboxRepository
 
 
 _LOGGER = logging.getLogger(__name__)
@@ -32,7 +32,7 @@ class DispatchSummary(BaseModel):
 class OutboxDispatcher:
     def __init__(
         self,
-        repository: InMemoryPolicyRepository,
+        repository: OutboxRepository,
         publisher: EventPublisher,
         *,
         clock: Callable[[], datetime] | None = None,
