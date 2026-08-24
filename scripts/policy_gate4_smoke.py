@@ -7,7 +7,6 @@ import argparse
 import asyncio
 from datetime import datetime, timezone
 from importlib.resources import files
-import json
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
@@ -17,11 +16,7 @@ from schemas.policy_snapshot import ImpactNode, PackName, PolicySnapshot
 from workers.policy.adapters.fake_proposal import FakeProposalModel
 from workers.policy.adapters.file_blob import FileBlobStore
 from workers.policy.adapters.http_source import HttpSourceFetcher
-from workers.policy.cloud_runtime import (
-    CloudPolicyConfigurationError,
-    CloudPolicySettings,
-)
-from workers.policy.gate4_smoke import run_source_smoke
+from workers.policy.gate4_smoke import run_cloud_smoke, run_source_smoke
 from workers.policy.models import ProposalDraft
 from workers.policy.repository import InMemoryPolicyRepository
 from workers.policy.source_config import load_policy_sources
@@ -72,26 +67,19 @@ async def run_source() -> int:
     return 0 if report.overall == "PASS" else 1
 
 
-def cloud_skip() -> int:
-    try:
-        CloudPolicySettings.from_env()
-        reason = "POLICY_CLOUD_SMOKE_PENDING"
-    except CloudPolicyConfigurationError:
-        reason = "POLICY_CLOUD_CONFIG_MISSING"
-    print(
-        json.dumps(
-            {"mode": "cloud", "overall": "SKIP", "reason_code": reason},
-            separators=(",", ":"),
-        )
+async def run_cloud() -> int:
+    report = await run_cloud_smoke(
+        clock=lambda: datetime.now(timezone.utc),
     )
-    return 0
+    print(report.model_dump_json())
+    return 0 if report.overall in {"PASS", "SKIP"} else 1
 
 
 def main() -> int:
     args = parse_args()
     if args.source:
         return asyncio.run(run_source())
-    return cloud_skip()
+    return asyncio.run(run_cloud())
 
 
 if __name__ == "__main__":

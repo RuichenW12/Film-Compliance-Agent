@@ -20,6 +20,7 @@ from .adapters.http_source import HttpSourceFetcher
 from .adapters.pubsub_event import PubSubEventPublisher
 from .interfaces import PolicyRepository
 from .launch import PolicyRunLauncher
+from .models import PolicySource
 from .outbox import EventPublisher, OutboxDispatcher
 from .publish import PolicyPublisher
 from .refresh import BlobStore, PolicyRefreshModule, ProposalModel, SourceFetcher
@@ -87,8 +88,10 @@ class CloudAdapterFactories:
 
 @dataclass(frozen=True)
 class CloudPolicyRuntime:
+    sources: Mapping[str, PolicySource]
     repository: PolicyRepository
     blob_store: BlobStore
+    proposal_model: ProposalModel
     refresh: PolicyRefreshModule
     launcher: PolicyRunLauncher
     publisher: PolicyPublisher
@@ -170,8 +173,10 @@ def build_cloud_policy_runtime(
     publisher = PolicyPublisher(repository)
     dispatcher = OutboxDispatcher(repository, event_publisher)
     return CloudPolicyRuntime(
+        sources=dict(sources),
         repository=repository,
         blob_store=blob_store,
+        proposal_model=proposal_model,
         refresh=refresh,
         launcher=launcher,
         publisher=publisher,
