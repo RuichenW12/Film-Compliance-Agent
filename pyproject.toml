@@ -21,10 +21,20 @@ test = [
   "httpx2>=2.12,<3",
   "pytest>=8,<9",
 ]
+cloud = [
+  "google-cloud-firestore>=2.28,<3",
+  "google-cloud-pubsub>=2.39,<3",
+  "google-cloud-storage>=3.13,<4",
+  "google-genai>=1,<2",
+]
 
 [tool.pytest.ini_options]
 addopts = "-q"
 testpaths = ["tests"]
 
 [tool.setuptools.packages.find]
-include = ["api*", "schemas*", "workers*"]
+include = ["api*", "policy*", "prompts*", "schemas*", "workers*"]
+
+[tool.setuptools.package-data]
+policy = ["*.yaml"]
+"prompts.policy" = ["*.md"]
