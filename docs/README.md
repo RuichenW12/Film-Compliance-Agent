@@ -15,6 +15,7 @@ Planned document groups include:
 - [Richard policy loop v1 scope](superpowers/specs/2026-08-22-richard-policy-loop-v1-design.md)
 - [Richard policy loop v1 technical design](technical/policy-loop-v1-tdd.md)
 - [Policy loop Gate 1 implementation plan](superpowers/plans/2026-08-23-policy-loop-gate1.md)
+- [Product workflow v1 implementation status](technical/product-workflow-v1-status.md)
 
 Documentation must distinguish proposed design, local verification, deployed verification, and unresolved assumptions.
 
