@@ -18,7 +18,12 @@ SOURCE = PolicySource(
 )
 
 
-def run_fetch(handler, *, max_bytes: int = 5 * 1024 * 1024):
+def run_fetch(
+    handler,
+    *,
+    max_bytes: int = 5 * 1024 * 1024,
+    timeout_seconds: float = 20.0,
+):
     async def execute():
         async with httpx.AsyncClient(
             transport=httpx.MockTransport(handler),
@@ -27,6 +32,7 @@ def run_fetch(handler, *, max_bytes: int = 5 * 1024 * 1024):
             return await HttpSourceFetcher(
                 client,
                 max_bytes=max_bytes,
+                timeout_seconds=timeout_seconds,
             ).fetch(SOURCE)
 
     return asyncio.run(execute())
@@ -74,6 +80,51 @@ def test_fetch_maps_timeout_to_stable_error() -> None:
 
     assert exc_info.value.code == "POLICY_SOURCE_FETCH_FAILED"
     assert "secret" not in str(exc_info.value)
+
+
+def test_fetch_enforces_total_timeout_across_stream() -> None:
+    class SlowStream(httpx.AsyncByteStream):
+        async def __aiter__(self):
+            for chunk in (b"a", b"b", b"c"):
+                await asyncio.sleep(0.02)
+                yield chunk
+
+    with pytest.raises(PolicySourceFetchError) as exc_info:
+        run_fetch(
+            lambda request: httpx.Response(
+                200,
+                stream=SlowStream(),
+                request=request,
+            ),
+            timeout_seconds=0.03,
+        )
+
+    assert exc_info.value.code == "POLICY_SOURCE_FETCH_FAILED"
+
+
+def test_fetch_stops_streaming_as_soon_as_body_exceeds_limit() -> None:
+    class CountingStream(httpx.AsyncByteStream):
+        def __init__(self) -> None:
+            self.yielded = 0
+
+        async def __aiter__(self):
+            for chunk in (b"aa", b"bb", b"must-not-be-read"):
+                self.yielded += 1
+                yield chunk
+
+    stream = CountingStream()
+
+    with pytest.raises(PolicySourceFetchError):
+        run_fetch(
+            lambda request: httpx.Response(
+                200,
+                stream=stream,
+                request=request,
+            ),
+            max_bytes=3,
+        )
+
+    assert stream.yielded == 2
 
 
 def test_fetch_rejects_final_non_https_url() -> None:

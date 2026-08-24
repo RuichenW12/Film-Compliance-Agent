@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import asyncio
+
 import httpx
 
 from ..models import FetchedSource, PolicySource
@@ -34,10 +36,28 @@ class HttpSourceFetcher:
             headers={"User-Agent": "Film-Compliance-Agent/0.1 policy-monitor"},
         )
         try:
-            response = await client.get(source.url)
-            response.raise_for_status()
-            content = response.content
-        except httpx.HTTPError as exc:
+            async with asyncio.timeout(self._timeout_seconds):
+                async with client.stream("GET", source.url) as response:
+                    response.raise_for_status()
+                    if response.url.scheme != "https":
+                        raise PolicySourceFetchError(
+                            "POLICY_SOURCE_FETCH_FAILED",
+                            "policy source redirect is unsafe",
+                        )
+                    chunks: list[bytes] = []
+                    total_bytes = 0
+                    async for chunk in response.aiter_bytes():
+                        total_bytes += len(chunk)
+                        if total_bytes > self._max_bytes:
+                            raise PolicySourceFetchError(
+                                "POLICY_SOURCE_FETCH_FAILED",
+                                "policy source body is invalid",
+                            )
+                        chunks.append(chunk)
+                    content = b"".join(chunks)
+        except PolicySourceFetchError:
+            raise
+        except (httpx.HTTPError, TimeoutError) as exc:
             raise PolicySourceFetchError(
                 "POLICY_SOURCE_FETCH_FAILED",
                 "policy source request failed",
@@ -46,14 +66,9 @@ class HttpSourceFetcher:
             if owns_client:
                 await client.aclose()
 
-        if not content or len(content) > self._max_bytes:
+        if not content:
             raise PolicySourceFetchError(
                 "POLICY_SOURCE_FETCH_FAILED",
                 "policy source body is invalid",
-            )
-        if response.url.scheme != "https":
-            raise PolicySourceFetchError(
-                "POLICY_SOURCE_FETCH_FAILED",
-                "policy source redirect is unsafe",
             )
         return FetchedSource(content=content, source_url=str(response.url))
