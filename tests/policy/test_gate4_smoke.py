@@ -21,6 +21,16 @@ from workers.policy.repository import InMemoryPolicyRepository
 
 ROOT = Path(__file__).parents[2]
 NOW = datetime(2026, 8, 24, 12, 0, tzinfo=timezone.utc)
+DefaultCredentialsError = type(
+    "DefaultCredentialsError",
+    (Exception,),
+    {"__module__": "google.auth.exceptions"},
+)
+NotFound = type(
+    "NotFound",
+    (Exception,),
+    {"__module__": "google.api_core.exceptions"},
+)
 SOURCE = PolicySource(
     source_id="nrta_micro_drama_management_measures",
     url="https://www.nrta.gov.cn/art/2026/7/31/art_113_73785.html",
@@ -90,7 +100,18 @@ class SecretFailEventPublisher:
         raise RuntimeError("credential secret must not leak")
 
 
-def build_injected_cloud_runtime(tmp_path: Path, *, fail_pubsub: bool = False):
+class MissingTopicEventPublisher:
+    def publish(self, event):
+        _ = event
+        raise NotFound("smoke topic is unavailable")
+
+
+def build_injected_cloud_runtime(
+    tmp_path: Path,
+    *,
+    fail_pubsub: bool = False,
+    missing_topic: bool = False,
+):
     settings = CloudPolicySettings(
         project="film-project",
         gcs_bucket="policy-smoke-bucket",
@@ -107,9 +128,12 @@ def build_injected_cloud_runtime(tmp_path: Path, *, fail_pubsub: bool = False):
             },
         )
     )
-    event_publisher = (
-        SecretFailEventPublisher() if fail_pubsub else FakeEventPublisher()
-    )
+    if fail_pubsub:
+        event_publisher = SecretFailEventPublisher()
+    elif missing_topic:
+        event_publisher = MissingTopicEventPublisher()
+    else:
+        event_publisher = FakeEventPublisher()
     factories = CloudAdapterFactories(
         firestore=lambda project, database: repository,
         gcs=lambda project, bucket: FileBlobStore(tmp_path / "cloud-blobs"),
@@ -148,6 +172,30 @@ def test_cloud_smoke_skips_without_required_settings() -> None:
         report.gemini_status,
         report.pubsub_status,
     } == {"SKIP"}
+
+
+def test_cloud_smoke_skips_when_application_credentials_are_missing() -> None:
+    settings = CloudPolicySettings(
+        project="film-project",
+        gcs_bucket="policy-smoke-bucket",
+        pubsub_topic="policy-smoke",
+    )
+
+    report = asyncio.run(
+        run_cloud_smoke(
+            settings=settings,
+            runtime_builder=lambda selected: (_ for _ in ()).throw(
+                DefaultCredentialsError("credential secret")
+            ),
+            clock=lambda: NOW,
+        )
+    )
+
+    assert report.overall == "SKIP"
+    assert report.stage_code == "POLICY_CLOUD_PREREQUISITE_UNAVAILABLE"
+    assert report.source_status == "SKIP"
+    assert report.pubsub_status == "SKIP"
+    assert "secret" not in report.model_dump_json().lower()
 
 
 def test_cloud_smoke_runs_all_probes_without_persisting_synthetic_proposal(
@@ -207,3 +255,24 @@ def test_cloud_adapter_failure_reports_stable_stage_without_secret(
     assert report.stage_code == "POLICY_CLOUD_PUBSUB_FAILED"
     assert report.message_id is None
     assert "secret" not in report.model_dump_json().lower()
+
+
+def test_cloud_smoke_skips_when_smoke_topic_is_missing(tmp_path: Path) -> None:
+    settings, runtime, _, _, _ = build_injected_cloud_runtime(
+        tmp_path,
+        missing_topic=True,
+    )
+
+    report = asyncio.run(
+        run_cloud_smoke(
+            settings=settings,
+            runtime_builder=lambda selected: runtime,
+            clock=lambda: NOW,
+        )
+    )
+
+    assert report.overall == "SKIP"
+    assert report.source_status == "PASS"
+    assert report.gemini_status == "PASS"
+    assert report.pubsub_status == "SKIP"
+    assert report.stage_code == "POLICY_CLOUD_PREREQUISITE_UNAVAILABLE"

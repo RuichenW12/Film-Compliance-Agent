@@ -31,6 +31,15 @@ from .refresh import (
 
 SmokeStatus = Literal["PASS", "FAIL", "SKIP"]
 
+_CLOUD_PREREQUISITE_ERRORS = {
+    ("google.auth.exceptions", "DefaultCredentialsError"),
+    ("google.auth.exceptions", "RefreshError"),
+    ("google.api_core.exceptions", "Forbidden"),
+    ("google.api_core.exceptions", "NotFound"),
+    ("google.api_core.exceptions", "PermissionDenied"),
+    ("google.api_core.exceptions", "Unauthenticated"),
+}
+
 
 class SourceSmokeReport(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -92,6 +101,20 @@ class _InjectedFailureFetcher:
     async def fetch(self, source: PolicySource) -> FetchedSource:
         _ = source
         raise _InjectedSourceFailure("injected policy source smoke failure")
+
+
+def _cloud_prerequisite_unavailable(error: Exception) -> bool:
+    current: BaseException | None = error
+    seen: set[int] = set()
+    while current is not None and id(current) not in seen:
+        seen.add(id(current))
+        error_type = type(current)
+        if (error_type.__module__, error_type.__name__) in (
+            _CLOUD_PREREQUISITE_ERRORS
+        ):
+            return True
+        current = current.__cause__ or current.__context__
+    return False
 
 
 async def run_source_smoke(
@@ -281,7 +304,12 @@ async def run_cloud_smoke(
 
     try:
         runtime = runtime_builder(settings)
-    except Exception:
+    except Exception as exc:
+        if _cloud_prerequisite_unavailable(exc):
+            return report(
+                overall="SKIP",
+                stage_code="POLICY_CLOUD_PREREQUISITE_UNAVAILABLE",
+            )
         return report(
             overall="FAIL",
             source_status="FAIL",
@@ -309,7 +337,12 @@ async def run_cloud_smoke(
             raise ValueError("cloud seed snapshot is missing")
         state_before = source_state.model_dump_json()
         snapshot_before_json = snapshot_before.model_dump_json()
-    except Exception:
+    except Exception as exc:
+        if _cloud_prerequisite_unavailable(exc):
+            return report(
+                overall="SKIP",
+                stage_code="POLICY_CLOUD_PREREQUISITE_UNAVAILABLE",
+            )
         return report(
             overall="FAIL",
             source_status="FAIL",
@@ -344,7 +377,16 @@ async def run_cloud_smoke(
         )
         if not preserved:
             raise ValueError("last-known-good state changed")
-    except Exception:
+    except Exception as exc:
+        if _cloud_prerequisite_unavailable(exc):
+            return report(
+                overall="SKIP",
+                source_status="PASS",
+                gcs_status="PASS",
+                firestore_status="PASS",
+                normalized_sha256=normalized_sha256,
+                stage_code="POLICY_CLOUD_PREREQUISITE_UNAVAILABLE",
+            )
         return report(
             overall="FAIL",
             source_status="PASS",
@@ -377,7 +419,18 @@ async def run_cloud_smoke(
         )
         if runtime.repository.list_proposals() != proposals_before:
             raise ValueError("Gemini probe persisted a synthetic proposal")
-    except Exception:
+    except Exception as exc:
+        if _cloud_prerequisite_unavailable(exc):
+            return report(
+                overall="SKIP",
+                source_status="PASS",
+                gcs_status="PASS",
+                firestore_status="PASS",
+                failure_status="PASS",
+                normalized_sha256=normalized_sha256,
+                preserved=True,
+                stage_code="POLICY_CLOUD_PREREQUISITE_UNAVAILABLE",
+            )
         return report(
             overall="FAIL",
             source_status="PASS",
@@ -402,7 +455,19 @@ async def run_cloud_smoke(
         message_id = runtime.event_publisher.publish(event)
         if not message_id:
             raise ValueError("Pub/Sub message ID is empty")
-    except Exception:
+    except Exception as exc:
+        if _cloud_prerequisite_unavailable(exc):
+            return report(
+                overall="SKIP",
+                source_status="PASS",
+                gcs_status="PASS",
+                firestore_status="PASS",
+                failure_status="PASS",
+                gemini_status="PASS",
+                normalized_sha256=normalized_sha256,
+                preserved=True,
+                stage_code="POLICY_CLOUD_PREREQUISITE_UNAVAILABLE",
+            )
         return report(
             overall="FAIL",
             source_status="PASS",
