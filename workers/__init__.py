@@ -1,1 +1,1 @@
-"""Executable worker packages."""
+"""Asynchronous jobs, event consumers, and executable worker packages."""

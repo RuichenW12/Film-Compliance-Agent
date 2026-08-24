@@ -70,7 +70,9 @@ export class PolicyApiError extends Error {
 }
 
 const API_BASE =
-  process.env.NEXT_PUBLIC_POLICY_API_BASE_URL ?? "http://127.0.0.1:8000";
+  process.env.NEXT_PUBLIC_POLICY_API_BASE_URL ??
+  process.env.NEXT_PUBLIC_API_BASE ??
+  "http://localhost:8080";
 
 async function decodePolicyError(response: Response): Promise<PolicyApiError> {
   try {

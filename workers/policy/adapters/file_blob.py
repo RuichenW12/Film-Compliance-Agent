@@ -6,7 +6,8 @@ from datetime import datetime
 from hashlib import sha256
 import json
 from pathlib import Path
-from urllib.parse import unquote, urlparse
+from urllib.parse import urlparse
+from urllib.request import url2pathname
 
 from ..models import BlobRef, PolicyDiff
 
@@ -74,7 +75,11 @@ class FileBlobStore:
         parsed = urlparse(uri)
         if parsed.scheme != "file" or parsed.netloc not in {"", "localhost"}:
             raise ValueError("FileBlobStore only accepts file:// URIs")
-        path = Path(unquote(parsed.path)).resolve()
+        # On Windows urlparse keeps the slash before the drive letter, so
+        # Path("/D:/x") becomes the drive-relative "D:x" and the containment
+        # check below fails. url2pathname handles that and the percent decoding
+        # on both platforms.
+        path = Path(url2pathname(parsed.path)).resolve()
         if not path.is_relative_to(self._root):
             raise ValueError("blob URI is outside the configured root")
         return path

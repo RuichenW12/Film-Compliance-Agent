@@ -1,0 +1,40 @@
+# Local development stack. Ports follow API contract v1 section 8.
+services:
+  firestore:
+    image: gcr.io/google.com/cloudsdktool/google-cloud-cli:emulators
+    command: >
+      gcloud emulators firestore start
+      --host-port=0.0.0.0:8791
+    ports:
+      - "8791:8791"
+
+  pubsub:
+    image: gcr.io/google.com/cloudsdktool/google-cloud-cli:emulators
+    command: >
+      gcloud beta emulators pubsub start
+      --project=${GOOGLE_CLOUD_PROJECT:-film-agent-local}
+      --host-port=0.0.0.0:8792
+    ports:
+      - "8792:8792"
+
+  api:
+    build:
+      context: .
+      dockerfile: infra/api.Dockerfile
+    command: uvicorn api.main:app --host 0.0.0.0 --port 8080 --reload
+    environment:
+      GOOGLE_CLOUD_PROJECT: ${GOOGLE_CLOUD_PROJECT:-film-agent-local}
+      REGION: ${REGION:-us-central1}
+      FIRESTORE_EMULATOR_HOST: firestore:8791
+      PUBSUB_EMULATOR_HOST: pubsub:8792
+      SNAPSHOT_SEED_PATH: policy/seed-snapshot-v1.yaml
+      INTERNAL_TOKEN: ${INTERNAL_TOKEN:-t_local_internal}
+      VERTEX_MODEL_GEMINI: ${VERTEX_MODEL_GEMINI:-}
+      STORE_BACKEND: ${STORE_BACKEND:-memory}
+    ports:
+      - "8080:8080"
+    volumes:
+      - .:/app
+    depends_on:
+      - firestore
+      - pubsub

@@ -29,7 +29,7 @@ describe("policy API client", () => {
       run_id: "run_001",
     });
     expect(fetchMock).toHaveBeenCalledWith(
-      "http://127.0.0.1:8000/v1/admin/policy/crawl",
+      "http://localhost:8080/v1/admin/policy/crawl",
       expect.objectContaining({
         method: "POST",
         cache: "no-store",
@@ -51,7 +51,7 @@ describe("policy API client", () => {
     await expect(listPendingProposals()).resolves.toEqual([]);
 
     expect(fetchMock).toHaveBeenCalledWith(
-      "http://127.0.0.1:8000/v1/admin/policy/proposals?status=pending",
+      "http://localhost:8080/v1/admin/policy/proposals?status=pending",
       expect.objectContaining({ cache: "no-store" }),
     );
   });
