@@ -11,7 +11,10 @@ Planned product-workstream responsibilities include:
 - internal `recalc-tier` called by the policy update consumer;
 - policy administration endpoints used by `web/app/admin/policy/`.
 
-The API imports shared models from `schemas/`. It must not depend on the internal implementation of `workers/policy/`; policy data is accessed through the snapshot contract.
+Product routers and workflow logic import policy models and reads only through
+the shared `schemas/` snapshot contract. The top-level application composition
+may assemble a `workers/policy/` adapter, but that storage dependency does not
+cross into product logic.
 
 ## Current implementation
 
@@ -40,5 +43,10 @@ uvicorn api.main:app --reload --port 8080
 ```
 
 The policy repository is process-local and resets to the seed v1 snapshot on every restart. That is deliberate fixture behavior, not production authentication or persistence.
+
+In the unified app, lifespan startup creates the policy state first and builds
+the default `AppContext` with a repository-backed `SnapshotService`. Supplying
+an explicit `AppContext` keeps that context unchanged; standalone composition
+continues to default to `FileSnapshotService`.
 
 Routing rule for both sides: routers never mutate state directly. Product routes call `core.workflow_service.WorkflowService`; policy routes call the workers in `workers/policy/`.

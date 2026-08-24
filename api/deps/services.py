@@ -43,12 +43,16 @@ def build_llm(settings: Settings) -> LLMClient:
     )
 
 
-def build_context(settings: Settings | None = None) -> AppContext:
+def build_context(
+    settings: Settings | None = None,
+    *,
+    snapshots: SnapshotService | None = None,
+) -> AppContext:
     settings = settings or Settings.from_env()
     return AppContext(
         settings=settings,
         stores=InMemoryStores(),
-        snapshots=FileSnapshotService(settings.snapshot_path),
+        snapshots=snapshots or FileSnapshotService(settings.snapshot_path),
         clock=SystemClock(),
         llm=build_llm(settings),
     )

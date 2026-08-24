@@ -25,7 +25,7 @@ status becomes `Superseded by D-0xx`. That way the reasoning trail survives.
 | [D-009](#d-009) | Shared | One API process on port 8080 serves both workstreams | Accepted |
 | [D-010](#d-010) | B | Wiring the policy consumer to the live recalc endpoint stays with B | Accepted, open |
 | [D-011](#d-011) | Shared | Two router directories and two auth helpers coexist for now | Accepted, cleanup pending |
-| [D-012](#d-012) | Shared | The product cannot read published snapshots yet | Open, needs an owner |
+| [D-012](#d-012) | Shared | The product cannot read published snapshots yet | Resolved locally by Gate 5-a |
 
 ---
 
@@ -208,7 +208,7 @@ routes depending on `Principal` so role handling lives in one place.
 
 ## D-012
 
-**The product cannot read published snapshots yet** · Area: Shared · Status: Open, needs an owner · 2026-08-23
+**The product cannot read published snapshots yet** · Area: Shared · Status: Resolved locally by Gate 5-a · 2026-08-23
 
 Found by driving the merged demo by hand: publish v2 through the policy console,
 then call `recalc-tier` with `snapshot_version: v2`. It fails, because the two
@@ -243,6 +243,13 @@ ever calls `latest_version`, `get_pack`, and `clause`.
 Owner: undecided. Needs a call between both workstreams before T-B3 is wired,
 since wiring the consumer without this produces a passing test and a broken
 demo.
+
+**Gate 5-a resolution (2026-08-24):** the unified FastAPI composition now
+adapts its policy repository to the existing product-side `SnapshotService`.
+A snapshot published through the admin route is therefore immediately readable
+by `recalc-tier` in the same process. This closes local snapshot visibility only;
+real `policy.updated` fan-out, project selection, deployed services, and cloud
+credentials remain Gate 5-b/deployment evidence.
 
 ## D-013
 

@@ -46,6 +46,11 @@ class OutboxRepository(Protocol):
     ) -> None: ...
 
 
+class SnapshotReadRepository(Protocol):
+    def get_snapshot(self, version: str) -> PolicySnapshot: ...
+    def list_snapshots(self) -> dict[str, PolicySnapshot]: ...
+
+
 class PolicyReadRepository(Protocol):
     def list_runs(self) -> dict[str, PolicyRun]: ...
     def list_proposals(self) -> dict[str, PolicyProposal]: ...
@@ -59,6 +64,7 @@ class PolicyRepository(
     PublicationRepository,
     OutboxRepository,
     PolicyReadRepository,
+    SnapshotReadRepository,
     Protocol,
 ):
     def put_snapshot(self, snapshot: PolicySnapshot) -> None: ...

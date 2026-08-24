@@ -22,6 +22,21 @@ Conventions:
 
 ## 2026-08-24
 
+### Shared — Gate 5-a published snapshot read bridge
+
+- Added a narrow policy snapshot repository read seam and a repository-backed
+  implementation of the existing product `SnapshotService`.
+- Unified FastAPI composition now shares published inline snapshots between
+  admin publication and product recalculation while preserving explicit context
+  injection and the file-backed standalone fallback.
+- Added local HTTP acceptance for `publish v2 -> recalc-tier v2`; event fan-out,
+  cloud deployment, and GCS pack resolution remain outside this gate.
+
+Verified: 193 Python tests via `.venv/bin/python -m pytest`; 12 Vitest tests;
+Next production build; `compileall`; `pip check`; and wheel packaging including
+the new adapter. The live NRTA source smoke returned `PASS`; cloud smoke returned
+`SKIP` (`POLICY_CLOUD_CONFIG_MISSING`), so this is not deployed-cloud evidence.
+
 ### B — policy loop Gate 4: real cloud adapters and bounded source ingestion
 
 - Added the HTTPS source adapter with a 20-second total timeout, redirect

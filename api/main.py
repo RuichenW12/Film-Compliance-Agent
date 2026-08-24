@@ -22,6 +22,7 @@ from api.routes.admin_policy import router as admin_policy_router
 from core.errors import AppError
 from schemas.enums import ErrorCode
 from schemas.snapshot import SnapshotNotFoundError
+from workers.policy.adapters.repository_snapshot import RepositorySnapshotService
 
 from .deps.services import AppContext, build_context
 from .routers import health, internal, projects
@@ -35,16 +36,25 @@ def create_app(
     context: AppContext | None = None,
     policy_state: PolicyApiState | None = None,
 ) -> FastAPI:
+    def install_policy_state(app: FastAPI, resolved: PolicyApiState) -> None:
+        app.state.policy = resolved
+        if context is None:
+            app.state.context = build_context(
+                Settings.from_env(),
+                snapshots=RepositorySnapshotService(resolved.repository),
+            )
+
     @asynccontextmanager
     async def lifespan(app: FastAPI):
         if policy_state is not None:
-            app.state.policy = policy_state
+            install_policy_state(app, policy_state)
             yield
             return
         with TemporaryDirectory(prefix="film-compliance-policy-") as temp_dir:
-            app.state.policy = await build_local_policy_api_state(
+            resolved = await build_local_policy_api_state(
                 Path(temp_dir) / "blobs"
             )
+            install_policy_state(app, resolved)
             yield
 
     app = FastAPI(
@@ -56,7 +66,8 @@ def create_app(
         ),
         lifespan=lifespan,
     )
-    app.state.context = context or build_context(Settings.from_env())
+    if context is not None:
+        app.state.context = context
 
     app.add_middleware(
         CORSMiddleware,
