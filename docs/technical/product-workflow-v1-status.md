@@ -59,9 +59,9 @@ This note records what is running, how it was verified, and what is still assume
 
 ## Open with the policy workstream
 
-1. **`recalc-tier` response shape.** Contract section 4.2 shows `{"changed": false, "reason": "not_provisional"}`, but the frozen `RecalcTierResponse` sets `extra="forbid"` with only three fields, and the contract test asserts the exact dump. The shared model was left untouched; the API returns exactly the three contract fields and reports the reason in the `X-Recalc-Reason` response header and the project timeline. If the policy loop wants the reason in the body, we add an optional `reason` field to the shared model in a PR both owners approve.
+1. **`recalc-tier` response shape.** Settled as [D-006](../decisions.md#d-006): the shared model stays untouched, the body keeps exactly the three contract fields, and the reason travels in the `X-Recalc-Reason` header and the timeline. Nothing consumes a body `reason` today.
 2. **Required facts for the gate.** `core/gate.py` defaults to `title, episode_count, episode_minutes, applicant_entity, investment_structure`, overridable from `p5_form_templates.required_facts`. Once the form template pack carries real fields, the default should stop being used.
-3. **Impact node vocabulary.** `ImpactNode` currently allows `D1c` and `C1-a` only. A policy change that alters form-type rules (p1) or process templates (p4) has no impact node to name, so product code cannot react to it. Worth revisiting before T-B2 publishes proposals.
+3. **Impact node vocabulary.** Settled as [D-007](../decisions.md#d-007): `ImpactNode` stays at `D1c` and `C1-a` for the submission. The demo only exercises a tier-threshold change, and extending a frozen enum touches publisher, consumer, and fixtures on both sides. Revisit at the first policy update that alters p1 or p4.
 
 ## Merge with the policy loop (2026-08-23)
 

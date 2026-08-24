@@ -17,6 +17,20 @@ Read before making any change in this repository.
 - Every Pub/Sub handler is idempotent on `{project_id}:{task_type}:{asset_version}`.
 - Missing model backend is reported as a pending flag, never as a clean result.
 
+## Record what you change
+
+Both workstreams commit to the same repository, days apart, often without
+reading each other's diffs. So:
+
+1. Every pull request that changes behavior adds a `CHANGELOG.md` entry tagged
+   **A**, **B**, or **Shared**. State what changed and what you actually
+   verified — a claim of "tests pass" names the command you ran.
+2. A change the other workstream depends on says so in bold in that entry.
+3. Any choice a later reader could question — contract shape, placeholder data,
+   a deferral, a boundary move — gets an entry in `docs/decisions.md` with its
+   reason and the condition that should make us revisit it. Append the next id;
+   never renumber or delete. A reversal is a new entry that supersedes the old.
+
 ## Boundaries
 
 - `schemas/` is the shared contract. Changing it needs both workstream owners.

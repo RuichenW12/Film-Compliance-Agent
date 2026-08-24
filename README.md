@@ -59,6 +59,16 @@ python -m workers.hello
 | [`infra/`](infra/README.md) | Deployment and cloud-resource definitions |
 | [`docs/`](docs/README.md) | Architecture decisions, runbooks, and delivery notes |
 
+## Tracking changes
+
+Two workstreams share this repository and work in parallel, so every change that
+the other side could trip over is written down:
+
+- [`CHANGELOG.md`](CHANGELOG.md) — what changed, when, and who owns it.
+- [`docs/decisions.md`](docs/decisions.md) — why, and when a choice should be revisited.
+
+Whoever makes the change writes the entry, in the same pull request.
+
 ## Boundary rules
 
 1. `schemas/` is the single shared contract boundary. Changes that affect both workstreams require review from both owners.
