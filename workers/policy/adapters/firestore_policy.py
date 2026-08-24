@@ -66,6 +66,86 @@ class FirestorePolicyRepository:
     def list_runs(self) -> dict[str, PolicyRun]:
         return self._list(self.RUNS, PolicyRun)
 
+    def fail_run(self, run_id: str, error: str, finished_at: datetime) -> None:
+        run_ref = self._document(self.RUNS, run_id)
+
+        def commit(transaction) -> None:
+            run = self._transaction_run(transaction, run_ref)
+            failed = run.model_copy(
+                update={
+                    "status": "failed",
+                    "finished_at": finished_at,
+                    "error": error,
+                }
+            )
+            transaction.set(run_ref, self._dump(failed))
+
+        self._run_transaction(commit)
+
+    def commit_refresh_proposal(
+        self,
+        *,
+        run_id: str,
+        source_id: str,
+        proposal: PolicyProposal,
+        source_state: SourceState,
+        finished_at: datetime,
+        previous_sha256: str,
+        current_sha256: str,
+    ) -> str:
+        run_ref = self._document(self.RUNS, run_id)
+        source_ref = self._document(self.SOURCE_STATES, source_id)
+        proposal_ref = self._client.collection(self.PROPOSALS).document()
+
+        def commit(transaction) -> None:
+            run = self._transaction_running_run(transaction, run_ref)
+            completed = run.model_copy(
+                update={
+                    "status": "proposal_created",
+                    "finished_at": finished_at,
+                    "previous_sha256": previous_sha256,
+                    "current_sha256": current_sha256,
+                    "proposal_id": proposal_ref.id,
+                    "error": None,
+                }
+            )
+            transaction.create(proposal_ref, self._dump(proposal))
+            transaction.set(source_ref, self._dump(source_state))
+            transaction.set(run_ref, self._dump(completed))
+
+        self._run_transaction(commit)
+        return proposal_ref.id
+
+    def commit_refresh_no_change(
+        self,
+        *,
+        run_id: str,
+        source_id: str,
+        source_state: SourceState,
+        finished_at: datetime,
+        previous_sha256: str | None,
+        current_sha256: str,
+    ) -> None:
+        run_ref = self._document(self.RUNS, run_id)
+        source_ref = self._document(self.SOURCE_STATES, source_id)
+
+        def commit(transaction) -> None:
+            run = self._transaction_running_run(transaction, run_ref)
+            completed = run.model_copy(
+                update={
+                    "status": "no_change",
+                    "finished_at": finished_at,
+                    "previous_sha256": previous_sha256,
+                    "current_sha256": current_sha256,
+                    "proposal_id": None,
+                    "error": None,
+                }
+            )
+            transaction.set(source_ref, self._dump(source_state))
+            transaction.set(run_ref, self._dump(completed))
+
+        self._run_transaction(commit)
+
     def get_source_state(self, source_id: str) -> SourceState | None:
         snapshot = self._document(self.SOURCE_STATES, source_id).get()
         if not snapshot.exists:
@@ -101,6 +181,20 @@ class FirestorePolicyRepository:
 
     def _document(self, collection: str, document_id: str):
         return self._client.collection(collection).document(document_id)
+
+    @staticmethod
+    def _transaction_run(transaction, run_ref) -> PolicyRun:
+        snapshot = transaction.get(run_ref)
+        if not snapshot.exists:
+            raise KeyError(f"missing run document: {run_ref.id}")
+        return PolicyRun.model_validate(snapshot.to_dict())
+
+    @classmethod
+    def _transaction_running_run(cls, transaction, run_ref) -> PolicyRun:
+        run = cls._transaction_run(transaction, run_ref)
+        if run.status != "running":
+            raise ValueError("run is not running")
+        return run
 
     def _read(self, collection: str, document_id: str, model: type[ModelT]) -> ModelT:
         snapshot = self._document(collection, document_id).get()

@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta, timezone
+from copy import deepcopy
 
 from pydantic import ValidationError
 import pytest
@@ -55,6 +56,15 @@ def make_proposal() -> PolicyProposal:
         },
         status=ProposalStatus.PENDING,
         published_version=None,
+    )
+
+
+def make_source_state(digest: str = "b" * 64) -> SourceState:
+    return SourceState(
+        last_success_at=NOW,
+        raw_uri="gs://policy-bucket/policy/raw/source/body.html",
+        normalized_uri="gs://policy-bucket/policy/normalized/source/body.txt",
+        normalized_sha256=digest,
     )
 
 
@@ -141,3 +151,123 @@ def test_missing_documents_raise_key_error(read) -> None:
 
     with pytest.raises(KeyError):
         read(repository)
+
+
+def test_refresh_no_change_updates_run_and_source_state_together() -> None:
+    repository, _ = build_repository()
+    repository.create_run("run_001", "source", NOW)
+    state = make_source_state()
+
+    repository.commit_refresh_no_change(
+        run_id="run_001",
+        source_id="source",
+        source_state=state,
+        finished_at=NOW + timedelta(seconds=1),
+        previous_sha256="a" * 64,
+        current_sha256="b" * 64,
+    )
+
+    run = repository.get_run("run_001")
+    assert run.status == "no_change"
+    assert run.previous_sha256 == "a" * 64
+    assert run.current_sha256 == "b" * 64
+    assert repository.get_source_state("source") == state
+
+
+def test_refresh_proposal_creates_auto_id_and_updates_all_state() -> None:
+    repository, _ = build_repository()
+    repository.create_run("run_001", "source", NOW)
+    state = make_source_state()
+
+    proposal_id = repository.commit_refresh_proposal(
+        run_id="run_001",
+        source_id="source",
+        proposal=make_proposal(),
+        source_state=state,
+        finished_at=NOW + timedelta(seconds=1),
+        previous_sha256="a" * 64,
+        current_sha256="b" * 64,
+    )
+
+    assert proposal_id == "auto_001"
+    assert repository.get_proposal(proposal_id) == make_proposal()
+    assert repository.get_source_state("source") == state
+    run = repository.get_run("run_001")
+    assert run.status == "proposal_created"
+    assert run.proposal_id == proposal_id
+
+
+@pytest.mark.parametrize("method", ["no_change", "proposal"])
+def test_missing_run_rolls_back_refresh(method: str) -> None:
+    repository, client = build_repository()
+    before = deepcopy(client.documents)
+
+    with pytest.raises(KeyError):
+        if method == "no_change":
+            repository.commit_refresh_no_change(
+                run_id="missing",
+                source_id="source",
+                source_state=make_source_state(),
+                finished_at=NOW,
+                previous_sha256=None,
+                current_sha256="b" * 64,
+            )
+        else:
+            repository.commit_refresh_proposal(
+                run_id="missing",
+                source_id="source",
+                proposal=make_proposal(),
+                source_state=make_source_state(),
+                finished_at=NOW,
+                previous_sha256="a" * 64,
+                current_sha256="b" * 64,
+            )
+
+    assert client.documents == before
+
+
+def test_non_running_run_rolls_back_refresh_proposal() -> None:
+    repository, client = build_repository()
+    repository.create_run("run_001", "source", NOW)
+    repository.commit_refresh_no_change(
+        run_id="run_001",
+        source_id="source",
+        source_state=make_source_state(),
+        finished_at=NOW,
+        previous_sha256=None,
+        current_sha256="b" * 64,
+    )
+    before = deepcopy(client.documents)
+
+    with pytest.raises(ValueError, match="run is not running"):
+        repository.commit_refresh_proposal(
+            run_id="run_001",
+            source_id="source",
+            proposal=make_proposal(),
+            source_state=make_source_state("c" * 64),
+            finished_at=NOW,
+            previous_sha256="b" * 64,
+            current_sha256="c" * 64,
+        )
+
+    assert client.documents == before
+
+
+def test_fail_run_preserves_hashes_and_source_state() -> None:
+    repository, client = build_repository()
+    repository.create_run("run_001", "source", NOW)
+    state = make_source_state("a" * 64)
+    repository.put_source_state("source", state)
+    client.documents["policy_runs/run_001"].update(
+        previous_sha256="0" * 64,
+        current_sha256="a" * 64,
+    )
+
+    repository.fail_run("run_001", "POLICY_REFRESH_FAILED", NOW)
+
+    run = repository.get_run("run_001")
+    assert run.status == "failed"
+    assert run.error == "POLICY_REFRESH_FAILED"
+    assert run.previous_sha256 == "0" * 64
+    assert run.current_sha256 == "a" * 64
+    assert repository.get_source_state("source") == state
