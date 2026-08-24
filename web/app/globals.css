@@ -1,0 +1,69 @@
+:root {
+  color-scheme: light dark;
+  font-family: ui-sans-serif, system-ui, "Segoe UI", sans-serif;
+  --line: color-mix(in srgb, currentColor 15%, transparent);
+}
+
+body {
+  margin: 0;
+  line-height: 1.5;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  padding: 0.75rem 1.5rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.topbar nav {
+  display: flex;
+  gap: 1rem;
+  margin-right: auto;
+}
+
+.role-switcher {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+}
+
+main {
+  padding: 1.5rem;
+  max-width: 60rem;
+}
+
+.card {
+  border: 1px solid var(--line);
+  border-radius: 0.5rem;
+  padding: 1rem;
+  margin-bottom: 1rem;
+}
+
+.badge {
+  display: inline-block;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 0.125rem 0.625rem;
+  font-size: 0.75rem;
+  margin-right: 0.5rem;
+}
+
+label {
+  display: block;
+  margin-bottom: 0.75rem;
+}
+
+label span {
+  display: inline-block;
+  min-width: 12rem;
+}
+
+.disclaimer {
+  padding: 1rem 1.5rem;
+  border-top: 1px solid var(--line);
+  font-size: 0.8125rem;
+  opacity: 0.75;
+}
