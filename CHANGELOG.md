@@ -22,6 +22,28 @@ Conventions:
 
 ## 2026-08-24
 
+### Shared — one router directory
+
+- `api/routes/admin_policy.py` moved to `api/routers/admin_policy.py` and the
+  now-empty `api/routes/` package was deleted. The two directories were the same
+  concept one letter apart, left over from the workstream merge.
+- The moved file is unchanged apart from its location: it keeps its absolute
+  `api.…` imports and its own style, so the diff is a rename plus one import
+  line in `api/main.py`. No route path, response, guard, or contract changed.
+- **B should know.** This moves a B-owned file. Nothing in `workers/policy/` or
+  `web/app/admin/policy/` was touched, and `/v1/admin/policy/*` behaves exactly
+  as before, but an in-flight branch that edits `api/routes/admin_policy.py`
+  will need to re-target the new path. Reasoning in
+  [D-011](docs/decisions.md#d-011).
+- The other half of D-011 is deliberately **not** done: `require_admin` and
+  `Principal` still coexist, because consolidating them changes how a policy
+  route authorizes and that wants B's agreement, not just B's awareness.
+
+Verified: `python -m pytest` — 193 passed, including
+`tests/policy/test_admin_routes.py`, which exercises the moved router through
+the app factory.
+
+
 ### Shared — Gate 5-a published snapshot read bridge
 
 - Added a narrow policy snapshot repository read seam and a repository-backed

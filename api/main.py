@@ -18,7 +18,7 @@ from fastapi.responses import JSONResponse
 
 from api.deps.policy import PolicyApiState, build_local_policy_api_state
 from api.errors import install_policy_error_handler
-from api.routes.admin_policy import router as admin_policy_router
+from api.routers.admin_policy import router as admin_policy_router
 from core.errors import AppError
 from schemas.enums import ErrorCode
 from schemas.snapshot import SnapshotNotFoundError

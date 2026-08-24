@@ -32,7 +32,7 @@ Still to build: materials and uploads, review triggers, findings actions, form p
 
 Policy workstream (B):
 
-- `routes/admin_policy.py` — `/v1/admin/policy`: launch the deterministic `fixture://policy-v2` refresh, read run status, list and review proposals, publish or discard, and list snapshot history.
+- `routers/admin_policy.py` — `/v1/admin/policy`: launch the deterministic `fixture://policy-v2` refresh, read run status, list and review proposals, publish or discard, and list snapshot history.
 - `deps/policy.py` builds the process-local policy state during lifespan startup and guards the routes with `X-Mock-Role: admin`.
 - `errors.py` renders `PolicyApiError` into the same error envelope.
 

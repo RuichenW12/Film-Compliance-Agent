@@ -94,7 +94,8 @@ all of which touch Richard's files and want his review:
    layout (top bar, role switcher, disclaimer) now wraps the policy pages too.
 6. **Two router directories.** `api/routes/` (policy) and `api/routers/`
    (product) both exist. Nothing breaks, but one of them should be renamed once
-   we agree which.
+   we agree which. **Resolved 2026-08-24:** `api/routers/` won; `admin_policy.py`
+   moved and `api/routes/` is gone. See [D-011](../decisions.md#d-011).
 7. **Two auth helpers.** `api/deps/policy.require_admin` reads `X-Mock-Role`
    directly; `api/deps/demo_auth.Principal` covers the product routes. Worth
    consolidating on the `Principal` dependency.
