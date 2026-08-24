@@ -15,7 +15,7 @@ from schemas.policy_snapshot import (
     ProposalStatus,
     SnapshotDiff,
 )
-from fakes.firestore import FakeFirestoreClient
+from fakes.firestore import FakeFirestoreClient, FakeTransaction
 from workers.policy.adapters.firestore_policy import FirestorePolicyRepository
 from workers.policy.models import SourceState
 
@@ -26,6 +26,16 @@ NOW = datetime(2026, 8, 24, 12, 0, tzinfo=timezone.utc)
 def build_repository():
     client = FakeFirestoreClient()
     return FirestorePolicyRepository(client, client.run_transaction), client
+
+
+class SdkLikeFakeTransaction(FakeTransaction):
+    def get(self, reference):
+        return iter([super().get(reference)])
+
+
+class SdkLikeFakeFirestoreClient(FakeFirestoreClient):
+    def transaction(self):
+        return SdkLikeFakeTransaction(self)
 
 
 def make_snapshot(version: str) -> PolicySnapshot:
@@ -293,6 +303,23 @@ def test_fail_run_preserves_hashes_and_source_state() -> None:
     assert run.previous_sha256 == "0" * 64
     assert run.current_sha256 == "a" * 64
     assert repository.get_source_state("source") == state
+
+
+def test_firestore_transactions_accept_sdk_streamed_document_get() -> None:
+    client = SdkLikeFakeFirestoreClient()
+    repository = FirestorePolicyRepository(client, client.run_transaction)
+    repository.create_run("run_sdk", "source", NOW)
+
+    repository.commit_refresh_no_change(
+        run_id="run_sdk",
+        source_id="source",
+        source_state=make_source_state(),
+        finished_at=NOW,
+        previous_sha256=None,
+        current_sha256="b" * 64,
+    )
+
+    assert repository.get_run("run_sdk").status == "no_change"
 
 
 def test_publication_updates_proposal_and_creates_snapshot_and_outbox() -> None:

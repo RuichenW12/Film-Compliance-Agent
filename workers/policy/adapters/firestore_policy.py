@@ -206,15 +206,23 @@ class FirestorePolicyRepository:
         outbox_ref = self._document(self.OUTBOX, outbox_id)
 
         def commit(transaction) -> None:
-            proposal_snapshot = transaction.get(proposal_ref)
-            if not proposal_snapshot.exists:
+            proposal_snapshot = self._transaction_snapshot(
+                transaction, proposal_ref
+            )
+            if proposal_snapshot is None or not proposal_snapshot.exists:
                 raise KeyError(f"missing proposal document: {proposal_id}")
             proposal = PolicyProposal.model_validate(proposal_snapshot.to_dict())
             if proposal.status is not ProposalStatus.PENDING:
                 raise ValueError("proposal is not pending")
-            if transaction.get(snapshot_ref).exists:
+            existing_snapshot = self._transaction_snapshot(
+                transaction, snapshot_ref
+            )
+            if existing_snapshot is not None and existing_snapshot.exists:
                 raise ValueError("snapshot already exists")
-            if transaction.get(outbox_ref).exists:
+            existing_outbox = self._transaction_snapshot(
+                transaction, outbox_ref
+            )
+            if existing_outbox is not None and existing_outbox.exists:
                 raise ValueError("outbox already exists")
 
             proposal_data = proposal.model_dump(mode="python")
@@ -233,8 +241,10 @@ class FirestorePolicyRepository:
         proposal_ref = self._document(self.PROPOSALS, proposal_id)
 
         def commit(transaction) -> None:
-            proposal_snapshot = transaction.get(proposal_ref)
-            if not proposal_snapshot.exists:
+            proposal_snapshot = self._transaction_snapshot(
+                transaction, proposal_ref
+            )
+            if proposal_snapshot is None or not proposal_snapshot.exists:
                 raise KeyError(f"missing proposal document: {proposal_id}")
             proposal = PolicyProposal.model_validate(proposal_snapshot.to_dict())
             if proposal.status is not ProposalStatus.PENDING:
@@ -271,8 +281,10 @@ class FirestorePolicyRepository:
         outbox_ref = self._document(self.OUTBOX, outbox_id)
 
         def commit(transaction) -> None:
-            outbox_snapshot = transaction.get(outbox_ref)
-            if not outbox_snapshot.exists:
+            outbox_snapshot = self._transaction_snapshot(
+                transaction, outbox_ref
+            )
+            if outbox_snapshot is None or not outbox_snapshot.exists:
                 raise KeyError(f"missing outbox document: {outbox_id}")
             outbox = PolicyOutbox.model_validate(outbox_snapshot.to_dict())
             if outbox.status is not OutboxStatus.PENDING:
@@ -295,10 +307,24 @@ class FirestorePolicyRepository:
 
     @staticmethod
     def _transaction_run(transaction, run_ref) -> PolicyRun:
-        snapshot = transaction.get(run_ref)
-        if not snapshot.exists:
+        snapshot = FirestorePolicyRepository._transaction_snapshot(
+            transaction, run_ref
+        )
+        if snapshot is None or not snapshot.exists:
             raise KeyError(f"missing run document: {run_ref.id}")
         return PolicyRun.model_validate(snapshot.to_dict())
+
+    @staticmethod
+    def _transaction_snapshot(transaction, reference):
+        result = transaction.get(reference)
+        if hasattr(result, "exists"):
+            return result
+        snapshots = list(result)
+        if not snapshots:
+            return None
+        if len(snapshots) != 1:
+            raise ValueError("document transaction read returned multiple snapshots")
+        return snapshots[0]
 
     @classmethod
     def _transaction_running_run(cls, transaction, run_ref) -> PolicyRun:
