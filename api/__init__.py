@@ -1,1 +1,1 @@
-"""Film Compliance Agent HTTP API."""
+"""Product-facing, internal, and policy administration HTTP API (FastAPI)."""

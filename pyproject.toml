@@ -5,19 +5,24 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "film-compliance-agent"
 version = "0.1.0"
-description = "Film compliance policy loop"
+description = "Compliance workflow and policy loop for micro-drama filing"
 requires-python = ">=3.11"
 dependencies = [
   "beautifulsoup4>=4.13,<5",
   "fastapi>=0.116,<1",
   "pydantic>=2.11,<3",
   "PyYAML>=6,<7",
-  "uvicorn>=0.35,<1",
+  "uvicorn[standard]>=0.35,<1",
 ]
 
 [project.optional-dependencies]
+vertex = [
+  "google-genai>=1.0,<2",
+]
 test = [
-  "httpx2>=2.12,<3",
+  # Starlette's TestClient imports `httpx`; the `httpx2` distribution ships a
+  # module named `httpx2` and does not satisfy it.
+  "httpx>=0.27,<1",
   "pytest>=8,<9",
 ]
 
@@ -26,4 +31,4 @@ addopts = "-q"
 testpaths = ["tests"]
 
 [tool.setuptools.packages.find]
-include = ["api*", "schemas*", "workers*"]
+include = ["api*", "core*", "schemas*", "store*", "workers*"]

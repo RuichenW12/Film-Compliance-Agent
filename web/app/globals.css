@@ -460,3 +460,68 @@ pre {
     width: 100%;
   }
 }
+
+/* Product shell (workstream A): top bar, role switcher, cards, and badges. */
+
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  padding: 0.75rem 1.5rem;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+
+.topbar nav {
+  display: flex;
+  gap: 1rem;
+  margin-right: auto;
+}
+
+.role-switcher {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+  color: var(--muted);
+}
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  padding: 1rem;
+  margin-bottom: 1rem;
+}
+
+.badge {
+  display: inline-block;
+  border: 1px solid var(--border);
+  background: var(--soft-blue);
+  border-radius: 999px;
+  padding: 0.125rem 0.625rem;
+  font-size: 0.75rem;
+  margin-right: 0.5rem;
+}
+
+.disclaimer {
+  padding: 1rem 1.5rem;
+  border-top: 1px solid var(--border);
+  font-size: 0.8125rem;
+  color: var(--muted);
+}
+
+main {
+  padding: 1.5rem;
+  max-width: 60rem;
+}
+
+main label {
+  display: block;
+  margin-bottom: 0.75rem;
+}
+
+main label span {
+  display: inline-block;
+  min-width: 12rem;
+}

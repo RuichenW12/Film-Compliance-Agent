@@ -33,7 +33,7 @@ def policy_state(tmp_path: Path) -> PolicyApiState:
 
 @pytest.fixture
 def api_client(policy_state: PolicyApiState):
-    with TestClient(create_app(policy_state)) as client:
+    with TestClient(create_app(policy_state=policy_state)) as client:
         yield client
 
 
@@ -306,7 +306,7 @@ def test_dispatch_failure_does_not_rollback_successful_publish(
         ),
     )
 
-    with TestClient(create_app(state)) as client:
+    with TestClient(create_app(policy_state=state)) as client:
         response = admin_post(
             client,
             f"/v1/admin/policy/proposals/{proposal_id}/publish",
