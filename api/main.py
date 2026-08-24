@@ -21,6 +21,7 @@ from api.errors import install_policy_error_handler
 from api.routes.admin_policy import router as admin_policy_router
 from core.errors import AppError
 from schemas.enums import ErrorCode
+from schemas.snapshot import SnapshotNotFoundError
 
 from .deps.services import AppContext, build_context
 from .routers import health, internal, projects
@@ -73,6 +74,23 @@ def create_app(
     @app.exception_handler(AppError)
     async def handle_app_error(_: Request, exc: AppError) -> JSONResponse:
         return JSONResponse(status_code=exc.status_code, content=exc.envelope())
+
+    @app.exception_handler(SnapshotNotFoundError)
+    async def handle_snapshot_not_found(
+        _: Request, exc: SnapshotNotFoundError
+    ) -> JSONResponse:
+        """A version the product cannot read is a 404, not a crash."""
+
+        return JSONResponse(
+            status_code=404,
+            content={
+                "error": {
+                    "code": ErrorCode.NOT_FOUND.value,
+                    "message": str(exc),
+                    "details": {"hint": "the product reads snapshots through SnapshotService"},
+                }
+            },
+        )
 
     @app.exception_handler(RequestValidationError)
     async def handle_validation_error(

@@ -25,6 +25,7 @@ status becomes `Superseded by D-0xx`. That way the reasoning trail survives.
 | [D-009](#d-009) | Shared | One API process on port 8080 serves both workstreams | Accepted |
 | [D-010](#d-010) | B | Wiring the policy consumer to the live recalc endpoint stays with B | Accepted, open |
 | [D-011](#d-011) | Shared | Two router directories and two auth helpers coexist for now | Accepted, cleanup pending |
+| [D-012](#d-012) | Shared | The product cannot read published snapshots yet | Open, needs an owner |
 
 ---
 
@@ -204,3 +205,41 @@ with in-flight branches for no functional gain.
 
 Cleanup, once both sides are between tasks: one router directory, and the policy
 routes depending on `Principal` so role handling lives in one place.
+
+## D-012
+
+**The product cannot read published snapshots yet** · Area: Shared · Status: Open, needs an owner · 2026-08-23
+
+Found by driving the merged demo by hand: publish v2 through the policy console,
+then call `recalc-tier` with `snapshot_version: v2`. It fails, because the two
+sides hold snapshots in different places.
+
+- The product reads policy only through `SnapshotService`. The only
+  implementation is `FileSnapshotService`, which loads
+  `policy/seed-snapshot-v1.yaml` and therefore knows exactly one version, v1.
+- The policy loop writes published snapshots into its own repository
+  (`InMemoryPolicyRepository` today, Firestore plus GCS later).
+
+Nothing bridges them, so every snapshot the loop publishes is invisible to the
+product. The full demo sequence — publish a snapshot, a provisional project
+recalculates, the creator is notified — cannot complete until it is bridged,
+independently of [D-010](#d-010).
+
+The immediate 500 was fixed: an unreadable version now returns a 404 in the
+contract envelope rather than crashing.
+
+Options, roughly in order of effort:
+
+1. a `SnapshotService` implementation backed by the policy repository, injected
+   into the product context — small, local, and enough for the demo;
+2. the policy publisher also writing each published snapshot to a path the file
+   adapter reads — simplest, but two copies of the truth;
+3. both sides reading Firestore and GCS, which is where the design lands anyway
+   and which the deployment tasks require.
+
+The interface is already the right one and does not change: the product only
+ever calls `latest_version`, `get_pack`, and `clause`.
+
+Owner: undecided. Needs a call between both workstreams before T-B3 is wired,
+since wiring the consumer without this produces a passing test and a broken
+demo.
