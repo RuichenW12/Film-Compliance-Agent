@@ -10,4 +10,8 @@ Planned worker families:
 
 Workers communicate through schemas and events defined in `schemas/`. At-least-once delivery is assumed, so every future consumer must be idempotent.
 
-No worker implementation exists in this scaffold.
+## Current implementation
+
+- `hello.py` — Vertex AI wiring check (`python -m workers.hello`). It proves the ADC identity can reach Gemini and that structured output round-trips; it makes no compliance judgement.
+
+Still to build: the fact extractor, the scene review worker, the notification consumer, and the push routes on port 8081.
