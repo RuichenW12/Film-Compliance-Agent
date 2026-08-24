@@ -2,7 +2,7 @@
 
 **Date:** 2026-08-24
 **Owner:** Richard (workstream B), with the existing workstream A read seam
-**Status:** Approved direction; pending written-spec review
+**Status:** Approved for implementation
 **Decision superseded/closed by this work:** D-012 once acceptance passes
 
 ## 1. Problem
