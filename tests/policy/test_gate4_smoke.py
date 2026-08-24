@@ -31,6 +31,14 @@ NotFound = type(
     (Exception,),
     {"__module__": "google.api_core.exceptions"},
 )
+
+
+class ClientError(Exception):
+    __module__ = "google.genai.errors"
+
+    def __init__(self, code: int) -> None:
+        self.code = code
+        super().__init__("model resource is unavailable")
 SOURCE = PolicySource(
     source_id="nrta_micro_drama_management_measures",
     url="https://www.nrta.gov.cn/art/2026/7/31/art_113_73785.html",
@@ -106,11 +114,18 @@ class MissingTopicEventPublisher:
         raise NotFound("smoke topic is unavailable")
 
 
+class MissingModelProposal:
+    async def draft(self, request):
+        _ = request
+        raise ClientError(404)
+
+
 def build_injected_cloud_runtime(
     tmp_path: Path,
     *,
     fail_pubsub: bool = False,
     missing_topic: bool = False,
+    missing_model: bool = False,
 ):
     settings = CloudPolicySettings(
         project="film-project",
@@ -128,6 +143,8 @@ def build_injected_cloud_runtime(
             },
         )
     )
+    if missing_model:
+        proposal_model = MissingModelProposal()
     if fail_pubsub:
         event_publisher = SecretFailEventPublisher()
     elif missing_topic:
@@ -274,5 +291,27 @@ def test_cloud_smoke_skips_when_smoke_topic_is_missing(tmp_path: Path) -> None:
     assert report.overall == "SKIP"
     assert report.source_status == "PASS"
     assert report.gemini_status == "PASS"
+    assert report.pubsub_status == "SKIP"
+    assert report.stage_code == "POLICY_CLOUD_PREREQUISITE_UNAVAILABLE"
+
+
+def test_cloud_smoke_skips_when_gemini_model_is_missing(tmp_path: Path) -> None:
+    settings, runtime, _, _, _ = build_injected_cloud_runtime(
+        tmp_path,
+        missing_model=True,
+    )
+
+    report = asyncio.run(
+        run_cloud_smoke(
+            settings=settings,
+            runtime_builder=lambda selected: runtime,
+            clock=lambda: NOW,
+        )
+    )
+
+    assert report.overall == "SKIP"
+    assert report.source_status == "PASS"
+    assert report.failure_status == "PASS"
+    assert report.gemini_status == "SKIP"
     assert report.pubsub_status == "SKIP"
     assert report.stage_code == "POLICY_CLOUD_PREREQUISITE_UNAVAILABLE"

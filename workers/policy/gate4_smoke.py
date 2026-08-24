@@ -113,6 +113,12 @@ def _cloud_prerequisite_unavailable(error: Exception) -> bool:
             _CLOUD_PREREQUISITE_ERRORS
         ):
             return True
+        if (
+            error_type.__module__ == "google.genai.errors"
+            and error_type.__name__ in {"APIError", "ClientError"}
+            and getattr(current, "code", None) in {401, 403, 404}
+        ):
+            return True
         current = current.__cause__ or current.__context__
     return False
 
