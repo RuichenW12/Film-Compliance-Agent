@@ -29,5 +29,13 @@
   "alert.impact.consult_authority": "Timeline depends on the authority",
   "alert.dept.pending": "Competent authority to be confirmed",
   "alert.subject_edge_case": "This subject sits on a boundary and needs a human decision",
-  "field.pending": "待补充 (to be completed)"
+  "field.pending": "待补充 (to be completed)",
+  "notification.policy_stale.title": "A policy update may affect this project",
+  "notification.policy_stale.body": "Snapshot {snapshot_version} was published. Review the project before the pre-shoot gate.",
+  "notification.tier_recalculated.title": "The tier was recalculated",
+  "notification.tier_recalculated.body": "Snapshot {snapshot_version} moved this project from {previous_tier} to {tier}.",
+  "notifications.title": "Notifications",
+  "notifications.empty": "No notifications yet.",
+  "notifications.mark_read": "Mark read",
+  "notifications.unread_only": "Unread only"
 }
