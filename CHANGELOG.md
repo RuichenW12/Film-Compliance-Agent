@@ -22,6 +22,21 @@ Conventions:
 
 ## 2026-08-23
 
+### A — an unknown snapshot version returned 500 instead of the error envelope (fixed)
+
+`SnapshotNotFoundError` is a `LookupError`, not an `AppError`, so asking
+`recalc-tier` for a version the product cannot read crashed the request. It now
+returns a 404 in the contract envelope. Found by manually driving the merged
+demo: publish v2 through the policy console, then call `recalc-tier` with
+`snapshot_version: v2`.
+
+**Shared, and blocking the closed loop:** that call is *supposed* to succeed. The
+product reads policy through `FileSnapshotService`, which only knows
+`policy/seed-snapshot-v1.yaml`, while the policy loop publishes new snapshots
+into its own repository. Nothing yet bridges the two, so a published v2 is
+invisible to the product side. See [D-012](docs/decisions.md#d-012).
+
+
 ### Shared — policy loop merged with the product workflow (PR #7)
 
 Both workstreams now run as one FastAPI process and one Next.js app.

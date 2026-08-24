@@ -208,3 +208,20 @@ def test_policy_stale_flag_never_changes_the_classification(client):
     after = client.get(f"/v1/projects/{project_id}").json()["project"]
     assert after["policy_stale"] is True
     assert after["classification"]["tier"] == before["classification"]["tier"]
+
+
+def test_unknown_snapshot_version_is_a_clean_404(client):
+    """The policy loop may name a version the product cannot read yet."""
+
+    project_id = create_project(client)
+    client.post(f"/v1/projects/{project_id}/intent", json=ROMANCE_INTENT)
+    client.post(f"/v1/projects/{project_id}/classify")
+
+    response = client.post(
+        f"/v1/internal/projects/{project_id}/recalc-tier",
+        json={"snapshot_version": "v99"},
+        headers={"X-Internal-Token": INTERNAL_TOKEN},
+    )
+    assert response.status_code == 404
+    assert response.json()["error"]["code"] == "NOT_FOUND"
+    assert "v99" in response.json()["error"]["message"]
