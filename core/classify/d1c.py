@@ -30,9 +30,15 @@ class TierDecision:
     comparison_card: list[dict] = field(default_factory=list)
 
 
+# The pack may carry the flag under either key: `thresholds_published` is what
+# the policy loop publishes, `official_published` is the older TDD spelling.
+PUBLISHED_KEYS = ("thresholds_published", "official_published")
+
+
 def _thresholds_published(pack3: dict, snapshot_thresholds_published: bool | None) -> bool:
-    if "official_published" in pack3:
-        return bool(pack3["official_published"])
+    for key in PUBLISHED_KEYS:
+        if key in pack3:
+            return bool(pack3[key])
     if snapshot_thresholds_published is not None:
         return bool(snapshot_thresholds_published)
     return False

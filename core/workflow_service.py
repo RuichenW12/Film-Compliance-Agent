@@ -25,7 +25,7 @@ from schemas.snapshot import SnapshotService
 
 from .classify import classify
 from .classify.chain import ClassificationOutcome
-from .classify.d1c import judge_tier
+from .classify.d1c import PUBLISHED_KEYS, judge_tier
 from .clock import Clock
 from .errors import NotFoundError, StateInvalidError
 from .gate import GateResult, evaluate_gate_d3
@@ -271,8 +271,9 @@ class WorkflowService:
 
     def _thresholds_published(self, version: str | None = None) -> bool | None:
         pack = self._snapshots.get_pack(PackName.P3_TIER_THRESHOLDS, version)
-        if "official_published" in pack:
-            return bool(pack["official_published"])
+        for key in PUBLISHED_KEYS:
+            if key in pack:
+                return bool(pack[key])
         thresholds = pack.get("thresholds")
         return bool(thresholds)
 

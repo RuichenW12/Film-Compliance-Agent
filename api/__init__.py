@@ -1,1 +1,1 @@
-"""Product-facing and internal HTTP API (FastAPI)."""
+"""Product-facing, internal, and policy administration HTTP API (FastAPI)."""

@@ -4,16 +4,16 @@ Owner: Richard
 
 This is the main runtime workspace for Workstream B. It contains executable policy-loop behavior; source configuration and seed/snapshot data belong in the repository-level [`policy/`](../../policy/README.md) directory.
 
-## Planned modules
+## Modules
 
 | Module | Responsibility |
 |---|---|
-| Policy refresh job | Fetch configured official pages, archive raw content, normalize text, and produce deterministic diffs |
-| Proposal generator | Ask Gemini to turn a deterministic diff into a schema-validated draft proposal |
+| Policy refresh | Normalize configured fixture sources, archive local content, and produce deterministic diffs and proposals |
+| Proposal adapter | Return a deterministic schema-validated draft during Gate 2 |
 | Publisher | Validate a human-approved proposal and create the next policy snapshot |
 | Outbox dispatcher | Publish committed `policy.updated` events without coupling event delivery to snapshot persistence |
 | Update consumer | Mark affected projects stale and request recalculation only for provisional classifications |
-| Policy notifier | Produce `policy_stale` and `tier_recalculated` notifications and timeline events |
+| Local assembly | Connect the Gate 2 adapters for same-process acceptance tests |
 
 ## Dependencies
 
@@ -28,4 +28,4 @@ This is the main runtime workspace for Workstream B. It contains executable poli
 - Policy events must be idempotent.
 - Frozen forms, submitted materials, and registration numbers are immutable to policy updates.
 
-No policy worker implementation exists in this scaffold.
+Gate 2 implements only deterministic local adapters and an in-memory acceptance boundary. HTTP/Gemini/cloud adapters, API wiring, and deployed verification remain future gates.

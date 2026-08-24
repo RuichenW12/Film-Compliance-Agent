@@ -23,6 +23,7 @@ packs:
         co_review_required: true
       operational_basis: partner_strict_rule
   p3_tier_thresholds:
+    thresholds_published: false
     thresholds: null
   p4_process_templates: {}
   p5_form_templates: {}

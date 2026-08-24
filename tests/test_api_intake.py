@@ -43,7 +43,7 @@ def client(stores, snapshots, clock) -> TestClient:
         clock=clock,
         llm=UnavailableLLM(),
     )
-    return TestClient(create_app(context))
+    return TestClient(create_app(context=context))
 
 
 def create_project(client: TestClient) -> str:

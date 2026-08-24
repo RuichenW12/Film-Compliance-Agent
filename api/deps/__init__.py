@@ -1,1 +1,1 @@
-"""Request-scoped dependencies: demo auth and the composition root."""
+"""Request-scoped dependencies: demo auth, product context, and policy state."""

@@ -2,7 +2,9 @@
 
 Film Compliance Agent is a workflow for helping micro-drama creators and licensed institutions prepare compliance reviews and filing materials. The product path combines deterministic gates, evidence-linked AI review, human confirmation, and versioned policy snapshots.
 
-> Repository status: the shared contracts, the product workflow core (state machine, D3 gate, D1a/D1b/D1c classification chain), the intake and classification API, and the web shell are implemented and unit-tested against the static seed snapshot. Not yet built: material collection, script review (C1-a), form freeze, institution console, the policy refresh loop, and cloud deployment.
+> Repository status, workstream A (product): shared contracts, the workflow core (state machine, D3 gate, D1a/D1b/D1c classification chain), the intake and classification API, and the web shell are implemented and unit-tested against the static seed snapshot. Not yet built: material collection, script review (C1-a), form freeze, institution console, and cloud deployment.
+>
+> Repository status, workstream B (policy loop): Gates 1–3 are implemented for a deterministic local demo — validated contracts and seed data, an offline proposal/publish loop, a FastAPI administration API, and the policy administration UI. Live crawling, model calls, durable storage, authentication, notifications, and cloud deployment remain outside this milestone.
 
 ## Workstreams
 
@@ -18,7 +20,7 @@ The workstreams meet through shared contracts in [`schemas/`](schemas/README.md)
 The test suite and the API run with no credentials, no emulator, and no network: the snapshot comes from the YAML seed, storage is in-memory, and the LLM backend reports itself unavailable rather than guessing.
 
 ```bash
-pip install -e ".[api,test]"     # 1. install
+pip install -e ".[test]"         # 1. install
 python -m pytest                 # 2. verify  (all green, no cloud access needed)
 uvicorn api.main:app --port 8080 # 3. run     (http://localhost:8080/healthz)
 ```
@@ -72,7 +74,8 @@ python -m workers.hello
 - **Unknown stays unknown.** A form field without a `SourceRef` renders as `待补充`; the model layer refuses to mark it filled.
 - **Uploaded text is data, not instructions.** Script and logline content is wrapped in `<<<DOC>>>` markers, and any model hit whose quote does not occur verbatim in the document is discarded.
 - **Missing model backend is reported, not faked.** With no Vertex configuration the semantic stages emit a pending flag instead of an implied clean result.
+- **Only a human publishes policy.** AI drafts a proposal; the administration UI is the single publish path.
 
-## First milestone
+## Implemented local milestone
 
-The first repository milestone is a contract-level handshake: the product workstream can load a validated seed snapshot, while the policy workstream can emit a validated `policy.updated` fixture. That handshake is green, and the product side now runs the full intake → classification path on top of it.
+The product workstream loads a validated seed snapshot and runs the full intake → classification path on top of it. The policy workstream runs a deterministic fixture refresh, reviews the resulting proposal, publishes a new snapshot, and emits a validated `policy.updated` event, all through a local API and UI. See [`api/`](api/README.md), [`web/`](web/README.md), and [`tests/`](tests/README.md) for commands and verification boundaries.
