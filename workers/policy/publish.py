@@ -18,7 +18,7 @@ from schemas.policy_snapshot import (
     SnapshotDiff,
 )
 
-from .repository import InMemoryPolicyRepository
+from .interfaces import PublicationRepository
 
 
 class PolicyPublishError(RuntimeError):
@@ -35,7 +35,7 @@ class PublishResult(BaseModel):
 
 
 class PolicyPublisher:
-    def __init__(self, repository: InMemoryPolicyRepository) -> None:
+    def __init__(self, repository: PublicationRepository) -> None:
         self._repository = repository
 
     def publish(

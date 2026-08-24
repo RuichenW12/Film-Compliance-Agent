@@ -21,7 +21,7 @@ Tests should distinguish local fixture behavior from live cloud verification. Pa
 | `test_classify.py` | D1a/D1b/D1c chain, prompt-injection resistance, quote verification (T-A2) |
 | `test_api_intake.py` | Intake and classification routes, role checks, error envelope, internal recalc-tier |
 | `contract/test_policy_contract.py` | Shared policy contracts and the `policy.updated` fixture |
-| `policy/` | Gate 2 offline policy loop and Gate 3 administration API |
+| `policy/` | Gate 2 offline loop, Gate 3 administration API, and Gate 4 adapter/orchestration tests |
 
 Run everything from the repository root:
 
@@ -30,6 +30,15 @@ python -m pytest          # product and policy Python suites
 npm --prefix web test     # policy administration UI (vitest)
 ```
 
+Gate 4 also provides two explicit smoke modes:
+
+```bash
+.venv/bin/python scripts/policy_gate4_smoke.py --source
+.venv/bin/python scripts/policy_gate4_smoke.py --cloud
+```
+
+The source command uses the real public NRTA page with temporary file and in-memory state. The cloud command needs the cloud extra, required environment settings, credentials, a named Google Cloud project, and an explicitly designated smoke Pub/Sub topic. Its per-adapter statuses are `PASS`, `FAIL`, or `SKIP`; only a real named-project run with every external adapter at `PASS` is cloud evidence.
+
 The Python suite runs with no credentials, no emulator, and no network. `scripts/e2e_check.py` is the manual counterpart: it drives a running API over HTTP and reports each step of the golden sequence as PASS, FAIL, or PENDING with the task that will deliver it.
 
-Scope limits worth stating plainly: the Gate 3 acceptance exercises the deterministic local review-and-publish path against `fixture://policy-v2`. It proves nothing about live website access, model output, production authentication, durable storage, GCP deployment, or external event delivery. The product suite likewise proves the workflow logic, not a real Gemini call.
+Scope limits worth stating plainly: the Gate 3 browser acceptance exercises the deterministic local review-and-publish path against `fixture://policy-v2`. It proves only that local path, not production authentication, durable cloud storage, model quality, GCP deployment, or external event delivery. Gate 4 unit tests use injected clients, and the product suite likewise proves workflow logic rather than a real Gemini call.

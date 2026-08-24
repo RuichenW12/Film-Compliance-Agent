@@ -12,12 +12,14 @@ from fastapi import Header, Request
 from api.errors import PolicyApiError
 from schemas.policy_snapshot import ImpactNode, PackName
 from workers.policy.adapters.file_blob import FileBlobStore
+from workers.policy.interfaces import PolicyRepository
 from workers.policy.launch import PolicyRunLauncher
 from workers.policy.local_demo import build_local_policy_loop
 from workers.policy.models import PolicySource, ProposalDraft
 from workers.policy.outbox import OutboxDispatcher
 from workers.policy.publish import PolicyPublisher
 from workers.policy.repository import InMemoryPolicyRepository
+from workers.policy.refresh import BlobStore
 
 
 ROOT = Path(__file__).parents[2]
@@ -45,11 +47,11 @@ def utc_now() -> datetime:
 
 @dataclass(frozen=True)
 class PolicyApiState:
-    repository: InMemoryPolicyRepository
+    repository: PolicyRepository
     launcher: PolicyRunLauncher
     publisher: PolicyPublisher
     dispatcher: OutboxDispatcher
-    blob_store: FileBlobStore
+    blob_store: BlobStore
     clock: Callable[[], datetime]
 
 

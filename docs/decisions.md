@@ -243,3 +243,25 @@ ever calls `latest_version`, `get_pack`, and `clause`.
 Owner: undecided. Needs a call between both workstreams before T-B3 is wired,
 since wiring the consumer without this produces a passing test and a broken
 demo.
+
+## D-013
+
+**Gate 4 adds B-owned cloud adapters without claiming deployment or taking over
+product persistence** · Area: B · Status: Accepted · 2026-08-24
+
+Gate 4 replaces the policy loop's external-I/O seams with real HTTP, GCS,
+Firestore, Gemini, and Pub/Sub adapters. The runtime is assembled from named
+environment settings and application-default credentials; credentials and
+service-account files do not belong in the repository.
+
+The smoke command reports `PASS`, `FAIL`, or `SKIP` per external stage. A run
+with missing project settings, credentials, resources, or a configured Gemini
+model is `SKIP`, never evidence that the cloud path works. Gate 4 is therefore
+implemented and locally verified, but remains not cloud-passed until every
+named-project stage reports `PASS`.
+
+This gate persists only B-owned policy source state, runs, proposals, snapshots,
+and outbox entries. Product project, notification, timeline, and `recalc-tier`
+persistence remain outside Gate 4. Revisit this boundary in Gate 5 when the
+closed-loop consumer is wired to the shared internal endpoint and the snapshot
+visibility gap in [D-012](#d-012) has an owner.

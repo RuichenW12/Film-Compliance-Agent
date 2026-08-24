@@ -4,7 +4,7 @@ Film Compliance Agent is a workflow for helping micro-drama creators and license
 
 > Repository status, workstream A (product): shared contracts, the workflow core (state machine, D3 gate, D1a/D1b/D1c classification chain), the intake and classification API, and the web shell are implemented and unit-tested against the static seed snapshot. Not yet built: material collection, script review (C1-a), form freeze, institution console, and cloud deployment.
 >
-> Repository status, workstream B (policy loop): Gates 1–3 are implemented for a deterministic local demo — validated contracts and seed data, an offline proposal/publish loop, a FastAPI administration API, and the policy administration UI. Live crawling, model calls, durable storage, authentication, notifications, and cloud deployment remain outside this milestone.
+> Repository status, workstream B (policy loop): Gates 1–3 provide the deterministic local policy demo. Gate 4 adds real HTTP, GCS, Firestore, Gemini, and Pub/Sub adapters behind the same policy-loop interfaces. The real NRTA source smoke passes locally; the full-cloud smoke is currently `SKIP` without named project configuration and credentials. This is not a deployed-cloud PASS.
 
 ## Workstreams
 
@@ -89,3 +89,28 @@ Whoever makes the change writes the entry, in the same pull request.
 ## Implemented local milestone
 
 The product workstream loads a validated seed snapshot and runs the full intake → classification path on top of it. The policy workstream runs a deterministic fixture refresh, reviews the resulting proposal, publishes a new snapshot, and emits a validated `policy.updated` event, all through a local API and UI. See [`api/`](api/README.md), [`web/`](web/README.md), and [`tests/`](tests/README.md) for commands and verification boundaries.
+
+## Gate 4 cloud adapters
+
+Install the default local/test environment or the optional cloud SDKs separately:
+
+```bash
+python -m pip install -e '.[test]'
+python -m pip install -e '.[test,cloud]'
+```
+
+Cloud assembly reads these environment variables by name; no credentials or service-account files belong in the repository:
+
+- required: `GOOGLE_CLOUD_PROJECT`, `POLICY_GCS_BUCKET`, `POLICY_PUBSUB_TOPIC`;
+- optional: `GOOGLE_CLOUD_LOCATION`, `POLICY_GEMINI_MODEL`, `FIRESTORE_DATABASE`.
+
+Run the source-only and credential-gated checks with:
+
+```bash
+.venv/bin/python scripts/policy_gate4_smoke.py --source
+.venv/bin/python scripts/policy_gate4_smoke.py --cloud
+```
+
+`PASS` means every check required by that selected mode ran successfully. `FAIL` means a required stage ran and failed. `SKIP` means prerequisites were absent, so the command is not evidence of success. Gate 4 is implementation-complete only after automated checks, the real-source smoke, packaging, and review are clean. Gate 4 is passed only after the named-project cloud smoke reports GCS, Firestore, Gemini, and Pub/Sub all as `PASS`.
+
+Gate 4 does not deploy infrastructure and does not add Maxine-owned project, notification, timeline, or `recalc-tier` persistence. Those integration boundaries remain Gate 5 work.

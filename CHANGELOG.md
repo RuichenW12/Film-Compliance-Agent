@@ -20,6 +20,29 @@ Conventions:
 
 ---
 
+## 2026-08-24
+
+### B — policy loop Gate 4: real cloud adapters and bounded source ingestion
+
+- Added the HTTPS source adapter with a 20-second total timeout, redirect
+  validation, streaming 5 MiB limit, and last-known-good preservation on
+  failures.
+- Added GCS blob storage, Firestore policy state and outbox persistence, Gemini
+  structured proposal drafting, and Pub/Sub `policy.updated` publishing behind
+  the existing policy-loop interfaces.
+- Added environment-based cloud runtime assembly and explicit source/cloud
+  smoke commands. A missing named project, resource, credential, or Gemini model
+  is reported as `SKIP`, never as cloud success.
+- Kept the Gate 4 persistence scope within B-owned collections. **No shared
+  schema or product-workflow persistence contract changed in this gate.**
+
+Verified after merging `origin/main`: 186 Python tests via
+`.venv/bin/python -m pytest -q`; 12 Vitest tests via `npm --prefix web test`;
+`npm --prefix web run build`; `compileall`; `pip check`; and a wheel containing
+the policy source, seed snapshot, and proposal prompt. The live NRTA source
+smoke returned `PASS`. The cloud smoke returned `SKIP`
+(`POLICY_CLOUD_CONFIG_MISSING`), so this is not deployed-cloud evidence.
+
 ## 2026-08-23
 
 ### A — an unknown snapshot version returned 500 instead of the error envelope (fixed)
