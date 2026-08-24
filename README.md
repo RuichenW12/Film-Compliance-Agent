@@ -90,6 +90,10 @@ Whoever makes the change writes the entry, in the same pull request.
 
 The product workstream loads a validated seed snapshot and runs the full intake → classification path on top of it. The policy workstream runs a deterministic fixture refresh, reviews the resulting proposal, publishes a new snapshot, and emits a validated `policy.updated` event, all through a local API and UI. See [`api/`](api/README.md), [`web/`](web/README.md), and [`tests/`](tests/README.md) for commands and verification boundaries.
 
+- Gate 5-a snapshot bridge: the unified API injects the policy repository into
+  the existing product `SnapshotService`, so an admin-published inline snapshot
+  is available to `recalc-tier` without a second write path.
+
 ## Gate 4 cloud adapters
 
 Install the default local/test environment or the optional cloud SDKs separately:

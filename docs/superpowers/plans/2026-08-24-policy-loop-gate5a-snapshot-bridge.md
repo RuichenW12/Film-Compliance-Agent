@@ -40,7 +40,7 @@
 - Modify: `workers/policy/interfaces.py:43-65`
 - Modify: `tests/policy/test_repository_interfaces.py:1-17`
 
-- [ ] **Step 1: Write the failing protocol test**
+- [x] **Step 1: Write the failing protocol test**
 
 Replace `tests/policy/test_repository_interfaces.py` with:
 
@@ -79,7 +79,7 @@ def test_in_memory_repository_works_through_snapshot_read_protocol() -> None:
     assert list(reader.list_snapshots()) == ["v1"]
 ```
 
-- [ ] **Step 2: Run the test and verify RED**
+- [x] **Step 2: Run the test and verify RED**
 
 Run:
 
@@ -89,7 +89,7 @@ Run:
 
 Expected: collection fails with `ImportError: cannot import name 'SnapshotReadRepository' from 'workers.policy.interfaces'`.
 
-- [ ] **Step 3: Add the minimal protocol**
+- [x] **Step 3: Add the minimal protocol**
 
 In `workers/policy/interfaces.py`, insert this immediately before `PolicyReadRepository`:
 
@@ -115,7 +115,7 @@ class PolicyRepository(
 
 Keep `PolicyReadRepository.list_snapshots()` unchanged for admin list compatibility. The apparent duplicate method is intentional: `PolicyReadRepository` is the admin-query surface, while `SnapshotReadRepository` is the minimum adapter dependency. Do not make product code import either protocol.
 
-- [ ] **Step 4: Run focused tests and verify GREEN**
+- [x] **Step 4: Run focused tests and verify GREEN**
 
 Run:
 
@@ -125,7 +125,7 @@ Run:
 
 Expected: all selected tests pass, demonstrating both in-memory behavior and no Firestore adapter regression.
 
-- [ ] **Step 5: Commit the seam**
+- [x] **Step 5: Commit the seam**
 
 ```bash
 git add workers/policy/interfaces.py tests/policy/test_repository_interfaces.py
@@ -140,7 +140,7 @@ git commit -m "refactor: expose policy snapshot read seam"
 - Create: `workers/policy/adapters/repository_snapshot.py`
 - Create: `tests/policy/test_repository_snapshot_service.py`
 
-- [ ] **Step 1: Write adapter contract tests**
+- [x] **Step 1: Write adapter contract tests**
 
 Create `tests/policy/test_repository_snapshot_service.py`:
 
@@ -249,7 +249,7 @@ rg -n "nrta-order-16-article-2" policy/seed-snapshot-v1.yaml
 
 If this exact identifier is absent, use the first existing seed clause ID in both assertions; do not add test-only seed data.
 
-- [ ] **Step 2: Run the test and verify RED**
+- [x] **Step 2: Run the test and verify RED**
 
 Run:
 
@@ -259,7 +259,7 @@ Run:
 
 Expected: collection fails with `ModuleNotFoundError: No module named 'workers.policy.adapters.repository_snapshot'`.
 
-- [ ] **Step 3: Implement behavioral parity with `FileSnapshotService`**
+- [x] **Step 3: Implement behavioral parity with `FileSnapshotService`**
 
 Create `workers/policy/adapters/repository_snapshot.py`:
 
@@ -330,7 +330,7 @@ class RepositorySnapshotService(SnapshotService):
 
 Do not catch `ValueError` or Pydantic validation failures here: repository corruption must not be disguised as a missing version. Do not add `blob_uri` fetching in this adapter.
 
-- [ ] **Step 4: Run adapter parity tests and verify GREEN**
+- [x] **Step 4: Run adapter parity tests and verify GREEN**
 
 Run:
 
@@ -340,7 +340,7 @@ Run:
 
 Expected: all selected tests pass.
 
-- [ ] **Step 5: Type-compile the new module**
+- [x] **Step 5: Type-compile the new module**
 
 Run:
 
@@ -350,7 +350,7 @@ Run:
 
 Expected: exit code 0 with no output.
 
-- [ ] **Step 6: Commit the adapter**
+- [x] **Step 6: Commit the adapter**
 
 ```bash
 git add workers/policy/adapters/repository_snapshot.py tests/policy/test_repository_snapshot_service.py
@@ -366,7 +366,7 @@ git commit -m "feat: read policy snapshots through repository"
 - Modify: `api/main.py:28-70`
 - Create: `tests/test_app_policy_snapshot_bridge.py`
 
-- [ ] **Step 1: Write the full HTTP acceptance test**
+- [x] **Step 1: Write the full HTTP acceptance test**
 
 Create `tests/test_app_policy_snapshot_bridge.py`:
 
@@ -527,7 +527,7 @@ def test_explicit_context_is_not_replaced_by_policy_composition(
         assert client.app.state.context is explicit
 ```
 
-- [ ] **Step 2: Run the HTTP test and verify RED**
+- [x] **Step 2: Run the HTTP test and verify RED**
 
 Run:
 
@@ -537,7 +537,7 @@ Run:
 
 Expected: `test_publish_v2_then_product_recalc_reads_the_same_repository` fails because the current default product context still uses `FileSnapshotService`; `/healthz` remains at v1 after publication and recalc of v2 returns 404.
 
-- [ ] **Step 3: Add injectable snapshot composition**
+- [x] **Step 3: Add injectable snapshot composition**
 
 In `api/deps/services.py`, change `build_context` to:
 
@@ -559,7 +559,7 @@ def build_context(
 
 Do not change `default_context()`. Its no-argument call intentionally keeps the standalone file-backed behavior.
 
-- [ ] **Step 4: Resolve policy state before the default product context**
+- [x] **Step 4: Resolve policy state before the default product context**
 
 In `api/main.py`, add:
 
@@ -606,7 +606,7 @@ This ordering is deliberate:
 - lifespan never replaces an explicit context;
 - the global `app = create_app()` resolves its default context during startup, as FastAPI expects.
 
-- [ ] **Step 5: Run the new acceptance test and verify GREEN**
+- [x] **Step 5: Run the new acceptance test and verify GREEN**
 
 Run:
 
@@ -616,7 +616,7 @@ Run:
 
 Expected: both tests pass. The first proves `publish v2 -> health v2 -> recalc v2`; the second proves explicit injection still pins the file-backed v1 view.
 
-- [ ] **Step 6: Run composition regression tests**
+- [x] **Step 6: Run composition regression tests**
 
 Run:
 
@@ -626,7 +626,7 @@ Run:
 
 Expected: all selected tests pass, including the existing v99 envelope and mutation-protection checks.
 
-- [ ] **Step 7: Commit unified composition**
+- [x] **Step 7: Commit unified composition**
 
 ```bash
 git add api/deps/services.py api/main.py tests/test_app_policy_snapshot_bridge.py
@@ -645,7 +645,7 @@ git commit -m "feat: share published snapshots with product workflow"
 - Modify: `tests/README.md`
 - Modify: `CHANGELOG.md`
 
-- [ ] **Step 1: Update D-012 without erasing its history**
+- [x] **Step 1: Update D-012 without erasing its history**
 
 In the D-012 row of `docs/decisions.md`, change its status to:
 
@@ -664,7 +664,7 @@ real `policy.updated` fan-out, project selection, deployed services, and cloud
 credentials remain Gate 5-b/deployment evidence.
 ```
 
-- [ ] **Step 2: Mark the approved design as locally implemented**
+- [x] **Step 2: Mark the approved design as locally implemented**
 
 Change the design status line to:
 
@@ -674,7 +674,7 @@ Change the design status line to:
 
 Only make this status change after Task 3 tests are green.
 
-- [ ] **Step 3: Document the composition in the repository guides**
+- [x] **Step 3: Document the composition in the repository guides**
 
 Add this concise statement to the root `README.md` architecture/current-status section:
 
@@ -716,7 +716,7 @@ Add a 2026-08-24 Gate 5-a entry to `CHANGELOG.md`:
   cloud deployment, and GCS pack resolution remain outside this gate.
 ```
 
-- [ ] **Step 4: Run the focused Gate 5-a suite**
+- [x] **Step 4: Run the focused Gate 5-a suite**
 
 Run:
 
@@ -731,7 +731,7 @@ Run:
 
 Expected: all selected tests pass.
 
-- [ ] **Step 5: Run the full Python verification**
+- [x] **Step 5: Run the full Python verification**
 
 Run:
 
@@ -743,7 +743,7 @@ Run:
 
 Expected: full pytest pass, compileall exit code 0, and `No broken requirements found.` Record the exact pytest count in the handoff; do not reuse the baseline count.
 
-- [ ] **Step 6: Run Web regression checks**
+- [x] **Step 6: Run Web regression checks**
 
 Run:
 
@@ -754,7 +754,7 @@ npm --prefix web run build
 
 Expected: all Vitest tests pass and the Next production build exits 0. No UI change is expected from Gate 5-a.
 
-- [ ] **Step 7: Run packaging verification**
+- [x] **Step 7: Run packaging verification**
 
 Run:
 
@@ -764,7 +764,7 @@ Run:
 
 Expected: one project wheel is created successfully. Keep generated `dist/` artifacts untracked unless repository policy explicitly tracks them.
 
-- [ ] **Step 8: Run source/cloud smoke with honest classification**
+- [x] **Step 8: Run source/cloud smoke with honest classification**
 
 Run:
 
@@ -775,7 +775,7 @@ Run:
 
 Expected: source smoke passes. Cloud smoke may report `SKIP` when credentials or named resources are absent; record it as `SKIP`, never as `PASS`. A genuine configured-resource failure must remain a failure and be investigated before completion.
 
-- [ ] **Step 9: Audit scope, typing, and unresolved markers**
+- [x] **Step 9: Audit scope, typing, and unresolved markers**
 
 Run:
 
@@ -796,7 +796,7 @@ Expected:
 - `WorkflowService` and `schemas/` have no diff;
 - the adapter imports `SnapshotReadRepository`, while product code still imports only `SnapshotService`.
 
-- [ ] **Step 10: Request independent code review before the final commit**
+- [x] **Step 10: Request independent code review before the final commit**
 
 Ask the reviewer to check only Critical/Important issues against:
 
@@ -809,7 +809,7 @@ Ask the reviewer to check only Critical/Important issues against:
 
 Apply validated findings with their own failing regression test before changing implementation. Rerun the affected focused suite and the full Python suite after any fix.
 
-- [ ] **Step 11: Commit documentation and final evidence**
+- [x] **Step 11: Commit documentation and final evidence**
 
 ```bash
 git add \

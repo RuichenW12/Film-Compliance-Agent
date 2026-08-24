@@ -20,6 +20,7 @@ Tests should distinguish local fixture behavior from live cloud verification. Pa
 | `test_guards.py` | State machine transitions, audit entries, and every D3 gate branch (T-A1) |
 | `test_classify.py` | D1a/D1b/D1c chain, prompt-injection resistance, quote verification (T-A2) |
 | `test_api_intake.py` | Intake and classification routes, role checks, error envelope, internal recalc-tier |
+| `test_app_policy_snapshot_bridge.py` | Local Gate 5-a admin publish → product recalc snapshot visibility |
 | `contract/test_policy_contract.py` | Shared policy contracts and the `policy.updated` fixture |
 | `policy/` | Gate 2 offline loop, Gate 3 administration API, and Gate 4 adapter/orchestration tests |
 
@@ -40,5 +41,10 @@ Gate 4 also provides two explicit smoke modes:
 The source command uses the real public NRTA page with temporary file and in-memory state. The cloud command needs the cloud extra, required environment settings, credentials, a named Google Cloud project, and an explicitly designated smoke Pub/Sub topic. Its per-adapter statuses are `PASS`, `FAIL`, or `SKIP`; only a real named-project run with every external adapter at `PASS` is cloud evidence.
 
 The Python suite runs with no credentials, no emulator, and no network. `scripts/e2e_check.py` is the manual counterpart: it drives a running API over HTTP and reports each step of the golden sequence as PASS, FAIL, or PENDING with the task that will deliver it.
+
+`test_app_policy_snapshot_bridge.py` is the local Gate 5-a closure: it publishes
+v2 through the admin API and recalculates a provisional v1 project through the
+internal API against that same v2 snapshot. It is not cloud or event-fan-out
+evidence.
 
 Scope limits worth stating plainly: the Gate 3 browser acceptance exercises the deterministic local review-and-publish path against `fixture://policy-v2`. It proves only that local path, not production authentication, durable cloud storage, model quality, GCP deployment, or external event delivery. Gate 4 unit tests use injected clients, and the product suite likewise proves workflow logic rather than a real Gemini call.
