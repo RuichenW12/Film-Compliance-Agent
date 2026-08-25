@@ -22,6 +22,36 @@ Conventions:
 
 ## 2026-08-25
 
+### A — institution console, the way back from a return, and task reads
+
+- New `/institution` page: the demo registry, submission with its licence
+  verdict, the institution's accept/return decision, and filing. The licence
+  verdict renders as `mock check passed` / `mock check did not pass` beside a
+  `mock` chip and a plain-English disclaimer, and an unknown institution reads
+  "Unknown, not approved" rather than looking like a failure or a pass.
+- **Closed a dead end:** `INSTITUTION_RETURNED` had no exit. The state table
+  allowed the way back to `REVISION_LOOP` but nothing performed it, so a
+  returned project could never be corrected and resubmitted. Added
+  `POST /v1/projects/{pid}/institution/resume`.
+- Added `GET /v1/projects/{pid}/institution` so a creator can read the verdict
+  and the return comments on their own project, and
+  `GET /v1/projects/{pid}/tasks` for contract step 17. The task list is
+  genuinely empty — nothing queues async work yet — and the test says so rather
+  than implying coverage.
+- `TaskStore` gained `list(project_id)`, with the in-memory adapter.
+- Loading the demo registry is offered only to an administrator; other roles see
+  why instead of a 403 from a button that should not have been there.
+- New `.button-group` style so buttons belonging to one decision sit together
+  rather than being pushed to opposite edges by `.action-row`.
+
+Verified: `python -m pytest` — 332 passed, 3 skipped, 6 new;
+`npm --prefix web test` — 17 passed; `npm --prefix web run build`. Then driven
+in a real browser against a live API: loaded the registry as admin, submitted to
+an institution outside it and saw "Unknown, not approved", switched to the
+licensed one, accepted as the institution role, recorded a filing, and watched
+the badge reach `FILED`.
+
+
 ### A — institution review and filing
 
 - `GET /v1/institutions`, `PUT /v1/admin/institutions`,

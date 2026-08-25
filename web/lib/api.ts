@@ -276,3 +276,107 @@ export async function runReview(projectId: string): Promise<ReviewResult> {
 export async function listFindings(projectId: string): Promise<Finding[]> {
   return apiFetch<Finding[]>(`/v1/projects/${projectId}/findings`);
 }
+
+// -------------------------------------------------------------- institution
+
+export interface Institution {
+  institution_id: string;
+  name: string;
+  license_no: string;
+  valid_until: string;
+  registered_capital_rmb: number;
+  has_foreign: boolean;
+}
+
+export interface LicenseCheck {
+  institution_id: string | null;
+  valid_until: string | null;
+  capital_ok: boolean | null;
+  no_foreign_ok: boolean | null;
+  mock: boolean;
+  reasons: string[];
+}
+
+export interface InstitutionReview {
+  review_id: string;
+  institution_id: string | null;
+  license_check: LicenseCheck | null;
+  decision: string;
+  return_comments: string | null;
+  signed_agreement_uri: string | null;
+  decided_at: string | null;
+}
+
+export interface ReviewStateResponse {
+  review: InstitutionReview;
+  state: string;
+}
+
+export interface FilingResponse {
+  state: string;
+  registration_number: string | null;
+}
+
+export async function listInstitutions(): Promise<Institution[]> {
+  return apiFetch<Institution[]>("/v1/institutions");
+}
+
+export async function loadInstitutions(
+  institutions: Institution[]
+): Promise<Institution[]> {
+  return apiFetch<Institution[]>("/v1/admin/institutions", {
+    method: "PUT",
+    body: JSON.stringify(institutions)
+  });
+}
+
+export async function submitToInstitution(
+  projectId: string,
+  institutionId: string
+): Promise<ReviewStateResponse> {
+  return apiFetch<ReviewStateResponse>(
+    `/v1/projects/${projectId}/institution/submit`,
+    { method: "POST", body: JSON.stringify({ institution_id: institutionId }) }
+  );
+}
+
+export async function readReview(
+  projectId: string
+): Promise<InstitutionReview | null> {
+  return apiFetch<InstitutionReview | null>(
+    `/v1/projects/${projectId}/institution`
+  );
+}
+
+export async function decideReview(
+  projectId: string,
+  body: {
+    decision: string;
+    return_comments?: string;
+    signed_agreement_uri?: string;
+  }
+): Promise<ReviewStateResponse> {
+  return apiFetch<ReviewStateResponse>(
+    `/v1/projects/${projectId}/institution/decide`,
+    { method: "POST", body: JSON.stringify(body) }
+  );
+}
+
+export async function resumeAfterReturn(
+  projectId: string
+): Promise<FilingResponse> {
+  return apiFetch<FilingResponse>(
+    `/v1/projects/${projectId}/institution/resume`,
+    { method: "POST" }
+  );
+}
+
+export async function recordFiling(
+  projectId: string,
+  registrationNumber: string
+): Promise<FilingResponse> {
+  return apiFetch<FilingResponse>(`/v1/projects/${projectId}/filing`, {
+    method: "POST",
+    body: JSON.stringify({ registration_number: registrationNumber })
+  });
+}

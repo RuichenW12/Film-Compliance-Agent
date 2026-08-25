@@ -285,7 +285,7 @@ export default function CollectionPage() {
                     {card.invalid_reasons.length ? (
                       <div className="muted">{card.invalid_reasons.join(", ")}</div>
                     ) : null}
-                    <div className="action-row">
+                    <div className="button-group">
                       <button
                         type="button"
                         className="secondary-button"

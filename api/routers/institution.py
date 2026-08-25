@@ -14,7 +14,7 @@ from fastapi import APIRouter, Depends
 from core.errors import ForbiddenError
 from core.workflow_service import WorkflowService
 from schemas.enums import Role
-from schemas.workflow import MockInstitution
+from schemas.workflow import InstitutionReview, MockInstitution, WorkflowTask
 
 from ..deps.demo_auth import Principal, get_principal
 from ..deps.services import get_workflow
@@ -104,3 +104,50 @@ def record_filing(
     return FilingResponse(
         state=project.state, registration_number=project.registration_number
     )
+
+
+@router.get(
+    "/v1/projects/{project_id}/institution",
+    response_model=InstitutionReview | None,
+)
+def read_review(
+    project_id: str,
+    principal: Principal = Depends(get_principal),
+    workflow: WorkflowService = Depends(get_workflow),
+) -> InstitutionReview | None:
+    """The creator watches their own submission; the institution reads its queue."""
+
+    project = workflow.get_project(project_id)
+    if principal.role is Role.CREATOR:
+        _assert_owner(principal, project.owner_uid)
+    return workflow.latest_institution_review(project_id)
+
+
+@router.post(
+    "/v1/projects/{project_id}/institution/resume",
+    response_model=FilingResponse,
+)
+def resume_after_return(
+    project_id: str,
+    principal: Principal = Depends(get_principal),
+    workflow: WorkflowService = Depends(get_workflow),
+) -> FilingResponse:
+    """Take a returned project back into the revision loop to be corrected."""
+
+    _assert_owner(principal, workflow.get_project(project_id).owner_uid)
+    project = workflow.resume_after_return(project_id)
+    return FilingResponse(
+        state=project.state, registration_number=project.registration_number
+    )
+
+
+@router.get("/v1/projects/{project_id}/tasks", response_model=list[WorkflowTask])
+def list_tasks(
+    project_id: str,
+    principal: Principal = Depends(get_principal),
+    workflow: WorkflowService = Depends(get_workflow),
+) -> list[WorkflowTask]:
+    project = workflow.get_project(project_id)
+    if principal.role is Role.CREATOR:
+        _assert_owner(principal, project.owner_uid)
+    return workflow.list_tasks(project_id)

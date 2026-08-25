@@ -719,6 +719,44 @@ class WorkflowService:
             )
         return project, updated
 
+    def resume_after_return(self, project_id: str) -> Project:
+        """Take a returned project back into the revision loop.
+
+        Without this, `INSTITUTION_RETURNED` is a dead end: the state table
+        allows the way back but nothing performed it, so a returned project
+        could never be corrected and resubmitted.
+        """
+
+        project = self.get_project(project_id)
+        if project.state is not ProjectState.INSTITUTION_RETURNED:
+            raise StateInvalidError(
+                "only a returned project can resume the revision loop",
+                {"state": project.state.value},
+            )
+        review = self._stores.institution_reviews.latest(project_id)
+        self._record_event(
+            project_id,
+            Actor.CREATOR,
+            "institution.return_acknowledged",
+            {"comments": review.return_comments if review else None},
+        )
+        return self._transition(
+            project,
+            ProjectState.REVISION_LOOP,
+            Actor.CREATOR,
+            "institution.returned_for_revision",
+        )
+
+    def latest_institution_review(self, project_id: str):
+        self.get_project(project_id)
+        return self._stores.institution_reviews.latest(project_id)
+
+    def list_tasks(self, project_id: str):
+        """Async job records for this project (contract step 17)."""
+
+        self.get_project(project_id)
+        return self._stores.tasks.list(project_id)
+
     def record_filing(self, project_id: str, registration_number: str) -> Project:
         """Record a number a human read off a government system.
 

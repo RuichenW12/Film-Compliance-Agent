@@ -406,3 +406,77 @@ def test_the_whole_institution_path_is_on_the_timeline(loaded_client):
     assert "institution.submitted" in events
     assert "institution.decided" in events
     assert "filing.recorded" in events
+
+
+# ------------------------------------------------- the way back from a return
+
+
+def test_a_returned_project_can_resume_the_revision_loop(loaded_client):
+    """Without this, INSTITUTION_RETURNED is a dead end and the project is stuck."""
+
+    project_id = frozen_project(loaded_client)
+    submit(loaded_client, project_id, "inst_demo_ok")
+    decide(
+        loaded_client,
+        project_id,
+        {"decision": "return", "return_comments": "请补充出资结构说明"},
+    )
+
+    resumed = loaded_client.post(
+        f"/v1/projects/{project_id}/institution/resume", headers=OWNER
+    )
+    assert resumed.status_code == 200
+    assert resumed.json()["state"] == "REVISION_LOOP"
+
+
+def test_resuming_a_project_that_was_not_returned_is_refused(loaded_client):
+    project_id = frozen_project(loaded_client)
+    refused = loaded_client.post(
+        f"/v1/projects/{project_id}/institution/resume", headers=OWNER
+    )
+    assert refused.status_code == 409
+    assert refused.json()["error"]["code"] == "STATE_INVALID"
+
+
+def test_the_return_comments_are_readable_by_the_creator(loaded_client):
+    project_id = frozen_project(loaded_client)
+    submit(loaded_client, project_id, "inst_demo_ok")
+    decide(
+        loaded_client,
+        project_id,
+        {"decision": "return", "return_comments": "请补充出资结构说明"},
+    )
+
+    review = loaded_client.get(
+        f"/v1/projects/{project_id}/institution", headers=OWNER
+    ).json()
+    assert review["decision"] == "return"
+    assert review["return_comments"] == "请补充出资结构说明"
+
+
+def test_another_creator_cannot_read_the_review(loaded_client):
+    project_id = frozen_project(loaded_client)
+    submit(loaded_client, project_id, "inst_demo_ok")
+    refused = loaded_client.get(
+        f"/v1/projects/{project_id}/institution", headers=OTHER
+    )
+    assert refused.status_code == 403
+
+
+def test_an_unsubmitted_project_has_no_review(loaded_client):
+    project_id = frozen_project(loaded_client)
+    assert (
+        loaded_client.get(
+            f"/v1/projects/{project_id}/institution", headers=OWNER
+        ).json()
+        is None
+    )
+
+
+def test_the_task_list_is_empty_until_async_work_exists(loaded_client):
+    """The route exists; nothing queues tasks yet, and it says so honestly."""
+
+    project_id = frozen_project(loaded_client)
+    tasks = loaded_client.get(f"/v1/projects/{project_id}/tasks", headers=OWNER)
+    assert tasks.status_code == 200
+    assert tasks.json() == []

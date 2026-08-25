@@ -408,6 +408,15 @@ tbody tr:last-child td {
   gap: 10px;
 }
 
+/* Buttons that belong to one decision sit together, not pushed to the edges. */
+.button-group {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin: 12px 0 20px;
+}
+
 pre {
   max-width: 100%;
   overflow-x: auto;
