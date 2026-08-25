@@ -29,7 +29,9 @@ Product workstream (A):
 - `routers/internal.py` — `recalc-tier` and `policy-stale`, guarded by `X-Internal-Token`. Both write the creator's notification as part of the same call ([D-014](../docs/decisions.md#d-014)).
 - `routers/notifications.py` — `GET /v1/notifications` and `POST /v1/notifications/{nid}/read`, each caller scoped to their own inbox.
 
-Still to build: materials and uploads, review triggers, findings actions, form preview/freeze, institution console, tasks.
+- `routers/assets.py` — upload tickets, `PUT /v1/uploads/{tid}`, asset listing and content reads ([D-015](../docs/decisions.md#d-015)).
+
+Still to build: material cards, fact extraction, review triggers, findings actions, form preview/freeze, institution console, tasks.
 
 Policy workstream (B):
 

@@ -6,11 +6,14 @@ directly, and every state change goes through `state_machine.transition()`.
 
 from __future__ import annotations
 
+import hashlib
 from dataclasses import dataclass
 
+from schemas.assets import AssetVersion, UploadTicket
 from schemas.common import AuditEntry, Fact, SourceRef, TimelineEvent
 from schemas.enums import (
     Actor,
+    AssetKind,
     BudgetBand,
     FactStatus,
     FindingSeverity,
@@ -29,7 +32,13 @@ from .classify import classify
 from .classify.chain import ClassificationOutcome
 from .classify.d1c import PUBLISHED_KEYS, judge_tier
 from .clock import Clock
-from .errors import ForbiddenError, NotFoundError, StateInvalidError
+from .errors import (
+    ConflictError,
+    ForbiddenError,
+    NotFoundError,
+    StateInvalidError,
+    ValidationFailedError,
+)
 from .gate import GateResult, evaluate_gate_d3
 from .ids import new_id
 from .llm import LLMClient
@@ -289,6 +298,100 @@ class WorkflowService:
                 {"snapshot_version": snapshot_version},
             )
         return project
+
+    # ---------------------------------------------------------------- uploads
+
+    def issue_upload_ticket(
+        self,
+        project_id: str,
+        kind: AssetKind,
+        issued_to: str,
+        filename: str | None = None,
+    ) -> UploadTicket:
+        """A one-shot permit naming where one asset version may be written."""
+
+        project = self.get_project(project_id)
+        ticket_id = new_id("asset").replace("av_", "tkt_", 1)
+        ticket = UploadTicket(
+            ticket_id=ticket_id,
+            project_id=project.project_id,
+            kind=kind,
+            storage_uri=f"blob://{project.project_id}/{ticket_id}",
+            issued_to=issued_to,
+            filename=filename,
+            created_at=self._clock.now(),
+        )
+        return self._stores.upload_tickets.add(ticket)
+
+    def complete_upload(self, ticket_id: str, data: bytes) -> AssetVersion:
+        """Write the bytes, then the immutable version record that names them."""
+
+        if not data:
+            raise ValidationFailedError("an upload must carry bytes")
+
+        pending = self._stores.upload_tickets.get(ticket_id)
+        if pending is None:
+            raise NotFoundError(
+                f"upload ticket not found: {ticket_id}", {"ticket_id": ticket_id}
+            )
+        ticket = self._stores.upload_tickets.consume(ticket_id)
+        if ticket is None:
+            raise ConflictError(
+                "this upload ticket was already used", {"ticket_id": ticket_id}
+            )
+
+        self._stores.blobs.put(ticket.storage_uri, data)
+        asset = AssetVersion(
+            version_id=new_id("asset"),
+            kind=ticket.kind,
+            storage_uri=ticket.storage_uri,
+            sha256=hashlib.sha256(data).hexdigest(),
+            parent_version=self._latest_version_of(ticket.project_id, ticket.kind),
+            uploaded_by=ticket.issued_to,
+            created_at=self._clock.now(),
+        )
+        self._stores.assets.add(ticket.project_id, asset)
+        self._record_event(
+            ticket.project_id,
+            Actor.CREATOR,
+            "asset.uploaded",
+            {
+                "version_id": asset.version_id,
+                "kind": asset.kind.value,
+                "sha256": asset.sha256,
+                "parent_version": asset.parent_version,
+            },
+        )
+        return asset
+
+    def list_assets(self, project_id: str) -> list[AssetVersion]:
+        self.get_project(project_id)
+        return self._stores.assets.list(project_id)
+
+    def read_asset(self, project_id: str, version_id: str) -> tuple[AssetVersion, bytes]:
+        self.get_project(project_id)
+        asset = self._stores.assets.get(project_id, version_id)
+        if asset is None:
+            raise NotFoundError(
+                f"asset version not found: {version_id}", {"version_id": version_id}
+            )
+        data = self._stores.blobs.get(asset.storage_uri)
+        if data is None:
+            raise NotFoundError(
+                "the stored bytes are missing for this version",
+                {"version_id": version_id},
+            )
+        return asset, data
+
+    def _latest_version_of(self, project_id: str, kind: AssetKind) -> str | None:
+        """A revision chains onto the previous version of the same kind only."""
+
+        same_kind = [
+            asset
+            for asset in self._stores.assets.list(project_id)
+            if asset.kind is kind
+        ]
+        return same_kind[-1].version_id if same_kind else None
 
     # --------------------------------------------------------- notifications
 

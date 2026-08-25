@@ -72,6 +72,27 @@ Verified: `python -m pytest` — 193 passed, including
 `tests/policy/test_admin_routes.py`, which exercises the moved router through
 the app factory.
 
+### A — upload tickets and immutable asset versions
+
+- `POST /v1/projects/{pid}/assets/upload-url` issues a one-shot ticket;
+  `PUT /v1/uploads/{tid}` takes the bytes and writes one `AssetVersion` with its
+  own sha256. `GET .../assets` lists them, `GET .../assets/{vid}/content` serves
+  the bytes back.
+- The ticket names its `backend`: `local` with no bucket configured, `gcs` once
+  `GCS_BUCKET` is set. A missing cloud backend is reported, never disguised as a
+  cloud upload. Signed-URL issuance slots in behind the same response shape.
+- A ticket is single-use — a replayed upload is a 409, not a silent second
+  version. A new version of the same `kind` chains onto the previous one via
+  `parent_version`; different kinds never chain together.
+- Added `BlobStore` and `UploadTicketStore` ports with in-memory adapters, and
+  the `UploadTicket` document to `schemas/assets.py`.
+- Deliberately **not** here: the material-card list and fact extraction. Both
+  need `p4`/`p5` pack content, which is empty. This is the mechanism half only.
+
+Verified: `python -m pytest` — 204 passed, 11 new in `tests/test_uploads.py`
+covering sha256, single-use tickets, version chaining, per-kind isolation,
+owner scoping, empty-upload rejection, and the timeline entry.
+
 
 ### Shared — Gate 5-a published snapshot read bridge
 

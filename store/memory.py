@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 from dataclasses import dataclass, field
 from typing import Protocol
 
-from schemas.assets import AssetVersion, MaterialCard
+from schemas.assets import AssetVersion, MaterialCard, UploadTicket
 from schemas.common import AuditEntry, Fact, TimelineEvent
 from schemas.findings import Finding
 from schemas.forms import FormDraft
@@ -247,6 +247,42 @@ class InMemoryInstitutionRegistry:
         return list(self._items.values())
 
 
+class InMemoryBlobStore:
+    """Raw bytes, keyed by storage uri. A GCS adapter slots in behind this."""
+
+    def __init__(self) -> None:
+        self._blobs: dict[str, bytes] = {}
+
+    def put(self, uri: str, data: bytes) -> str:
+        self._blobs[uri] = data
+        return uri
+
+    def get(self, uri: str) -> bytes | None:
+        return self._blobs.get(uri)
+
+
+class InMemoryUploadTicketStore:
+    def __init__(self) -> None:
+        self._items: dict[str, UploadTicket] = {}
+
+    def add(self, ticket: UploadTicket) -> UploadTicket:
+        self._items[ticket.ticket_id] = ticket
+        return ticket
+
+    def get(self, ticket_id: str) -> UploadTicket | None:
+        return self._items.get(ticket_id)
+
+    def consume(self, ticket_id: str) -> UploadTicket | None:
+        """Mark spent and return it, or None if it was already spent."""
+
+        ticket = self._items.get(ticket_id)
+        if ticket is None or ticket.consumed:
+            return None
+        spent = ticket.model_copy(update={"consumed": True})
+        self._items[ticket_id] = spent
+        return spent
+
+
 class Stores(Protocol):
     """The bundle the API and workers receive by dependency injection."""
 
@@ -255,6 +291,8 @@ class Stores(Protocol):
     findings: object
     materials: object
     assets: object
+    blobs: object
+    upload_tickets: object
     tasks: object
     timeline: object
     audit: object
@@ -271,6 +309,10 @@ class InMemoryStores:
     findings: InMemoryFindingStore = field(default_factory=InMemoryFindingStore)
     materials: InMemoryMaterialStore = field(default_factory=InMemoryMaterialStore)
     assets: InMemoryAssetStore = field(default_factory=InMemoryAssetStore)
+    blobs: InMemoryBlobStore = field(default_factory=InMemoryBlobStore)
+    upload_tickets: InMemoryUploadTicketStore = field(
+        default_factory=InMemoryUploadTicketStore
+    )
     tasks: InMemoryTaskStore = field(default_factory=InMemoryTaskStore)
     timeline: InMemoryTimelineStore = field(default_factory=InMemoryTimelineStore)
     audit: InMemoryAuditStore = field(default_factory=InMemoryAuditStore)

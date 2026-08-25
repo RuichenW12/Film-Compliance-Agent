@@ -28,6 +28,7 @@ status becomes `Superseded by D-0xx`. That way the reasoning trail survives.
 | [D-012](#d-012) | Shared | The product cannot read published snapshots yet | Resolved locally by Gate 5-a |
 | [D-013](#d-013) | B | Gate 4 adds cloud adapters without claiming deployment | Accepted |
 | [D-014](#d-014) | Shared | The policy loop triggers notifications; the product produces them | Accepted |
+| [D-015](#d-015) | A | Uploads go through a one-shot ticket, not a bare route | Accepted |
 
 ---
 
@@ -325,3 +326,31 @@ reader could question:
 Revisit when the consumer is wired to the live endpoint ([D-010](#d-010)): if B
 ever needs a notification that no product state change accompanies, this split
 stops working and the two owners need a new seam rather than a workaround.
+
+## D-015
+
+**Uploads go through a one-shot ticket, not a bare route** · Area: A · Status: Accepted · 2026-08-24
+
+The client asks for an upload permit and gets back `upload_url`, `method`,
+`backend`, and `storage_uri`; it then writes the bytes to that url. Locally the
+url is a route on this same API. In the cloud it becomes a signed object-storage
+url and the bytes never touch the API process.
+
+Why the indirection now, when only the local path exists: the client flow is
+identical either way, so moving to signed urls is a change to one response
+field, not a change to how uploading works. A bare `POST .../assets` would have
+to be rewritten on both sides.
+
+`backend` is in the response for the same reason the LLM layer reports
+`unavailable`: with no `GCS_BUCKET` configured the ticket says `local` out loud
+rather than letting a local run look like a cloud one.
+
+Two rules the ticket enforces, both tested:
+
+1. **Single use.** A replayed upload is a `409`, not a silent second version.
+   Retries are normal on flaky networks and must not multiply versions.
+2. **Chaining is per kind.** A new script version chains onto the previous
+   script via `parent_version`; a synopsis never chains onto a script.
+
+Revisit when the GCS adapter lands: the ticket store becomes the place to record
+the signed url's expiry, which the local path does not need.
