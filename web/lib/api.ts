@@ -48,3 +48,32 @@ export async function apiFetch<T>(
   }
   return (await response.json()) as T;
 }
+
+export interface NotificationItem {
+  notification_id: string;
+  user_id: string;
+  project_id: string | null;
+  kind: string;
+  title_key: string;
+  body_key: string;
+  params: Record<string, unknown>;
+  link: string | null;
+  read: boolean;
+  created_at: string | null;
+}
+
+export async function listNotifications(
+  unreadOnly = false
+): Promise<NotificationItem[]> {
+  const query = unreadOnly ? "?unread_only=true" : "";
+  return apiFetch<NotificationItem[]>(`/v1/notifications${query}`);
+}
+
+export async function markNotificationRead(
+  notificationId: string
+): Promise<NotificationItem> {
+  return apiFetch<NotificationItem>(
+    `/v1/notifications/${notificationId}/read`,
+    { method: "POST" }
+  );
+}

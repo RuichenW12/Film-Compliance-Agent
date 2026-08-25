@@ -22,6 +22,56 @@ Conventions:
 
 ## 2026-08-24
 
+### A — policy notifications reach the creator
+
+- `WorkflowService` now writes an inbox entry when a policy update sets
+  `policy_stale` or actually changes a tier. A recalculation that changes
+  nothing stays silent, and a repeated stale flag notifies once, so consumer
+  redelivery cannot refill the inbox. Reasoning in
+  [D-014](docs/decisions.md#d-014).
+- Added `GET /v1/notifications` (with `unread_only`) and
+  `POST /v1/notifications/{nid}/read`. Each caller reads only their own inbox;
+  another creator gets 403 on a read receipt and an empty list on a read.
+- Added `NotificationStore.get()` to the port and the in-memory adapter, and
+  made `list()` return newest first.
+- Notification text stays keys plus a flat `params` map. Registered
+  `notification.policy_stale.*` and `notification.tier_recalculated.*` in
+  `web/locales/en.json` and `zh.json`, added `format()` to `web/lib/i18n.ts`
+  for placeholder substitution, and rendered the inbox on `/dashboard`.
+- **B depends on this.** It closes the product half of B P0 item 9. The policy
+  consumer does not call any notification route: it keeps calling
+  `/v1/internal/projects/{pid}/policy-stale` and `.../recalc-tier`, and the
+  notification is written inside those calls. Nothing on the B side needs to
+  change, and Gate 5-b fan-out now has a visible effect for the creator.
+
+Verified: `python -m pytest` — 202 passed (9 new in `tests/test_notifications.py`,
+including the publish-v2 → recalc → notified path); `npm --prefix web test` — 17
+passed (5 new); `npm --prefix web run build`; and `python scripts/e2e_check.py`
+against a live API on port 8082 with `INTERNAL_TOKEN` set — ALL CHECKS PASSED,
+including the six new checks under `17. the creator inbox`. No cloud
+credentials, no emulator, no network.
+
+### Shared — one router directory
+
+- `api/routes/admin_policy.py` moved to `api/routers/admin_policy.py` and the
+  now-empty `api/routes/` package was deleted. The two directories were the same
+  concept one letter apart, left over from the workstream merge.
+- The moved file is unchanged apart from its location: it keeps its absolute
+  `api.…` imports and its own style, so the diff is a rename plus one import
+  line in `api/main.py`. No route path, response, guard, or contract changed.
+- **B should know.** This moves a B-owned file. Nothing in `workers/policy/` or
+  `web/app/admin/policy/` was touched, and `/v1/admin/policy/*` behaves exactly
+  as before, but an in-flight branch that edits `api/routes/admin_policy.py`
+  will need to re-target the new path. Reasoning in
+  [D-011](docs/decisions.md#d-011).
+- The other half of D-011 is deliberately **not** done: `require_admin` and
+  `Principal` still coexist, because consolidating them changes how a policy
+  route authorizes and that wants B's agreement, not just B's awareness.
+
+Verified: `python -m pytest` — 193 passed, including
+`tests/policy/test_admin_routes.py`, which exercises the moved router through
+the app factory.
+
 ### A — upload tickets and immutable asset versions
 
 - `POST /v1/projects/{pid}/assets/upload-url` issues a one-shot ticket;

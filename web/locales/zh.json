@@ -29,5 +29,13 @@
   "alert.impact.consult_authority": "时间取决于主管部门",
   "alert.dept.pending": "主管部门待确认",
   "alert.subject_edge_case": "该题材处于边界，需要人工判断",
-  "field.pending": "待补充"
+  "field.pending": "待补充",
+  "notification.policy_stale.title": "政策更新可能影响本项目",
+  "notification.policy_stale.body": "已发布快照 {snapshot_version}。开机前请复核本项目。",
+  "notification.tier_recalculated.title": "档位已重算",
+  "notification.tier_recalculated.body": "快照 {snapshot_version} 将本项目从 {previous_tier} 调整为 {tier}。",
+  "notifications.title": "通知",
+  "notifications.empty": "暂无通知。",
+  "notifications.mark_read": "标记已读",
+  "notifications.unread_only": "仅看未读"
 }
