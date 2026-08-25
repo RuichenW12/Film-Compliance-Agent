@@ -26,9 +26,10 @@ Product workstream (A):
 - `deps/services.py` is the product composition root: store, snapshot service, clock, LLM backend.
 - `routers/health.py` — `GET /healthz`.
 - `routers/projects.py` — create/read project, S1 intent, S2 channels, classify, tier-choice, gate, timeline.
-- `routers/internal.py` — `recalc-tier` and `policy-stale`, guarded by `X-Internal-Token`.
+- `routers/internal.py` — `recalc-tier` and `policy-stale`, guarded by `X-Internal-Token`. Both write the creator's notification as part of the same call ([D-014](../docs/decisions.md#d-014)).
+- `routers/notifications.py` — `GET /v1/notifications` and `POST /v1/notifications/{nid}/read`, each caller scoped to their own inbox.
 
-Still to build: materials and uploads, review triggers, findings actions, form preview/freeze, institution console, tasks and notifications.
+Still to build: materials and uploads, review triggers, findings actions, form preview/freeze, institution console, tasks.
 
 Policy workstream (B):
 

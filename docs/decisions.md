@@ -26,6 +26,8 @@ status becomes `Superseded by D-0xx`. That way the reasoning trail survives.
 | [D-010](#d-010) | B | Wiring the policy consumer to the live recalc endpoint stays with B | Accepted, open |
 | [D-011](#d-011) | Shared | Two router directories and two auth helpers coexist for now | Accepted, cleanup pending |
 | [D-012](#d-012) | Shared | The product cannot read published snapshots yet | Resolved locally by Gate 5-a |
+| [D-013](#d-013) | B | Gate 4 adds cloud adapters without claiming deployment | Accepted |
+| [D-014](#d-014) | Shared | The policy loop triggers notifications; the product produces them | Accepted |
 
 ---
 
@@ -272,3 +274,40 @@ and outbox entries. Product project, notification, timeline, and `recalc-tier`
 persistence remain outside Gate 4. Revisit this boundary in Gate 5 when the
 closed-loop consumer is wired to the shared internal endpoint and the snapshot
 visibility gap in [D-012](#d-012) has an owner.
+
+## D-014
+
+**The policy loop triggers notifications; the product produces them** · Area: Shared · Status: Accepted · 2026-08-24
+
+B P0 item 9 lists `policy_stale` and `tier_recalculated` notifications as
+policy-loop scope, but the boundary rules say B does not edit product code and
+reaches the product only through `/v1/internal/*`. Both statements are right and
+they do not fit together, so the item is split rather than argued:
+
+- **B triggers.** The update consumer calls `policy-stale` and `recalc-tier`.
+  It does not know that notifications exist.
+- **A produces.** `WorkflowService` writes the inbox entry inside the same call
+  that sets the flag or changes the tier, so a notification cannot exist without
+  the state change that justifies it, and cannot be forgotten by a caller.
+
+Three consequences worth writing down, because each one is a choice a later
+reader could question:
+
+1. **A recalculation notifies only when something changed.** Re-running the same
+   snapshot returns `changed: false` and stays silent. An inbox that fills up
+   with "nothing happened" is an inbox nobody reads. The timeline still records
+   every recalculation, changed or not, so the audit trail is unaffected.
+2. **A repeated stale flag notifies once.** `mark_policy_stale` is called again
+   on every redelivery — the consumer is idempotent on
+   `{project_id}:{task_type}:{asset_version}`, but retries still reach the
+   endpoint. The producer checks whether the project was already stale and skips
+   the duplicate, so redelivery cannot refill the inbox.
+3. **Text is keys and params, never prose from the server.** The notification
+   carries `title_key`, `body_key`, and a flat `params` map; `web/locales/`
+   renders them. This keeps ground rule 3 intact — a param the API did not send
+   renders as the literal placeholder, not as `undefined` and not as an invented
+   value.
+
+Revisit when the consumer is wired to the live endpoint ([D-010](#d-010)): if B
+ever needs a notification that no product state change accompanies, this split
+stops working and the two owners need a new seam rather than a workaround.

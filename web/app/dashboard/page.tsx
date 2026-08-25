@@ -1,8 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
-import { ApiError, apiFetch } from "../../lib/api";
+import {
+  ApiError,
+  NotificationItem,
+  apiFetch,
+  listNotifications,
+  markNotificationRead
+} from "../../lib/api";
+import { format, t } from "../../lib/i18n";
 
 interface ProjectResponse {
   project: Record<string, unknown> & {
@@ -26,6 +33,28 @@ export default function DashboardPage() {
   const [timeline, setTimeline] = useState<TimelineEvent[]>([]);
   const [gate, setGate] = useState<{ passed: boolean; gaps: { check: string; items: string[] }[] } | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
+  const [unreadOnly, setUnreadOnly] = useState(false);
+
+  // The inbox belongs to the signed-in creator, not to a project, so it loads
+  // on its own rather than waiting for a project id.
+  const loadNotifications = useCallback(async () => {
+    try {
+      setNotifications(await listNotifications(unreadOnly));
+    } catch {
+      // An unreachable inbox must not hide the project view.
+      setNotifications([]);
+    }
+  }, [unreadOnly]);
+
+  useEffect(() => {
+    void loadNotifications();
+  }, [loadNotifications]);
+
+  async function markRead(notificationId: string) {
+    await markNotificationRead(notificationId);
+    await loadNotifications();
+  }
 
   async function load(event: React.FormEvent) {
     event.preventDefault();
@@ -87,6 +116,40 @@ export default function DashboardPage() {
           ) : null}
         </section>
       ) : null}
+
+      <section className="card">
+        <h2>{t("notifications.title")}</h2>
+        <label>
+          <input
+            type="checkbox"
+            checked={unreadOnly}
+            onChange={(event) => setUnreadOnly(event.target.checked)}
+          />
+          <span>{t("notifications.unread_only")}</span>
+        </label>
+        {notifications.length ? (
+          <ul>
+            {notifications.map((item) => (
+              <li key={item.notification_id}>
+                <strong>{t(item.title_key)}</strong>
+                {item.read ? null : <span className="badge">new</span>}
+                <br />
+                {format(item.body_key, item.params)}
+                {item.read ? null : (
+                  <>
+                    {" "}
+                    <button type="button" onClick={() => markRead(item.notification_id)}>
+                      {t("notifications.mark_read")}
+                    </button>
+                  </>
+                )}
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p>{t("notifications.empty")}</p>
+        )}
+      </section>
 
       {timeline.length ? (
         <section className="card">

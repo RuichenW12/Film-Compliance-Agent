@@ -14,6 +14,7 @@ from schemas.enums import (
     BudgetBand,
     FactStatus,
     FindingSeverity,
+    NotificationKind,
     ProjectState,
     SourceRefType,
     Tier,
@@ -22,12 +23,13 @@ from schemas.findings import Finding, Locator
 from schemas.policy_snapshot import PackName
 from schemas.project import ChannelProfile, IntentProfile, Project, TracksEnabled
 from schemas.snapshot import SnapshotService
+from schemas.workflow import Notification
 
 from .classify import classify
 from .classify.chain import ClassificationOutcome
 from .classify.d1c import PUBLISHED_KEYS, judge_tier
 from .clock import Clock
-from .errors import NotFoundError, StateInvalidError
+from .errors import ForbiddenError, NotFoundError, StateInvalidError
 from .gate import GateResult, evaluate_gate_d3
 from .ids import new_id
 from .llm import LLMClient
@@ -249,12 +251,25 @@ class WorkflowService:
                 "changed": changed,
             },
         )
+        # Re-running the same snapshot is not news. Only a real change is.
+        if changed:
+            self._notify(
+                project,
+                NotificationKind.TIER_RECALCULATED,
+                {
+                    "snapshot_version": snapshot_version,
+                    "tier": decision.tier.value,
+                    "tier_provisional": decision.tier_provisional,
+                    "previous_tier": classification.tier.value,
+                },
+            )
         return RecalcResult(decision.tier, decision.tier_provisional, changed)
 
     def mark_policy_stale(self, project_id: str, snapshot_version: str) -> Project:
         """Flag only. Frozen forms and filed data are never rewritten."""
 
         project = self.get_project(project_id)
+        already_stale = project.policy_stale
         project = project.model_copy(
             update={"policy_stale": True, "updated_at": self._clock.now()}
         )
@@ -265,7 +280,35 @@ class WorkflowService:
             "policy.stale",
             {"snapshot_version": snapshot_version},
         )
+        # Redelivery must not refill the inbox: the consumer retries, the
+        # creator should still see one notice per stale flag.
+        if not already_stale:
+            self._notify(
+                project,
+                NotificationKind.POLICY_STALE,
+                {"snapshot_version": snapshot_version},
+            )
         return project
+
+    # --------------------------------------------------------- notifications
+
+    def list_notifications(
+        self, user_id: str, unread_only: bool = False
+    ) -> list[Notification]:
+        return self._stores.notifications.list(user_id, unread_only)
+
+    def mark_notification_read(self, notification_id: str, user_id: str) -> Notification:
+        existing = self._stores.notifications.get(notification_id)
+        if existing is None:
+            raise NotFoundError(
+                f"notification not found: {notification_id}",
+                {"notification_id": notification_id},
+            )
+        if existing.user_id != user_id:
+            raise ForbiddenError("this notification belongs to another user")
+        marked = self._stores.notifications.mark_read(notification_id)
+        assert marked is not None  # the get above already proved it exists
+        return marked
 
     # --------------------------------------------------------------- internals
 
@@ -409,6 +452,24 @@ class WorkflowService:
         self._stores.audit.add(project.project_id, result.audit)
         self._stores.timeline.add(project.project_id, result.timeline)
         return result.project
+
+    def _notify(
+        self, project: Project, kind: NotificationKind, params: dict
+    ) -> Notification:
+        """One inbox entry for the project owner. Text is keys, rendered by the UI."""
+
+        notification = Notification(
+            notification_id=new_id("notification"),
+            user_id=project.owner_uid,
+            project_id=project.project_id,
+            kind=kind,
+            title_key=f"notification.{kind.value}.title",
+            body_key=f"notification.{kind.value}.body",
+            params=params,
+            link=f"/dashboard?project={project.project_id}",
+            created_at=self._clock.now(),
+        )
+        return self._stores.notifications.add(notification)
 
     def _record_event(
         self, project_id: str, actor: Actor, event: str, detail: dict
