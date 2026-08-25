@@ -25,7 +25,15 @@ from schemas.snapshot import SnapshotNotFoundError
 from workers.policy.adapters.repository_snapshot import RepositorySnapshotService
 
 from .deps.services import AppContext, build_context
-from .routers import assets, health, internal, materials, notifications, projects
+from .routers import (
+    assets,
+    health,
+    internal,
+    materials,
+    notifications,
+    projects,
+    review,
+)
 from .settings import Settings
 
 WEB_ORIGINS = ["http://localhost:3000", "http://127.0.0.1:3000"]
@@ -81,6 +89,7 @@ def create_app(
     app.include_router(projects.router)
     app.include_router(assets.router)
     app.include_router(materials.router)
+    app.include_router(review.router)
     app.include_router(notifications.router)
     app.include_router(internal.router)
     app.include_router(admin_policy_router)

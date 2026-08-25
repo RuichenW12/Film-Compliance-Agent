@@ -6,6 +6,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from schemas.enums import AssetKind, BudgetBand, ClaimedFormType, ExitKind, ProjectState
 from schemas.common import Fact
+from schemas.findings import Finding
 from schemas.project import Classification, Roadmap
 
 
@@ -129,3 +130,14 @@ class RoadmapResponse(ApiModel):
     roadmap: Roadmap | None = None
     state: ProjectState | None = None
     pending_flags: list[str]
+
+
+class ReviewResponse(ApiModel):
+    """`pending_flags` carries `script_semantic_check_pending` when no backend
+    ran, so "patterns found nothing" is never rendered as "the script is clean"."""
+
+    findings: list[Finding]
+    discarded: list[str]
+    pending_flags: list[str]
+    backend: str
+    state: ProjectState
