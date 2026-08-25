@@ -22,6 +22,7 @@ from ..dto import (
     IntentResponse,
     ProjectCounts,
     ProjectResponse,
+    RoadmapResponse,
     TierChoiceRequest,
     TracksEnabledResponse,
 )
@@ -199,3 +200,32 @@ def read_timeline(
     _assert_owner(principal, project.owner_uid)
     events = get_context(request).stores.timeline.list(project_id)
     return [event.model_dump(mode="json") for event in events]
+
+
+@router.get("/{project_id}/roadmap", response_model=RoadmapResponse)
+def read_roadmap(
+    project_id: str,
+    principal: Principal = Depends(get_principal),
+    workflow: WorkflowService = Depends(get_workflow),
+) -> RoadmapResponse:
+    project = workflow.get_project(project_id)
+    _assert_owner(principal, project.owner_uid)
+    roadmap, flags = workflow.roadmap_preview(project_id)
+    return RoadmapResponse(roadmap=roadmap, state=project.state, pending_flags=flags)
+
+
+@router.post("/{project_id}/roadmap/confirm", response_model=RoadmapResponse)
+def confirm_roadmap(
+    project_id: str,
+    principal: Principal = Depends(get_principal),
+    workflow: WorkflowService = Depends(get_workflow),
+) -> RoadmapResponse:
+    """Accepting the plan is the creator's own act, and it moves the state."""
+
+    owner_uid = workflow.get_project(project_id).owner_uid
+    if principal.user_id != owner_uid:
+        raise ForbiddenError("this project belongs to another creator")
+    project, flags = workflow.confirm_roadmap(project_id)
+    return RoadmapResponse(
+        roadmap=project.roadmap, state=project.state, pending_flags=flags
+    )

@@ -25,7 +25,11 @@ packs:
   p3_tier_thresholds:
     thresholds_published: false
     thresholds: null
-  p4_process_templates: {}
+  # Shape the product reads; contents stay empty until a real filing process is
+  # sourced. An empty template yields no steps and a roadmap_template_pending
+  # flag, rather than a plan the policy never defined.
+  p4_process_templates:
+    templates: {}
   # Shape the product reads; contents stay empty until a real filing form is
   # sourced. An empty pack yields no cards and no required-fact override, which
   # is visible, rather than invented cards that look official.

@@ -6,7 +6,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from schemas.enums import AssetKind, BudgetBand, ClaimedFormType, ExitKind, ProjectState
 from schemas.common import Fact
-from schemas.project import Classification
+from schemas.project import Classification, Roadmap
 
 
 class ApiModel(BaseModel):
@@ -120,3 +120,12 @@ class ExtractFactsResponse(ApiModel):
     discarded: list[str]
     pending_flags: list[str]
     backend: str
+
+
+class RoadmapResponse(ApiModel):
+    """`pending_flags` carries `roadmap_template_pending` when the process pack
+    defines no steps, so an empty plan is never read as a short one."""
+
+    roadmap: Roadmap | None = None
+    state: ProjectState | None = None
+    pending_flags: list[str]

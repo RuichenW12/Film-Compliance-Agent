@@ -30,6 +30,7 @@ status becomes `Superseded by D-0xx`. That way the reasoning trail survives.
 | [D-014](#d-014) | Shared | The policy loop triggers notifications; the product produces them | Accepted |
 | [D-015](#d-015) | A | Uploads go through a one-shot ticket, not a bare route | Accepted |
 | [D-016](#d-016) | Shared | `p5_form_templates` card shape proposed by A, pending B's review | Proposed |
+| [D-017](#d-017) | Shared | `p4_process_templates` step shape proposed by A, pending B's review | Proposed |
 
 ---
 
@@ -401,3 +402,49 @@ loader is deliberately the only code that knows the pack layout.
 Revisit when the real filing form is sourced: the field list may force
 `material_cards` to carry per-card `kind`, size, or format constraints, none of
 which are guessed here.
+
+## D-017
+
+**`p4_process_templates` gets a step shape now, proposed by A and pending B's review** · Area: Shared · Status: Proposed, needs B · 2026-08-24
+
+The same situation as [D-016](#d-016), one pack over. `p4_process_templates` was
+`{}`, and the roadmap is the step the whole collection phase hangs off, so the
+shape is written down and named as a proposal rather than guessed quietly:
+
+```yaml
+p4_process_templates:
+  templates:
+    T3_4steps:
+      steps:
+        - name: roadmap.step.materials
+          owner: creator
+          material_refs: [mat_synopsis]
+          est_weeks: 2
+```
+
+Template names are already fixed by the classification chain
+(`ROADMAP_TEMPLATE_BY_TIER`: `T1_7steps`, `T2_5steps`, `T3_4steps`), so the pack
+only supplies each template's contents.
+
+Two rules the loader enforces:
+
+1. **An empty template yields no steps and a `roadmap_template_pending` flag.**
+   A creator follows a roadmap, so inventing one is worse than showing none.
+   The flag is on the API response rather than the `Roadmap` document, which
+   keeps `schemas/` unchanged.
+2. **A step without a `name` or an `owner` is skipped.** It would tell the
+   creator neither what to do nor who does it.
+
+Confirming a roadmap with no steps is deliberately allowed. Refusing would block
+the entire downstream path — collection, review, gate — on unpublished policy,
+which is exactly the coupling the pending-flag pattern exists to avoid. The gap
+travels with the response instead.
+
+One wart worth naming: `RoadmapStep.name` carries a message key, while the
+equivalent field on `MaterialCard` is called `name_key`. Renaming it touches
+`schemas/`, which needs both owners, so it waits for the same conversation that
+reviews these two pack shapes.
+
+Revisit when the real filing process is sourced: real steps may need
+dependencies between them, per-step deadlines, or an institution-side owner,
+none of which are guessed here.
