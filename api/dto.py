@@ -7,6 +7,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from schemas.enums import AssetKind, BudgetBand, ClaimedFormType, ExitKind, ProjectState
 from schemas.common import Fact
 from schemas.findings import Finding
+from schemas.workflow import InstitutionReview
 from schemas.project import Classification, Roadmap
 
 
@@ -162,3 +163,31 @@ class ConfirmFieldRequest(ApiModel):
 class GatePassResponse(ApiModel):
     state: ProjectState
     passed: bool
+
+
+class SubmitToInstitutionRequest(ApiModel):
+    institution_id: str
+
+
+class InstitutionDecisionRequest(ApiModel):
+    """`accept` needs a signed agreement; `return` needs comments."""
+
+    decision: str
+    return_comments: str | None = None
+    signed_agreement_uri: str | None = None
+
+
+class InstitutionReviewResponse(ApiModel):
+    review: InstitutionReview
+    state: ProjectState
+
+
+class FilingRequest(ApiModel):
+    """The number a human received. The product never generates one."""
+
+    registration_number: str
+
+
+class FilingResponse(ApiModel):
+    state: ProjectState
+    registration_number: str | None = None

@@ -36,6 +36,7 @@ status becomes `Superseded by D-0xx`. That way the reasoning trail survives.
 | [D-020](#d-020) | A | A vanished quote is `self_fixed`; a surviving one keeps its decision | Accepted |
 | [D-021](#d-021) | A | Confirming the roadmap starts collection in the same call | Accepted, supersedes part of D-A4 deferral |
 | [D-022](#d-022) | A | A form field is filled only from a confirmed fact; freezing hashes it | Accepted |
+| [D-023](#d-023) | A | The institution registry ships empty; an unknown institution is unverifiable, not invalid | Accepted |
 
 ---
 
@@ -622,3 +623,44 @@ same draft rather than a new hash.
 Revisit when the institution console can return a form for correction: today
 `FORM_FROZEN -> REVISION_LOOP` exists in the state table but nothing performs
 it, and unfreezing will need its own rule about what happens to the old hash.
+
+## D-023
+
+**The institution registry ships empty, and an unknown institution is unverifiable rather than invalid** · Area: A · Status: Accepted · 2026-08-25
+
+TDD section 11 forbids real licence verification, and ground rule 3 forbids
+inventing entity names and licence numbers. Both bear on the same feature, so
+the console is built to make the limitation structural rather than remembered:
+
+1. **The registry ships empty.** No institution is bundled with the product. An
+   administrator loads demo entries through `PUT /v1/admin/institutions`, and
+   the tests supply their own, so nothing in the repository asserts that any
+   real company exists or holds a licence.
+2. **`LicenseCheck.mock` is always true.** Every response says the check was a
+   mock. There is no code path that produces a non-mock check.
+3. **An unknown institution is `institution_not_in_registry`, with `capital_ok`
+   and `no_foreign_ok` left `None`.** Unknown is not the same as failed, and
+   neither is the same as passed. The same distinction the LLM layer draws
+   between pending and clean.
+
+A mock check that fails still stops the flow: accepting requires a check that
+passed, so an institution the demo registry rejects cannot accept a project.
+A demo that let a failed check through would teach the wrong lesson about what
+the gate is for.
+
+Two smaller calls recorded here rather than left to be re-derived:
+
+- **Re-submitting switches institutions.** The state table allows
+  `INSTITUTION_REVIEW -> INSTITUTION_REVIEW`, so a project under review can be
+  sent to a different institution. The frozen form is untouched by the switch,
+  which is tested.
+- **The registration number is input, never output.** `record_filing` refuses a
+  blank one and stores what it is given verbatim. It is the single value in the
+  system that a human must read off a government screen, and the one the product
+  may never generate — the model already refuses a `FILED` project without one.
+
+Revisit when a real filing partner is involved: the capital threshold in
+`core/institution.py` is a demo constant, not policy, and a real check would
+read its criteria from a pack and stop being mock — at which point every
+`mock=True` in this module becomes a lie that needs removing rather than
+updating.
