@@ -20,6 +20,31 @@ Conventions:
 
 ---
 
+## 2026-08-25
+
+### A — collection UI, and the CORS bug it found
+
+- New `/collection` page: upload an asset, see the version chain and its sha256,
+  extract facts, work the material cards, confirm the roadmap, run the C1-a
+  pre-check, and read the findings with their clause citations.
+- **Fixed: `PUT` was missing from `allow_methods` in the API's CORS config**, so
+  every upload failed in a browser while all 268 tests passed. Found by driving
+  the page in a real browser, not by a test. `tests/test_uploads.py` now
+  preflights `PUT /v1/uploads/{tid}` so it cannot regress silently.
+- Pending flags render as visible warnings rather than being swallowed:
+  `roadmap_template_pending`, `fact_extraction_pending`, and
+  `script_semantic_check_pending` each say in plain English that the result is
+  not clean, matching what the API reports.
+- An empty pack renders as "the policy snapshot defines none yet", never as an
+  empty-looking success.
+- New keys registered in `web/locales/en.json` and `zh.json`.
+
+Verified: `python -m pytest` — 269 passed, 3 skipped; `npm --prefix web test` —
+17 passed; `npm --prefix web run build`. Then driven end to end in a real
+browser against a live API: upload a script, run the pre-check, and see two
+`public_security` findings at `needs_human` citing `nrta-order-16-article-5`,
+with both pending-flag warnings visible.
+
 ## 2026-08-24
 
 ### A — C1-a script pre-check and the golden-sample harness

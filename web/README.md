@@ -12,7 +12,8 @@ Locked decisions that shape this app:
 | Path | Owner | Purpose |
 |---|---|---|
 | `app/wizard` | Maxine | S1/S2 intake and the classification card |
-| `app/dashboard` | Maxine | Project state, gate gaps, and the audit timeline |
+| `app/collection` | Maxine | Uploads, material cards, roadmap, and the C1-a pre-check |
+| `app/dashboard` | Maxine | Project state, gate gaps, notifications, and the audit timeline |
 | `app/admin/policy` | Richard | Policy proposals, diff view, publish gate |
 | `components/policy/` | Richard | Policy administration components |
 | `lib/api.ts` | Maxine | Product API client, sends the demo role headers |
