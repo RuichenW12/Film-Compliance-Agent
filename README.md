@@ -35,11 +35,28 @@ cd web && npm install && npm run dev   # http://localhost:3000
 
 Emulator-backed runs (Firestore on 8791, Pub/Sub on 8792) use `docker compose up`. Copy `.env.example` to `.env` first.
 
-To exercise a real Gemini call, set `GOOGLE_CLOUD_PROJECT`, `REGION`, and `VERTEX_MODEL_GEMINI`, run `gcloud auth application-default login`, then:
+To exercise a real Gemini call through Vertex AI, install the optional client,
+choose the project, location, and model available to your account, and create
+Application Default Credentials (ADC). Keep credentials outside the repository:
 
 ```bash
+python -m pip install -e '.[vertex]'
+
+export GOOGLE_CLOUD_PROJECT="your-google-cloud-project-id"
+export REGION="your-vertex-location"
+export VERTEX_MODEL_GEMINI="your-gemini-model-id"
+
+gcloud auth application-default login
+gcloud auth application-default set-quota-project "$GOOGLE_CLOUD_PROJECT"
+
 python -m workers.hello
 ```
+
+If another local service occupies the OAuth callback port, use
+`gcloud auth login --no-launch-browser --update-adc` instead, then set the ADC
+quota project as shown above. A successful smoke test prints a JSON greeting
+and the selected model and location; it verifies connectivity, not a compliance
+judgement.
 
 ## Repository map
 
