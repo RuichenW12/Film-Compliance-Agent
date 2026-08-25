@@ -13,7 +13,9 @@ from schemas.assets import AssetVersion, MaterialCard, UploadTicket
 from schemas.common import AuditEntry, Fact, SourceRef, TimelineEvent
 from schemas.enums import (
     Actor,
+    AlertOption,
     AssetKind,
+    FindingStatus,
     MaterialStatus,
     BudgetBand,
     FactStatus,
@@ -345,11 +347,13 @@ class WorkflowService:
         )
         result = review_script(document, rules, self._llm)
 
-        existing = {
-            (finding.category, finding.locator.quote)
-            for finding in self._stores.findings.list(project_id)
-            if finding.asset_version == asset.version_id
-        }
+        # Carry decisions across versions: a scene the creator already judged is
+        # not re-litigated, and a scene they removed is marked self-fixed rather
+        # than left open against a script that no longer contains it.
+        carried, self_fixed = self._carry_findings_forward(
+            project_id, asset.version_id, document
+        )
+        existing = carried
 
         written: list[Finding] = []
         for proposed in result.findings:
@@ -387,12 +391,127 @@ class WorkflowService:
             {
                 "asset_version": asset.version_id,
                 "finding_count": len(written),
+                "self_fixed": self_fixed,
                 "discarded": result.discarded,
                 "pending_flags": result.pending_flags,
                 "backend": result.backend,
             },
         )
         return self.get_project(project_id), written, result
+
+    def _carry_findings_forward(
+        self, project_id: str, version_id: str, document: str
+    ) -> tuple[set[tuple[str, str]], int]:
+        """Move prior findings onto this version, or close the ones that are gone.
+
+        A quote still present in the new script is the same problem, so its
+        finding follows the version and keeps whatever the creator decided about
+        it. A quote that has vanished was rewritten, which is the creator fixing
+        it — recorded as `self_fixed`, never silently deleted.
+        """
+
+        seen: set[tuple[str, str]] = set()
+        self_fixed = 0
+        for finding in self._stores.findings.list(project_id):
+            if finding.asset_version == version_id:
+                seen.add((finding.category, finding.locator.quote))
+                continue
+            if finding.alert is not None:
+                # Alert findings come from the intent profile, not the script.
+                continue
+            if finding.locator.quote and finding.locator.quote in document:
+                self._stores.findings.save(
+                    project_id, finding.model_copy(update={"asset_version": version_id})
+                )
+                seen.add((finding.category, finding.locator.quote))
+            elif finding.status is FindingStatus.OPEN:
+                self._stores.findings.save(
+                    project_id,
+                    finding.model_copy(update={"status": FindingStatus.SELF_FIXED}),
+                )
+                self_fixed += 1
+        return seen, self_fixed
+
+    # --------------------------------------------------------- finding actions
+
+    def act_on_finding(
+        self,
+        project_id: str,
+        finding_id: str,
+        action: str,
+        reason: str | None = None,
+        option_id: str | None = None,
+    ) -> Finding:
+        """Apply one creator decision to one finding.
+
+        `accept` acknowledges without releasing the gate: agreeing that a scene
+        is a problem does not make it stop being one. `resolve`, `waive`, and
+        `reject` each release it for a different recorded reason.
+        """
+
+        self.get_project(project_id)
+        finding = self._stores.findings.get(project_id, finding_id)
+        if finding is None:
+            raise NotFoundError(
+                f"finding not found: {finding_id}", {"finding_id": finding_id}
+            )
+
+        if action == "choose_option":
+            updated = self._dispatch_alert(finding, option_id)
+        else:
+            updated = finding.model_copy(
+                update={"status": self._status_for(action, reason)}
+            )
+
+        self._stores.findings.save(project_id, updated)
+        self._record_event(
+            project_id,
+            Actor.CREATOR,
+            "finding.action",
+            {
+                "finding_id": finding_id,
+                "action": action,
+                "status": updated.status.value,
+                "reason": reason,
+                "option_id": option_id,
+            },
+        )
+        return updated
+
+    def _status_for(self, action: str, reason: str | None) -> FindingStatus:
+        if action == "accept":
+            return FindingStatus.ACCEPTED
+        if action == "resolve":
+            return FindingStatus.RESOLVED
+        if action in ("waive", "reject"):
+            if not (reason or "").strip():
+                raise ValidationFailedError(
+                    f"{action} requires a reason", {"action": action}
+                )
+            return (
+                FindingStatus.WAIVED if action == "waive" else FindingStatus.REJECTED
+            )
+        raise ValidationFailedError(f"unknown finding action: {action}", {"action": action})
+
+    def _dispatch_alert(self, finding: Finding, option_id: str | None) -> Finding:
+        if finding.alert is None:
+            raise ValidationFailedError(
+                "this finding carries no alert to dispatch",
+                {"finding_id": finding.finding_id},
+            )
+        offered = {option.id.value for option in finding.alert.options}
+        if option_id not in offered:
+            raise ValidationFailedError(
+                "that option was not offered for this alert",
+                {"offered": sorted(offered)},
+            )
+        alert = finding.alert.model_copy(
+            update={
+                "chosen_option": AlertOption(option_id),
+                "chosen_at": self._clock.now(),
+            }
+        )
+        return finding.model_copy(update={"alert": alert})
 
     def list_findings(self, project_id: str) -> list[Finding]:
         self.get_project(project_id)

@@ -22,6 +22,30 @@ Conventions:
 
 ## 2026-08-25
 
+### A — finding actions and incremental review
+
+- `POST /v1/projects/{pid}/findings/{fid}/action` takes `accept`, `resolve`,
+  `waive`, `reject`, or `choose_option`. `waive` and `reject` require a reason,
+  recorded on the finding and the timeline.
+- **`accept` acknowledges without releasing the gate** ([D-019](docs/decisions.md#d-019)):
+  agreeing that a scene is a problem does not make it stop being one.
+- `choose_option` dispatches an alert finding's five-field alert. An option that
+  was not offered is refused, and a finding with no alert cannot be dispatched.
+- Re-reviewing a new script version carries findings forward
+  ([D-020](docs/decisions.md#d-020)): a quote still in the script keeps its
+  decision and moves to the new version; a vanished quote becomes `self_fixed`
+  rather than being deleted. Alert findings are exempt — they come from the
+  intent profile, not the script.
+- Noted while testing: **the seed's synthesized subject rules never set
+  `is_edge_case`, so the edge-case alert path is unreachable with the
+  placeholder pack.** The alert tests publish an explicit `subject_rules` pack —
+  the shape the policy loop will publish — rather than skipping.
+
+Verified: `python -m pytest` — 285 passed, 3 skipped, 16 new in
+`tests/test_finding_actions.py` covering each action, the gate consequence of
+each, alert dispatch and its refusals, carry-forward, self-fix, and the timeline.
+
+
 ### A — collection UI, and the CORS bug it found
 
 - New `/collection` page: upload an asset, see the version chain and its sha256,
