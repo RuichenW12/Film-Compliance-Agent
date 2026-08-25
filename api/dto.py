@@ -150,3 +150,15 @@ class FindingActionRequest(ApiModel):
     action: str
     reason: str | None = None
     option_id: str | None = None
+
+
+class ConfirmFieldRequest(ApiModel):
+    """A value the documents did not supply, given by the creator."""
+
+    value: str | int | float
+    reason: str | None = None
+
+
+class GatePassResponse(ApiModel):
+    state: ProjectState
+    passed: bool

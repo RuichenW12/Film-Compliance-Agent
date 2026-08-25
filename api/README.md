@@ -37,7 +37,9 @@ Product workstream (A):
 
 - `routers/review.py` — C1-a pre-check, the project finding list, and finding actions ([D-019](../docs/decisions.md#d-019)).
 
-Still to build: form preview/freeze, institution console, tasks.
+- `routers/forms.py` — gate passage, form preview, field confirmation, and freeze ([D-022](../docs/decisions.md#d-022)).
+
+Still to build: institution console, tasks.
 
 Policy workstream (B):
 

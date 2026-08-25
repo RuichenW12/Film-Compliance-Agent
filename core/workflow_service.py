@@ -26,6 +26,7 @@ from schemas.enums import (
     Tier,
 )
 from schemas.findings import Finding, Locator
+from schemas.forms import FormDraft
 from schemas.policy_snapshot import PackName
 from schemas.project import (
     ChannelProfile,
@@ -45,12 +46,14 @@ from .classify.d1c import PUBLISHED_KEYS, judge_tier
 from .clock import Clock
 from .extract import extract_facts
 from .errors import (
+    GateBlockedError,
     ConflictError,
     ForbiddenError,
     NotFoundError,
     StateInvalidError,
     ValidationFailedError,
 )
+from .forms import build_fields, draft_hash, pending_keys
 from .gate import GateResult, evaluate_gate_d3, required_fact_keys
 from .ids import new_id
 from .llm import LLMClient
@@ -58,6 +61,11 @@ from .materials import build_material_cards
 from .review import SCRIPT_REVIEW_PROMPT_VERSION, evidence_for, review_script
 from .roadmap import build_roadmap
 from .state_machine import GateContext, transition
+
+# The gate is only reachable once a pre-check has run: collect, review, gate.
+GATE_READY_STATES = frozenset(
+    {ProjectState.REVIEW_RUNNING, ProjectState.REVISION_LOOP}
+)
 
 # States where a recalculation must not touch anything any more.
 RECALC_FROZEN_STATES = frozenset(
@@ -397,7 +405,37 @@ class WorkflowService:
                 "backend": result.backend,
             },
         )
-        return self.get_project(project_id), written, result
+        return self._advance_after_review(project_id), written, result
+
+    def _advance_after_review(self, project_id: str) -> Project:
+        """Move the review loop on, but only from a state that allows it.
+
+        A pre-check run before collection has started reports without moving
+        anything: the state machine, not this method, decides what is legal.
+        """
+
+        project = self.get_project(project_id)
+        if project.state is ProjectState.COLLECTING_MATERIALS:
+            project = self._transition(
+                project, ProjectState.REVIEW_RUNNING, Actor.SYSTEM, "review.started"
+            )
+        if project.state is not ProjectState.REVIEW_RUNNING:
+            return project
+
+        blocking = [
+            finding
+            for finding in self._stores.findings.list(project_id)
+            if finding.blocks_gate_d3
+        ]
+        if blocking:
+            return self._transition(
+                project,
+                ProjectState.REVISION_LOOP,
+                Actor.SYSTEM,
+                "review.findings_open",
+                detail={"open": len(blocking)},
+            )
+        return project
 
     def _carry_findings_forward(
         self, project_id: str, version_id: str, document: str
@@ -431,6 +469,131 @@ class WorkflowService:
                 )
                 self_fixed += 1
         return seen, self_fixed
+
+    # ---------------------------------------------------------- gate and form
+
+    def pass_gate(self, project_id: str) -> Project:
+        """Move to GATE_D3_PASSED, or refuse and say exactly what is missing."""
+
+        project = self.get_project(project_id)
+        report = self.gate_report(project_id)
+        if not report.passed:
+            raise GateBlockedError(
+                "the pre-shoot gate is still blocked",
+                {"gaps": [{"check": gap.check, "items": gap.items} for gap in report.gaps]},
+            )
+        if project.state is ProjectState.GATE_D3_PASSED:
+            return project
+        if project.state not in GATE_READY_STATES:
+            # The state table says the same thing, but a raw "transition X -> Y
+            # is not allowed" tells a creator nothing about what to do next.
+            raise StateInvalidError(
+                "the script pre-check must run before the gate can be passed",
+                {"state": project.state.value},
+            )
+        return self._transition(
+            project, ProjectState.GATE_D3_PASSED, Actor.SYSTEM, "gate.d3_passed"
+        )
+
+    def form_draft(self, project_id: str) -> FormDraft:
+        """The current draft: frozen if it was frozen, rebuilt from facts if not."""
+
+        project = self.get_project(project_id)
+        existing = self._stores.forms.latest(project_id)
+        if existing is not None and existing.frozen:
+            return existing
+
+        version = self._pinned_version(project)
+        keys = required_fact_keys(
+            self._snapshots.get_pack(PackName.P5_FORM_TEMPLATES, version)
+        )
+        fields, conflicts = build_fields(keys, self._stores.facts.list(project_id))
+        draft = FormDraft(
+            draft_id=existing.draft_id if existing else new_id("draft"),
+            fields=fields,
+            conflicts=conflicts,
+            snapshot_version=version,
+            parent_draft=existing.parent_draft if existing else None,
+            created_at=existing.created_at if existing else self._clock.now(),
+        )
+        return self._stores.forms.put(project_id, draft)
+
+    def confirm_form_field(
+        self, project_id: str, key: str, value, reason: str | None = None
+    ) -> FormDraft:
+        """A human supplies a value the documents did not.
+
+        It is recorded as a user answer rather than a document fact, so the form
+        can always show where each field came from.
+        """
+
+        draft = self.form_draft(project_id)
+        if draft.frozen:
+            raise ConflictError(
+                "a frozen form cannot be edited", {"draft_id": draft.draft_id}
+            )
+        if key not in draft.fields:
+            raise NotFoundError(f"this form has no field named {key}", {"key": key})
+        if value in (None, ""):
+            raise ValidationFailedError(
+                "a confirmed field needs a value; leave it pending instead",
+                {"key": key},
+            )
+
+        self._upsert_fact(
+            project_id,
+            key,
+            value,
+            SourceRef(type=SourceRefType.USER_ANSWER, answer_id=new_id("fact")),
+        )
+        self._record_event(
+            project_id,
+            Actor.CREATOR,
+            "form.field_confirmed",
+            {"key": key, "reason": reason},
+        )
+        return self.form_draft(project_id)
+
+    def freeze_form(self, project_id: str) -> FormDraft:
+        """Freeze only from GATE_D3_PASSED, and only with no field left pending."""
+
+        project = self.get_project(project_id)
+        existing = self._stores.forms.latest(project_id)
+        if existing is not None and existing.frozen:
+            return existing
+
+        if project.state is not ProjectState.GATE_D3_PASSED:
+            raise StateInvalidError(
+                "a form can only be frozen once the pre-shoot gate has passed",
+                {"state": project.state.value},
+            )
+
+        draft = self.form_draft(project_id)
+        outstanding = pending_keys(draft)
+        if outstanding:
+            raise GateBlockedError(
+                "every field must be filled or confirmed before freezing",
+                {"pending": outstanding},
+            )
+
+        frozen = draft.model_copy(
+            update={
+                "frozen": True,
+                "hash": draft_hash(draft),
+                "confirmed_by_user_at": self._clock.now(),
+            }
+        )
+        self._stores.forms.put(project_id, frozen)
+        self._record_event(
+            project_id,
+            Actor.CREATOR,
+            "form.frozen",
+            {"draft_id": frozen.draft_id, "hash": frozen.hash},
+        )
+        self._transition(
+            project, ProjectState.FORM_FROZEN, Actor.CREATOR, "form.frozen"
+        )
+        return frozen
 
     # --------------------------------------------------------- finding actions
 
@@ -574,6 +737,16 @@ class WorkflowService:
             ProjectState.ROADMAP_CONFIRMED,
             Actor.CREATOR,
             "roadmap.confirmed",
+        )
+        # Confirming the plan is what starting collection means. Both
+        # transitions are recorded, so the audit trail keeps ROADMAP_CONFIRMED
+        # visible while the project rests where the work actually is. The
+        # roadmap document carries `confirmed` regardless.
+        project = self._transition(
+            project,
+            ProjectState.COLLECTING_MATERIALS,
+            Actor.CREATOR,
+            "materials.collection_started",
         )
         return project, flags
 

@@ -164,17 +164,25 @@ def test_an_unclassified_project_has_no_roadmap_yet(client):
 # ------------------------------------------------------------------- confirm
 
 
-def test_confirming_moves_the_project_to_roadmap_confirmed(client):
+def test_confirming_starts_collection_and_records_both_steps(client):
+    """Confirming the plan is what starting collection means, so the project
+    rests where the work is. ROADMAP_CONFIRMED stays visible on the timeline."""
+
     project_id = classified_project(client)
     response = confirm(client, project_id)
 
     assert response.status_code == 200
     assert response.json()["roadmap"]["confirmed"] is True
-    assert response.json()["state"] == "ROADMAP_CONFIRMED"
+    assert response.json()["state"] == "COLLECTING_MATERIALS"
 
     project = client.get(f"/v1/projects/{project_id}", headers=OWNER).json()
-    assert project["project"]["state"] == "ROADMAP_CONFIRMED"
+    assert project["project"]["state"] == "COLLECTING_MATERIALS"
     assert project["project"]["roadmap"]["confirmed"] is True
+
+    timeline = client.get(f"/v1/projects/{project_id}/timeline", headers=OWNER).json()
+    states = [e["event"] for e in timeline if e["event"].startswith("state.")]
+    assert "state.ROADMAP_CONFIRMED" in states
+    assert "state.COLLECTING_MATERIALS" in states
 
 
 def test_confirming_an_unclassified_project_is_refused(client):
@@ -203,7 +211,7 @@ def test_confirming_twice_is_idempotent(client):
     second = confirm(client, project_id)
 
     assert second.status_code == 200
-    assert second.json()["state"] == "ROADMAP_CONFIRMED"
+    assert second.json()["state"] == "COLLECTING_MATERIALS"
 
     timeline = client.get(f"/v1/projects/{project_id}/timeline", headers=OWNER).json()
     confirmed = [e for e in timeline if e["event"] == "roadmap.confirmed"]

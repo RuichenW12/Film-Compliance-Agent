@@ -34,6 +34,8 @@ status becomes `Superseded by D-0xx`. That way the reasoning trail survives.
 | [D-018](#d-018) | A | Placeholder subject rules cap C1-a severity at `needs_human` | Accepted, revisit after the first real-rule test |
 | [D-019](#d-019) | A | `accept` acknowledges a finding without releasing the gate | Accepted |
 | [D-020](#d-020) | A | A vanished quote is `self_fixed`; a surviving one keeps its decision | Accepted |
+| [D-021](#d-021) | A | Confirming the roadmap starts collection in the same call | Accepted, supersedes part of D-A4 deferral |
+| [D-022](#d-022) | A | A form field is filled only from a confirmed fact; freezing hashes it | Accepted |
 
 ---
 
@@ -552,3 +554,71 @@ and a fresh one opens. That is the safe direction (a changed scene is re-checked
 rather than silently inheriting an old verdict), but it will inflate
 `self_fixed` counts. Revisit if the count becomes misleading in the timeline,
 or when scene-level diffing exists to match a scene across edits.
+
+## D-021
+
+**Confirming the roadmap starts collection in the same call** · Area: A · Status: Accepted · 2026-08-25
+
+`ROADMAP_CONFIRMED` had no way out. Its only successor is
+`COLLECTING_MATERIALS`, and the natural trigger — attaching the first material
+card — cannot fire while `p5` publishes no cards. The whole path downstream of
+the roadmap was therefore unreachable, which only became visible when the gate
+needed to be passed.
+
+`confirm_roadmap` now transitions twice: `ROADMAP_CONFIRMED`, then
+`COLLECTING_MATERIALS`. Both are recorded, so the audit trail still shows the
+roadmap being confirmed as its own event, and the `Roadmap` document carries
+`confirmed` regardless. The project simply rests where the work actually is.
+
+There is precedent: `classify` already chains `INTAKE_DONE -> FORM_JUDGED ->
+CLASSIFIED` in one call for the same reason — the intermediate state is a fact
+worth recording, not a place to wait.
+
+The same discovery pass fixed a second gap. The state table only allows
+`GATE_D3_PASSED` from `REVIEW_RUNNING` or `REVISION_LOOP`, so the gate is
+unreachable until a pre-check has run — correct, but it surfaced as
+`transition COLLECTING_MATERIALS -> GATE_D3_PASSED is not allowed`, which tells
+a creator nothing. `pass_gate` now checks first and says "the script pre-check
+must run before the gate can be passed".
+
+This partly supersedes the T-A4 note that a pre-check does not move state: it
+still does not move a project that has not started collecting, but from
+`COLLECTING_MATERIALS` it now advances to `REVIEW_RUNNING`, and to
+`REVISION_LOOP` when blocking findings exist. That was always T-A5 work; T-A4
+deferred it rather than inventing a path while `p4` and `p5` were empty.
+
+Revisit when `p5` publishes real material cards: attaching the first card may
+become the more honest trigger for collection, and this chained transition
+should then be reconsidered rather than left in place out of habit.
+
+## D-022
+
+**A form field is filled only from a confirmed fact, and freezing hashes it** · Area: A · Status: Accepted · 2026-08-25
+
+The form is built, never written. Each field comes from the same
+`required_facts` the D3 gate reads, so the gate and the form cannot disagree
+about what a filing needs. Then:
+
+- a **confirmed fact** fills the field and the field carries that fact's
+  `SourceRef`, so every value on a form can be traced to the document line or
+  the human answer that produced it;
+- **conflicting facts** leave the field in `conflict` and neither value is
+  rendered — two sources disagreeing is not an answer;
+- **anything else** stays `pending` and renders as `待补充`.
+
+A human confirming a field is recorded as a `user_answer` fact, not as a
+document fact. Both fill the form; only one of them is traceable to a document,
+and the form must be able to show which is which.
+
+Freezing requires `GATE_D3_PASSED` and no pending field, then hashes the draft
+over its values, their provenance, and the pinned snapshot version. That makes a
+frozen form verifiable against the policy it was prepared under, and it is why
+the hash covers sources rather than values alone: the same value from a
+different source is a different filing.
+
+A frozen form is immutable — editing returns `409`, and re-freezing returns the
+same draft rather than a new hash.
+
+Revisit when the institution console can return a form for correction: today
+`FORM_FROZEN -> REVISION_LOOP` exists in the state table but nothing performs
+it, and unfreezing will need its own rule about what happens to the old hash.
