@@ -22,6 +22,37 @@ Conventions:
 
 ## 2026-08-25
 
+### A — gate passage, form preview, field confirmation, and freeze
+
+- `POST /v1/projects/{pid}/gate/pass` moves a project to `GATE_D3_PASSED` or
+  refuses with the machine-readable gaps. `GET .../form`,
+  `POST .../form/fields/{key}/confirm`, and `POST .../form/freeze` complete
+  contract step 11.
+- A field is filled only from a confirmed fact and carries that fact's
+  `SourceRef`; conflicting facts leave it in `conflict` with neither value
+  shown; everything else renders as `待补充`
+  ([D-022](docs/decisions.md#d-022)). Freezing requires the gate to have passed
+  and no field left pending, then hashes values, provenance, and the snapshot
+  version. A frozen form cannot be edited and re-freezing returns the same hash.
+- **Two dead ends in the state path, found by needing to reach the gate**
+  ([D-021](docs/decisions.md#d-021)): `ROADMAP_CONFIRMED` had no exit because
+  its natural trigger is attaching a material card and `p5` publishes none, so
+  confirming the roadmap now starts collection in the same call, recording both
+  transitions. And the gate refused with `transition COLLECTING_MATERIALS ->
+  GATE_D3_PASSED is not allowed`, which tells a creator nothing; it now says the
+  pre-check must run first.
+- The pre-check now advances the review loop from `COLLECTING_MATERIALS` to
+  `REVIEW_RUNNING`, and to `REVISION_LOOP` when blocking findings exist. T-A4
+  deferred this rather than invent a path while the packs were empty.
+
+Verified: `python -m pytest` — 305 passed, 3 skipped, 20 new in
+`tests/test_form_freeze.py`. The whole golden path driven against a live API:
+classify T3, roadmap into `COLLECTING_MATERIALS`, pre-check into
+`REVIEW_RUNNING`, gate refused with `facts_missing`, freeze refused with
+`STATE_INVALID`, five fields confirmed, gate passed, form frozen with a 64-char
+hash, and a post-freeze edit refused with `CONFLICT`.
+
+
 ### A — finding actions and incremental review
 
 - `POST /v1/projects/{pid}/findings/{fid}/action` takes `accept`, `resolve`,

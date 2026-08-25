@@ -29,6 +29,7 @@ from .routers import (
     assets,
     health,
     internal,
+    forms,
     materials,
     notifications,
     projects,
@@ -92,6 +93,7 @@ def create_app(
     app.include_router(assets.router)
     app.include_router(materials.router)
     app.include_router(review.router)
+    app.include_router(forms.router)
     app.include_router(notifications.router)
     app.include_router(internal.router)
     app.include_router(admin_policy_router)
