@@ -22,6 +22,29 @@ Conventions:
 
 ## 2026-08-24
 
+### A — roadmap preview and confirmation
+
+- `GET /v1/projects/{pid}/roadmap` builds the plan from
+  `p4_process_templates` for the template the classification chain already
+  chose; `POST .../roadmap/confirm` accepts it and moves the project to
+  `ROADMAP_CONFIRMED`.
+- An empty template yields no steps and a `roadmap_template_pending` flag rather
+  than an invented plan — a creator follows a roadmap, so inventing one is worse
+  than showing none. Confirming an empty roadmap is allowed on purpose: refusing
+  would block collection, review, and the gate on unpublished policy.
+- Confirming twice is one event, not two. An unclassified project is refused.
+- The pending flag rides on the API response, not the `Roadmap` document, so
+  `schemas/` is unchanged.
+- **B: this proposes a shape for `p4_process_templates`** and writes it into the
+  seed with empty contents. See [D-017](docs/decisions.md#d-017) — it needs your
+  review, along with [D-016](docs/decisions.md#d-016), before real content is
+  published into either pack.
+
+Verified: `python -m pytest` — 249 passed, 10 new in `tests/test_roadmap.py`.
+Live against the real seed: `T3_4steps` with no steps and
+`roadmap_template_pending`, confirm moves the state and keeps the flag.
+
+
 ### A — fact extraction from uploaded assets
 
 - `POST /v1/projects/{pid}/assets/{vid}/extract-facts` reads one asset and

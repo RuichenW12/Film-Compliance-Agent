@@ -25,11 +25,18 @@ from schemas.enums import (
 )
 from schemas.findings import Finding, Locator
 from schemas.policy_snapshot import PackName
-from schemas.project import ChannelProfile, IntentProfile, Project, TracksEnabled
+from schemas.project import (
+    ChannelProfile,
+    IntentProfile,
+    Project,
+    Roadmap,
+    TracksEnabled,
+)
 from schemas.snapshot import SnapshotService
 from schemas.workflow import Notification
 
 from .classify import classify
+from .classify.chain import ROADMAP_TEMPLATE_BY_TIER
 from .classify.chain import ClassificationOutcome
 from .classify.d1c import PUBLISHED_KEYS, judge_tier
 from .clock import Clock
@@ -45,6 +52,7 @@ from .gate import GateResult, evaluate_gate_d3, required_fact_keys
 from .ids import new_id
 from .llm import LLMClient
 from .materials import build_material_cards
+from .roadmap import build_roadmap
 from .state_machine import GateContext, transition
 
 # States where a recalculation must not touch anything any more.
@@ -303,6 +311,69 @@ class WorkflowService:
                 {"snapshot_version": snapshot_version},
             )
         return project
+
+    # --------------------------------------------------------------- roadmap
+
+    def roadmap_preview(self, project_id: str) -> tuple[Roadmap | None, list[str]]:
+        """The plan this project would follow, built from the pinned snapshot."""
+
+        project = self.get_project(project_id)
+        if project.roadmap is not None:
+            _, flags = self._build_roadmap_for(project)
+            return project.roadmap, flags
+        if project.classification is None:
+            return None, ["classification_pending"]
+        return self._build_roadmap_for(project)
+
+    def confirm_roadmap(self, project_id: str) -> tuple[Project, list[str]]:
+        """The creator accepts the plan. Idempotent: confirming twice is one event."""
+
+        project = self.get_project(project_id)
+        if project.classification is None:
+            raise StateInvalidError(
+                "a project must be classified before its roadmap is confirmed",
+                {"state": project.state.value},
+            )
+
+        roadmap, flags = self._build_roadmap_for(project)
+        if project.roadmap is not None and project.roadmap.confirmed:
+            return project, flags
+
+        project = project.model_copy(
+            update={
+                "roadmap": roadmap.model_copy(update={"confirmed": True}),
+                "updated_at": self._clock.now(),
+            }
+        )
+        self._stores.projects.save(project)
+        self._record_event(
+            project_id,
+            Actor.CREATOR,
+            "roadmap.confirmed",
+            {
+                "template": roadmap.template,
+                "step_count": len(roadmap.steps),
+                "pending_flags": flags,
+            },
+        )
+        project = self._transition(
+            project,
+            ProjectState.ROADMAP_CONFIRMED,
+            Actor.CREATOR,
+            "roadmap.confirmed",
+        )
+        return project, flags
+
+    def _build_roadmap_for(self, project: Project) -> tuple[Roadmap, list[str]]:
+        classification = project.classification
+        assert classification is not None  # callers check before reaching here
+        template = ROADMAP_TEMPLATE_BY_TIER.get(
+            classification.tier, f"{classification.tier.value}_template"
+        )
+        version = self._pinned_version(project)
+        return build_roadmap(
+            template, self._snapshots.get_pack(PackName.P4_PROCESS_TEMPLATES, version)
+        )
 
     # ------------------------------------------------------- fact extraction
 
