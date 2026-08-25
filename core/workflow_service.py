@@ -13,6 +13,7 @@ from schemas.assets import AssetVersion, MaterialCard, UploadTicket
 from schemas.common import AuditEntry, Fact, SourceRef, TimelineEvent
 from schemas.enums import (
     Actor,
+    InstitutionDecision,
     AlertOption,
     AssetKind,
     FindingStatus,
@@ -36,7 +37,7 @@ from schemas.project import (
     TracksEnabled,
 )
 from schemas.snapshot import SnapshotService
-from schemas.workflow import Notification
+from schemas.workflow import InstitutionReview, MockInstitution, Notification
 
 from .classify import classify
 from .classify.chain import ROADMAP_TEMPLATE_BY_TIER
@@ -55,6 +56,7 @@ from .errors import (
 )
 from .forms import build_fields, draft_hash, pending_keys
 from .gate import GateResult, evaluate_gate_d3, required_fact_keys
+from .institution import check_licence
 from .ids import new_id
 from .llm import LLMClient
 from .materials import build_material_cards
@@ -594,6 +596,159 @@ class WorkflowService:
             project, ProjectState.FORM_FROZEN, Actor.CREATOR, "form.frozen"
         )
         return frozen
+
+    # ------------------------------------------------- institution and filing
+
+    def load_institutions(self, institutions: list[MockInstitution]) -> list[MockInstitution]:
+        """Demo registry. Empty by default: no institution ships invented."""
+
+        self._stores.institutions.load(institutions)
+        return self._stores.institutions.list()
+
+    def list_institutions(self) -> list[MockInstitution]:
+        return self._stores.institutions.list()
+
+    def submit_to_institution(
+        self, project_id: str, institution_id: str
+    ) -> tuple[Project, InstitutionReview]:
+        """Hand a frozen form to a licensed institution, with a mock licence check."""
+
+        project = self.get_project(project_id)
+        # Re-submitting while already under review is switching institutions,
+        # which the state table allows; the frozen form is unchanged either way.
+        if project.state not in (
+            ProjectState.FORM_FROZEN,
+            ProjectState.INSTITUTION_REVIEW,
+        ):
+            raise StateInvalidError(
+                "the form must be frozen before it goes to an institution",
+                {"state": project.state.value},
+            )
+
+        review = InstitutionReview(
+            review_id=new_id("review"),
+            institution_id=institution_id,
+            license_check=check_licence(
+                institution_id, self._stores.institutions.get(institution_id)
+            ),
+            created_at=self._clock.now(),
+        )
+        self._stores.institution_reviews.put(project_id, review)
+        self._record_event(
+            project_id,
+            Actor.CREATOR,
+            "institution.submitted",
+            {
+                "institution_id": institution_id,
+                "license_reasons": list(review.license_check.reasons),
+            },
+        )
+        project = self._transition(
+            project,
+            ProjectState.INSTITUTION_REVIEW,
+            Actor.CREATOR,
+            "institution.submitted",
+        )
+        return project, review
+
+    def decide_institution_review(
+        self,
+        project_id: str,
+        decision: str,
+        return_comments: str | None = None,
+        signed_agreement_uri: str | None = None,
+    ) -> tuple[Project, InstitutionReview]:
+        """The institution's verdict. Accepting needs a licence check that passed."""
+
+        project = self.get_project(project_id)
+        review = self._stores.institution_reviews.latest(project_id)
+        if review is None:
+            raise NotFoundError(
+                "this project has not been submitted to an institution",
+                {"project_id": project_id},
+            )
+
+        try:
+            verdict = InstitutionDecision(decision)
+        except ValueError as exc:
+            raise ValidationFailedError(
+                f"unknown decision: {decision}", {"decision": decision}
+            ) from exc
+
+        if verdict is InstitutionDecision.ACCEPT:
+            if not (signed_agreement_uri or "").strip():
+                raise ValidationFailedError(
+                    "accepting requires the signed agreement",
+                    {"field": "signed_agreement_uri"},
+                )
+            if review.license_check is None or not review.license_check.valid:
+                # The check is mock, but a mock check that failed must still
+                # stop the flow — otherwise the demo teaches the wrong lesson.
+                raise ValidationFailedError(
+                    "the mock license check did not pass for this institution",
+                    {"reasons": list((review.license_check.reasons if review.license_check else ["no_license_check"]))},
+                )
+        if verdict is InstitutionDecision.RETURN and not (return_comments or "").strip():
+            raise ValidationFailedError(
+                "returning a project requires comments", {"field": "return_comments"}
+            )
+
+        updated = review.model_copy(
+            update={
+                "decision": verdict,
+                "return_comments": return_comments,
+                "signed_agreement_uri": signed_agreement_uri,
+                "decided_at": self._clock.now(),
+            }
+        )
+        self._stores.institution_reviews.put(project_id, updated)
+        self._record_event(
+            project_id,
+            Actor.INSTITUTION,
+            "institution.decided",
+            {"decision": verdict.value, "review_id": updated.review_id},
+        )
+
+        target = {
+            InstitutionDecision.ACCEPT: ProjectState.READY_FOR_EXTERNAL_FILING,
+            InstitutionDecision.RETURN: ProjectState.INSTITUTION_RETURNED,
+        }.get(verdict)
+        if target is not None:
+            project = self._transition(
+                project, target, Actor.INSTITUTION, f"institution.{verdict.value}"
+            )
+        return project, updated
+
+    def record_filing(self, project_id: str, registration_number: str) -> Project:
+        """Record a number a human read off a government system.
+
+        Ground rule 3 at its sharpest: this is the one value the product must
+        never generate, so it arrives as input and is stored verbatim.
+        """
+
+        if not (registration_number or "").strip():
+            raise ValidationFailedError(
+                "a filing needs the registration number a human received",
+                {"field": "registration_number"},
+            )
+
+        project = self.get_project(project_id)
+        project = project.model_copy(
+            update={
+                "registration_number": registration_number.strip(),
+                "updated_at": self._clock.now(),
+            }
+        )
+        self._stores.projects.save(project)
+        self._record_event(
+            project_id,
+            Actor.INSTITUTION,
+            "filing.recorded",
+            {"registration_number": project.registration_number},
+        )
+        return self._transition(
+            project, ProjectState.FILED, Actor.INSTITUTION, "filing.recorded"
+        )
 
     # --------------------------------------------------------- finding actions
 

@@ -39,7 +39,9 @@ Product workstream (A):
 
 - `routers/forms.py` — gate passage, form preview, field confirmation, and freeze ([D-022](../docs/decisions.md#d-022)).
 
-Still to build: institution console, tasks.
+- `routers/institution.py` — the demo registry, submission, the institution's decision, and filing ([D-023](../docs/decisions.md#d-023)).
+
+Still to build: tasks, and the institution console UI.
 
 Policy workstream (B):
 

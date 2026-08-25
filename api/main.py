@@ -27,9 +27,10 @@ from workers.policy.adapters.repository_snapshot import RepositorySnapshotServic
 from .deps.services import AppContext, build_context
 from .routers import (
     assets,
-    health,
-    internal,
     forms,
+    health,
+    institution,
+    internal,
     materials,
     notifications,
     projects,
@@ -94,6 +95,7 @@ def create_app(
     app.include_router(materials.router)
     app.include_router(review.router)
     app.include_router(forms.router)
+    app.include_router(institution.router)
     app.include_router(notifications.router)
     app.include_router(internal.router)
     app.include_router(admin_policy_router)

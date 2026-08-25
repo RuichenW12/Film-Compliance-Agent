@@ -22,6 +22,33 @@ Conventions:
 
 ## 2026-08-25
 
+### A — institution review and filing
+
+- `GET /v1/institutions`, `PUT /v1/admin/institutions`,
+  `POST /v1/projects/{pid}/institution/submit`, `.../institution/decide`, and
+  `POST /v1/projects/{pid}/filing` complete contract steps 12-14.
+- **The registry ships empty and the licence check is always mock**
+  ([D-023](docs/decisions.md#d-023)). An institution the registry does not know
+  reports `institution_not_in_registry` with both sub-checks `None` — unknown,
+  not passed and not failed. Nothing in the repository asserts that a real
+  company exists or holds a licence.
+- A mock check that failed still stops the flow: accepting requires a check that
+  passed, so a foreign-invested demo institution cannot accept a project.
+  Accepting also requires the signed agreement; returning requires comments.
+- The creator submits and the institution decides; neither may do the other's
+  act. Re-submitting while under review switches institutions and leaves the
+  frozen form untouched.
+- **The registration number is input, never output.** `POST .../filing` refuses
+  a blank one and stores what a human supplies, verbatim. Filing never rewrites
+  the frozen form — its hash is unchanged after `FILED`, which is tested.
+
+Verified: `python -m pytest` — 326 passed, 3 skipped, 21 new in
+`tests/test_institution.py`. Driven against a live API from an empty registry
+through to `FILED`: unknown institution reported as unverifiable, bare accept
+refused, accept into `READY_FOR_EXTERNAL_FILING`, blank registration number
+refused, filing recorded, and the frozen form's hash unchanged afterwards.
+
+
 ### A — gate passage, form preview, field confirmation, and freeze
 
 - `POST /v1/projects/{pid}/gate/pass` moves a project to `GATE_D3_PASSED` or
