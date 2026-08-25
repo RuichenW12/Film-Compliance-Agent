@@ -80,7 +80,9 @@ def create_app(
     app.add_middleware(
         CORSMiddleware,
         allow_origins=WEB_ORIGINS,
-        allow_methods=["GET", "POST", "OPTIONS"],
+        # PUT is the upload route: the browser preflights it, so omitting it
+        # here fails the upload in the UI while every test still passes.
+        allow_methods=["GET", "POST", "PUT", "OPTIONS"],
         allow_headers=["Content-Type", "X-Mock-Role", "X-User-Id", "X-Internal-Token"],
     )
 

@@ -20,6 +20,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           <strong>{t("app.title")}</strong>
           <nav>
             <Link href="/wizard">{t("nav.wizard")}</Link>
+            <Link href="/collection">{t("nav.collection")}</Link>
             <Link href="/dashboard">{t("nav.dashboard")}</Link>
             <Link href="/admin/policy">{t("nav.admin")}</Link>
           </nav>

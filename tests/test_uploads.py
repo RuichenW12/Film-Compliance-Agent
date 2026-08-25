@@ -182,3 +182,23 @@ def test_the_upload_is_on_the_timeline(client):
     assert len(uploaded) == 1
     assert uploaded[0]["detail"]["version_id"] == version["version_id"]
     assert uploaded[0]["detail"]["kind"] == "script"
+
+
+# ------------------------------------------------------------ browser access
+
+
+def test_the_browser_may_preflight_an_upload(client):
+    """Found by driving the real UI: without PUT allowed, every test still
+    passes and the upload fails only in a browser."""
+
+    response = client.options(
+        "/v1/uploads/tkt_any",
+        headers={
+            "Origin": "http://localhost:3000",
+            "Access-Control-Request-Method": "PUT",
+            "Access-Control-Request-Headers": "x-mock-role,x-user-id",
+        },
+    )
+    assert response.status_code == 200
+    allowed = response.headers["access-control-allow-methods"]
+    assert "PUT" in allowed
