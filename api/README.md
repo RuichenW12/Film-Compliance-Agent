@@ -26,17 +26,18 @@ Product workstream (A):
 - `deps/services.py` is the product composition root: store, snapshot service, clock, LLM backend.
 - `routers/health.py` — `GET /healthz`.
 - `routers/projects.py` — create/read project, S1 intent, S2 channels, classify, tier-choice, gate, timeline.
-- `routers/internal.py` — `recalc-tier` and `policy-stale`, guarded by `X-Internal-Token`.
+- `routers/internal.py` — `recalc-tier` and `policy-stale`, guarded by `X-Internal-Token`. Both write the creator's notification as part of the same call ([D-014](../docs/decisions.md#d-014)).
+- `routers/notifications.py` — `GET /v1/notifications` and `POST /v1/notifications/{nid}/read`, each caller scoped to their own inbox.
 
 - `routers/assets.py` — upload tickets, `PUT /v1/uploads/{tid}`, asset listing and content reads ([D-015](../docs/decisions.md#d-015)).
 
 - `routers/materials.py` — collection cards from `p5_form_templates`: list, attach, validate, waive ([D-016](../docs/decisions.md#d-016)).
 
-Still to build: fact extraction, review triggers, findings actions, form preview/freeze, institution console, tasks and notifications.
+Still to build: fact extraction, review triggers, findings actions, form preview/freeze, institution console, tasks.
 
 Policy workstream (B):
 
-- `routes/admin_policy.py` — `/v1/admin/policy`: launch the deterministic `fixture://policy-v2` refresh, read run status, list and review proposals, publish or discard, and list snapshot history.
+- `routers/admin_policy.py` — `/v1/admin/policy`: launch the deterministic `fixture://policy-v2` refresh, read run status, list and review proposals, publish or discard, and list snapshot history.
 - `deps/policy.py` builds the process-local policy state during lifespan startup and guards the routes with `X-Mock-Role: admin`.
 - `errors.py` renders `PolicyApiError` into the same error envelope.
 

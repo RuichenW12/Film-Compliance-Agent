@@ -270,6 +270,53 @@ def main() -> int:
         (after.get("project", {}).get("classification") or {}).get("tier") == "T1",
     )
 
+    print()
+    print("== 17. the creator inbox ==")
+    status, inbox, _ = checker.call("GET", "/v1/notifications")
+    stale_notice = [item for item in inbox if item["kind"] == "policy_stale"]
+    checker.check(
+        "the stale flag reached the owner's inbox",
+        status == 200 and len(stale_notice) == 1,
+        json.dumps([item["kind"] for item in inbox]),
+    )
+    checker.check(
+        "the notice carries keys and params, not prose",
+        bool(stale_notice)
+        and stale_notice[0]["title_key"] == "notification.policy_stale.title"
+        and stale_notice[0]["params"].get("snapshot_version") == "v2",
+    )
+
+    checker.call(
+        "POST",
+        f"/v1/internal/projects/{project_id}/policy-stale",
+        {"snapshot_version": "v2"},
+        headers=internal,
+    )
+    _, redelivered, _ = checker.call("GET", "/v1/notifications")
+    checker.check(
+        "redelivery does not refill the inbox",
+        len([item for item in redelivered if item["kind"] == "policy_stale"]) == 1,
+    )
+
+    if stale_notice:
+        nid = stale_notice[0]["notification_id"]
+        status, marked, _ = checker.call("POST", f"/v1/notifications/{nid}/read")
+        checker.check(
+            "a notice can be marked read", status == 200 and marked["read"] is True
+        )
+        _, unread, _ = checker.call("GET", "/v1/notifications?unread_only=true")
+        checker.check(
+            "unread_only hides what was read",
+            all(item["notification_id"] != nid for item in unread),
+        )
+
+    _, other_inbox, _ = checker.call(
+        "GET",
+        "/v1/notifications",
+        headers={"X-Mock-Role": "creator", "X-User-Id": "u_other"},
+    )
+    checker.check("another creator sees an empty inbox", other_inbox == [])
+
     print("\n== not built yet (each line is the next task, not a bug) ==")
     for label, task in PENDING_STEPS:
         print(f"  [PENDING {task}] {label}")

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections import defaultdict
+from datetime import datetime, timezone
 from dataclasses import dataclass, field
 from typing import Protocol
 
@@ -195,6 +196,13 @@ class InMemoryInstitutionReviewStore:
         return reviews[-1] if reviews else None
 
 
+EPOCH = datetime.min.replace(tzinfo=timezone.utc)
+
+
+def _created_at(notification: Notification) -> datetime:
+    return notification.created_at or EPOCH
+
+
 class InMemoryNotificationStore:
     def __init__(self) -> None:
         self._items: dict[str, Notification] = {}
@@ -203,12 +211,18 @@ class InMemoryNotificationStore:
         self._items[notification.notification_id] = notification
         return notification
 
+    def get(self, notification_id: str) -> Notification | None:
+        return self._items.get(notification_id)
+
     def list(self, user_id: str, unread_only: bool = False) -> list[Notification]:
-        return [
+        """Newest first: an inbox is read from the top."""
+
+        matching = [
             item
             for item in self._items.values()
             if item.user_id == user_id and (not unread_only or not item.read)
         ]
+        return sorted(matching, key=_created_at, reverse=True)
 
     def mark_read(self, notification_id: str) -> Notification | None:
         item = self._items.get(notification_id)
