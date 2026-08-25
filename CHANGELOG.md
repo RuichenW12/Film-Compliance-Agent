@@ -34,7 +34,9 @@ Conventions:
 - **Severity comes from the rule, never the model.** While the p2 keywords are
   the placeholder list, every finding is `needs_human`, not `block`. Each one
   carries an `EvidenceRef` into the pinned snapshot, so ground rule 2 holds by
-  construction rather than by review.
+  construction rather than by review. The ceiling and the condition for changing
+  it are recorded in [D-018](docs/decisions.md#d-018): it is revisited after the
+  first test against partner-confirmed rules, not tuned on speculation before.
 - No backend means `script_semantic_check_pending`. Patterns finding nothing is
   never rendered as a clean script.
 - A pre-check reports and does not move project state; the revision loop that

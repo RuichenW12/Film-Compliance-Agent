@@ -31,6 +31,7 @@ status becomes `Superseded by D-0xx`. That way the reasoning trail survives.
 | [D-015](#d-015) | A | Uploads go through a one-shot ticket, not a bare route | Accepted |
 | [D-016](#d-016) | Shared | `p5_form_templates` card shape proposed by A, pending B's review | Proposed |
 | [D-017](#d-017) | Shared | `p4_process_templates` step shape proposed by A, pending B's review | Proposed |
+| [D-018](#d-018) | A | Placeholder subject rules cap C1-a severity at `needs_human` | Accepted, revisit after the first real-rule test |
 
 ---
 
@@ -448,3 +449,49 @@ reviews these two pack shapes.
 Revisit when the real filing process is sourced: real steps may need
 dependencies between them, per-step deadlines, or an institution-side owner,
 none of which are guessed here.
+
+## D-018
+
+**Placeholder subject rules cap C1-a severity at `needs_human`** · Area: A · Status: Accepted, revisit after the first real-rule test · 2026-08-25
+
+Three of the five severities assert a compliance conclusion — `block`,
+`co_review_required`, `caution`. `needs_human` asserts the opposite: that the
+machine will not say.
+
+The p2 pack names the nine statutory categories but publishes no trigger text,
+so `core/classify/subject_rules.py` attaches its own keyword list and marks
+every derived rule `expert_pending` ([D-002](#d-002)). When a scene matches
+公安 on 卧底警察, what actually happened is that a keyword this codebase
+invented matched. Reporting that as `co_review_required` would state a legal
+conclusion resting on a guess, and the attached clause citation would make it
+look sourced: `nrta-order-16-article-5` is real and does list 公安, but the link
+from *this scene* to *that article* came from the keyword list, not the article.
+
+So while `expert_pending` is set, `core/review.py` caps severity:
+
+```python
+severity=(
+    FindingSeverity.NEEDS_HUMAN
+    if rule.expert_pending
+    else FindingSeverity.CO_REVIEW_REQUIRED
+)
+```
+
+**This is not a softening.** `needs_human` blocks the D3 gate exactly as `block`
+does, so the project cannot proceed either way. What changes is the claim: "a
+person must look at this scene" rather than "this scene requires co-review with
+the authority."
+
+Nothing in code has to change when partner-confirmed rules arrive. The pack
+publishes `subject_rules: [...]`, the loader stops synthesizing, `expert_pending`
+becomes false, and the same scenes begin reporting `co_review_required`.
+
+**Revisit after the first test against real rules, not before.** Whether
+`co_review_required` is the right ceiling even for confirmed rules — or whether
+some categories should reach `block`, or whether a confirmed rule with a
+low-confidence match should still route to a human — is a question the placeholder
+list cannot answer. The golden-sample corpus is where that gets decided: samples
+written against today's keywords will start failing when real rules land, and
+that failure is the signal, because it shows exactly what the partner's rules
+changed versus the guesses. Until such a test has been run, this ceiling stays
+where it is rather than being tuned on speculation.
