@@ -25,7 +25,7 @@ the commit's files.
 | Owner | Meaning |
 |---|---|
 | **Maxine (A)** | Product workflow. Owns `api/routers/`, `core/`, `store/`, `web/app/{wizard,dashboard}`, `web/lib/api.ts` |
-| **Richard (B)** | Policy loop. Owns `workers/policy/`, `api/routes/admin_policy.py`, `web/app/admin/policy/`, `policy/` |
+| **Richard (B)** | Policy loop. Owns `workers/policy/`, `api/routers/admin_policy.py`, `web/app/admin/policy/`, `policy/` |
 | **Shared** | `schemas/` — the contract boundary. Changes need both owners |
 
 Boundary rule that decides the ambiguous rows: B does not edit product code and
@@ -97,7 +97,7 @@ The loop is closed on paper and open in wiring.
 | `policy.updated` delivered from B's outbox to A's `/v1/internal/*` | Richard (T-B3, [D-010](../decisions.md#d-010)) | ❌ |
 | Project enumeration and impact filtering | Richard | ❌ |
 | `policy_stale` / `tier_recalculated` notification fan-out | Split: B triggers, A produces and serves | ⚠️ A's half done, B's half open |
-| One router directory, one auth helper | Shared, cleanup pending ([D-011](../decisions.md#d-011)) | ❌ |
+| One router directory, one auth helper | Shared ([D-011](../decisions.md#d-011)) | ⚠️ one directory done, the two auth helpers remain |
 
 ## What has never executed anywhere
 

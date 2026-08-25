@@ -24,7 +24,7 @@ status becomes `Superseded by D-0xx`. That way the reasoning trail survives.
 | [D-008](#d-008) | Shared | `create_app` takes keyword-only state arguments | Accepted |
 | [D-009](#d-009) | Shared | One API process on port 8080 serves both workstreams | Accepted |
 | [D-010](#d-010) | B | Wiring the policy consumer to the live recalc endpoint stays with B | Accepted, open |
-| [D-011](#d-011) | Shared | Two router directories and two auth helpers coexist for now | Accepted, cleanup pending |
+| [D-011](#d-011) | Shared | Two router directories and two auth helpers coexist for now | Directory half resolved 2026-08-24 |
 | [D-012](#d-012) | Shared | The product cannot read published snapshots yet | Resolved locally by Gate 5-a |
 | [D-013](#d-013) | B | Gate 4 adds cloud adapters without claiming deployment | Accepted |
 | [D-014](#d-014) | Shared | The policy loop triggers notifications; the product produces them | Accepted |
@@ -198,7 +198,7 @@ institution-stage, and filed projects are refused, and the reason comes back in
 
 ## D-011
 
-**Two router directories and two auth helpers coexist for now** · Area: Shared · Status: Accepted, cleanup pending · 2026-08-23
+**Two router directories and two auth helpers coexist for now** · Area: Shared · Status: Directory half resolved 2026-08-24, auth helpers pending · 2026-08-23
 
 The merge left `api/routes/` (policy) beside `api/routers/` (product), and
 `api/deps/policy.require_admin` beside `api/deps/demo_auth.Principal`. Both
@@ -207,6 +207,20 @@ with in-flight branches for no functional gain.
 
 Cleanup, once both sides are between tasks: one router directory, and the policy
 routes depending on `Principal` so role handling lives in one place.
+
+**Directory resolution (2026-08-24):** `api/routers/` won and `api/routes/` is
+gone — `admin_policy.py` moved into `api/routers/` and the empty package was
+deleted. Four product files stayed put and one policy file moved, which is the
+smaller move; the name is otherwise arbitrary. The moved file keeps its absolute
+`api.…` imports and its own style, so the diff is a rename plus one import line
+in `api/main.py`. Called by the A-line owner while B was between tasks; B's file
+moved, so B should know, but no policy behavior, route path, or contract
+changed.
+
+**Still open:** the two auth helpers. `api/deps/policy.require_admin` reads
+`X-Mock-Role` directly and `api/deps/demo_auth.Principal` covers the product
+routes. Consolidating those changes how a policy route authorizes, which is a
+behavior change in B's code and wants B's agreement, not just B's awareness.
 
 ## D-012
 
