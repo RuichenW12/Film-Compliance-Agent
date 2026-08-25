@@ -35,9 +35,9 @@ Product workstream (A):
 
 - `routers/assets.py` also serves `extract-facts` and the project fact list.
 
-- `routers/review.py` — C1-a pre-check and the project finding list.
+- `routers/review.py` — C1-a pre-check, the project finding list, and finding actions ([D-019](../docs/decisions.md#d-019)).
 
-Still to build: findings actions, form preview/freeze, institution console, tasks.
+Still to build: form preview/freeze, institution console, tasks.
 
 Policy workstream (B):
 

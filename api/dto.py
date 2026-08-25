@@ -141,3 +141,12 @@ class ReviewResponse(ApiModel):
     pending_flags: list[str]
     backend: str
     state: ProjectState
+
+
+class FindingActionRequest(ApiModel):
+    """`accept` acknowledges; `resolve`, `waive`, and `reject` release the gate.
+    `waive` and `reject` require a reason, which is recorded with the finding."""
+
+    action: str
+    reason: str | None = None
+    option_id: str | None = None

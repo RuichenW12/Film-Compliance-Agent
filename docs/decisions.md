@@ -32,6 +32,8 @@ status becomes `Superseded by D-0xx`. That way the reasoning trail survives.
 | [D-016](#d-016) | Shared | `p5_form_templates` card shape proposed by A, pending B's review | Proposed |
 | [D-017](#d-017) | Shared | `p4_process_templates` step shape proposed by A, pending B's review | Proposed |
 | [D-018](#d-018) | A | Placeholder subject rules cap C1-a severity at `needs_human` | Accepted, revisit after the first real-rule test |
+| [D-019](#d-019) | A | `accept` acknowledges a finding without releasing the gate | Accepted |
+| [D-020](#d-020) | A | A vanished quote is `self_fixed`; a surviving one keeps its decision | Accepted |
 
 ---
 
@@ -495,3 +497,58 @@ written against today's keywords will start failing when real rules land, and
 that failure is the signal, because it shows exactly what the partner's rules
 changed versus the guesses. Until such a test has been run, this ceiling stays
 where it is rather than being tuned on speculation.
+
+## D-019
+
+**`accept` acknowledges a finding without releasing the gate** · Area: A · Status: Accepted · 2026-08-25
+
+Four actions close a finding and they are not interchangeable:
+
+| Action | Status | Releases D3 | Means |
+|---|---|---|---|
+| `accept` | `accepted` | **no** | "yes, this is a problem" |
+| `resolve` | `resolved` | yes | "it is fixed" |
+| `waive` | `waived` | yes | "we proceed anyway, and here is why" |
+| `reject` | `rejected` | yes | "this finding is wrong, and here is why" |
+
+`accept` deliberately does not release the gate. Agreeing that a scene is a
+problem does not make it stop being one, and an "acknowledge" button that
+silently unblocked the workflow would be the easiest possible way to walk a
+project past its own compliance check.
+
+`waive` and `reject` both require a reason, which is recorded on the finding and
+on the timeline. They are the two ways a project moves forward while a machine
+still thinks something is wrong, so neither may happen anonymously.
+
+Revisit if the institution console needs to distinguish a creator's waiver from
+an institution's: today both would land in the same `waived` status, and only
+the timeline actor tells them apart.
+
+## D-020
+
+**A vanished quote is `self_fixed`; a surviving one keeps its decision** · Area: A · Status: Accepted · 2026-08-25
+
+When a new script version is reviewed, prior findings are neither wiped nor left
+pointing at a script that no longer exists:
+
+- a quote still present in the new version is **the same problem**, so its
+  finding moves to the new `asset_version` and keeps whatever the creator
+  decided about it. A waiver already justified is not re-litigated because a
+  neighbouring scene changed.
+- a quote that has vanished was rewritten, which is the creator fixing it. The
+  finding is marked `self_fixed` rather than deleted, so the history of what was
+  flagged and what happened to it survives.
+
+Only `open` findings become `self_fixed`. A finding the creator already waived
+or rejected keeps that decision even if the scene disappears, because the record
+of *why* they decided it matters more than the scene's current presence.
+
+Alert findings are exempt: they come from the intent profile, not the script, so
+a script rewrite says nothing about them.
+
+The weakness worth naming: matching on exact quote text means a scene edited
+only slightly reads as vanished-and-new — the old finding closes as `self_fixed`
+and a fresh one opens. That is the safe direction (a changed scene is re-checked
+rather than silently inheriting an old verdict), but it will inflate
+`self_fixed` counts. Revisit if the count becomes misleading in the timeline,
+or when scene-level diffing exists to match a scene across edits.
