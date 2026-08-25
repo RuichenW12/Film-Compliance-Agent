@@ -33,6 +33,7 @@ from .classify import classify
 from .classify.chain import ClassificationOutcome
 from .classify.d1c import PUBLISHED_KEYS, judge_tier
 from .clock import Clock
+from .extract import extract_facts
 from .errors import (
     ConflictError,
     ForbiddenError,
@@ -40,7 +41,7 @@ from .errors import (
     StateInvalidError,
     ValidationFailedError,
 )
-from .gate import GateResult, evaluate_gate_d3
+from .gate import GateResult, evaluate_gate_d3, required_fact_keys
 from .ids import new_id
 from .llm import LLMClient
 from .materials import build_material_cards
@@ -302,6 +303,50 @@ class WorkflowService:
                 {"snapshot_version": snapshot_version},
             )
         return project
+
+    # ------------------------------------------------------- fact extraction
+
+    def extract_asset_facts(self, project_id: str, version_id: str):
+        """Read one asset and store only the facts it can back verbatim."""
+
+        project = self.get_project(project_id)
+        asset, data = self.read_asset(project_id, version_id)
+        document = data.decode("utf-8", errors="replace")
+
+        version = self._pinned_version(project)
+        wanted = required_fact_keys(
+            self._snapshots.get_pack(PackName.P5_FORM_TEMPLATES, version)
+        )
+        result = extract_facts(document, self._llm, wanted)
+
+        stored: list[Fact] = []
+        for proposed in result.facts:
+            stored.append(
+                self._upsert_fact(
+                    project_id,
+                    proposed.key,
+                    proposed.value,
+                    proposed.source_ref(asset.version_id),
+                )
+            )
+
+        self._record_event(
+            project_id,
+            Actor.SYSTEM,
+            "facts.extracted",
+            {
+                "asset_version": asset.version_id,
+                "keys": [fact.key for fact in stored],
+                "discarded": result.discarded,
+                "pending_flags": result.pending_flags,
+                "backend": result.backend,
+            },
+        )
+        return stored, result
+
+    def list_facts(self, project_id: str) -> list[Fact]:
+        self.get_project(project_id)
+        return self._stores.facts.list(project_id)
 
     # -------------------------------------------------------------- materials
 

@@ -5,6 +5,7 @@ from __future__ import annotations
 from pydantic import BaseModel, ConfigDict, Field
 
 from schemas.enums import AssetKind, BudgetBand, ClaimedFormType, ExitKind, ProjectState
+from schemas.common import Fact
 from schemas.project import Classification
 
 
@@ -109,3 +110,13 @@ class AttachMaterialRequest(ApiModel):
 
 class WaiveMaterialRequest(ApiModel):
     reason: str
+
+
+class ExtractFactsResponse(ApiModel):
+    """`pending_flags` carries `fact_extraction_pending` when no backend ran, so
+    an empty `facts` list is never mistaken for "the document held nothing"."""
+
+    facts: list[Fact]
+    discarded: list[str]
+    pending_flags: list[str]
+    backend: str

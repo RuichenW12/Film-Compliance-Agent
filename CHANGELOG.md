@@ -22,6 +22,27 @@ Conventions:
 
 ## 2026-08-24
 
+### A — fact extraction from uploaded assets
+
+- `POST /v1/projects/{pid}/assets/{vid}/extract-facts` reads one asset and
+  stores only the facts the document backs verbatim; `GET .../facts` lists them.
+- Kept honest three ways, each tested: a quote must occur in the document, the
+  value must occur inside its own quote, and a null or blank value is dropped
+  rather than stored. Rejected proposals come back in `discarded`.
+- With no Vertex backend the response carries `fact_extraction_pending` and
+  writes nothing, so an empty list is never read as "the document held nothing".
+- Every stored fact carries `SourceRef(type=asset, asset_version, locator=quote)`,
+  so a form field rendered from it traces back to the line that produced it.
+- Wanted keys come from `p5_form_templates.required_facts` when the pack defines
+  them, otherwise the `core.gate` defaults.
+- Prompt contract in `prompts/fact-extract.v1.md`.
+
+Verified: `python -m pytest` — 239 passed, 11 new in
+`tests/test_fact_extraction.py`, covering the offline pending path, verbatim
+rejection, value-not-in-quote rejection, null values, prompt injection inside an
+uploaded document, gate gap closure, and role scoping.
+
+
 ### A — policy notifications reach the creator
 
 - `WorkflowService` now writes an inbox entry when a policy update sets
