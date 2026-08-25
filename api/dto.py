@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from schemas.enums import BudgetBand, ClaimedFormType, ExitKind, ProjectState
+from schemas.enums import AssetKind, BudgetBand, ClaimedFormType, ExitKind, ProjectState
 from schemas.project import Classification
 
 
@@ -85,3 +85,19 @@ class ProjectCounts(ApiModel):
 class ProjectResponse(ApiModel):
     project: dict
     counts: ProjectCounts
+
+
+class UploadUrlRequest(ApiModel):
+    kind: AssetKind
+    filename: str | None = None
+
+
+class UploadTicketResponse(ApiModel):
+    """`backend` says where the bytes will land, so a local run is never
+    mistaken for a cloud one."""
+
+    ticket_id: str
+    upload_url: str
+    method: str
+    backend: str
+    storage_uri: str

@@ -34,3 +34,21 @@ class MaterialCard(DomainModel):
     asset_version: str | None = None
     invalid_reasons: list[str] = Field(default_factory=list)
     waive_reason: str | None = None
+
+
+class UploadTicket(DomainModel):
+    """A one-shot permit to write one asset version.
+
+    The product issues a ticket instead of a bare route so the same flow works
+    for a local upload and for a signed object-storage URL later: only
+    `upload_url` and `backend` differ.
+    """
+
+    ticket_id: str
+    project_id: str
+    kind: AssetKind
+    storage_uri: str
+    issued_to: str
+    filename: str | None = None
+    consumed: bool = False
+    created_at: AwareDatetime

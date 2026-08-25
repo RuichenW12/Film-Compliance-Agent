@@ -28,7 +28,9 @@ Product workstream (A):
 - `routers/projects.py` — create/read project, S1 intent, S2 channels, classify, tier-choice, gate, timeline.
 - `routers/internal.py` — `recalc-tier` and `policy-stale`, guarded by `X-Internal-Token`.
 
-Still to build: materials and uploads, review triggers, findings actions, form preview/freeze, institution console, tasks and notifications.
+- `routers/assets.py` — upload tickets, `PUT /v1/uploads/{tid}`, asset listing and content reads ([D-015](../docs/decisions.md#d-015)).
+
+Still to build: material cards, fact extraction, review triggers, findings actions, form preview/freeze, institution console, tasks and notifications.
 
 Policy workstream (B):
 

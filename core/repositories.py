@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from typing import Protocol
 
-from schemas.assets import AssetVersion, MaterialCard
+from schemas.assets import AssetVersion, MaterialCard, UploadTicket
 from schemas.common import AuditEntry, Fact, TimelineEvent
 from schemas.findings import Finding
 from schemas.forms import FormDraft
@@ -63,6 +63,24 @@ class AssetStore(Protocol):
     def get(self, project_id: str, version_id: str) -> AssetVersion | None: ...
 
     def list(self, project_id: str) -> list[AssetVersion]: ...
+
+
+class BlobStore(Protocol):
+    """Raw uploaded bytes. Local in development, object storage in the cloud."""
+
+    def put(self, uri: str, data: bytes) -> str: ...
+
+    def get(self, uri: str) -> bytes | None: ...
+
+
+class UploadTicketStore(Protocol):
+    """One-shot permits. A ticket names what may be written, exactly once."""
+
+    def add(self, ticket: UploadTicket) -> UploadTicket: ...
+
+    def get(self, ticket_id: str) -> UploadTicket | None: ...
+
+    def consume(self, ticket_id: str) -> UploadTicket | None: ...
 
 
 class TaskStore(Protocol):
