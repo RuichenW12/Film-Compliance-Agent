@@ -22,6 +22,38 @@ Conventions:
 
 ## 2026-08-24
 
+### A — C1-a script pre-check and the golden-sample harness
+
+- `POST /v1/projects/{pid}/review` runs the pre-check over the latest uploaded
+  script; `GET /v1/projects/{pid}/findings` lists what it found. Institutions
+  and admins may read findings; only the owner triggers a review.
+- Stage 1 matches the published p2 rules scene by scene, parsing 第N集/场景N
+  headings into `Locator.episode` and `Locator.scene`. Stage 2 is one semantic
+  pass that may only report categories the pack publishes, and whose quote must
+  occur verbatim in the script — anything else lands in `discarded`.
+- **Severity comes from the rule, never the model.** While the p2 keywords are
+  the placeholder list, every finding is `needs_human`, not `block`. Each one
+  carries an `EvidenceRef` into the pinned snapshot, so ground rule 2 holds by
+  construction rather than by review.
+- No backend means `script_semantic_check_pending`. Patterns finding nothing is
+  never rendered as a clean script.
+- A pre-check reports and does not move project state; the revision loop that
+  consumes findings is T-A5. Re-running does not duplicate findings for the same
+  asset version.
+- Added the golden-sample harness (`tests/test_golden_samples.py`,
+  `tests/golden/SCHEMA.md`). It runs synthetic scripts to prove the machinery,
+  and rejects any golden sample lacking `provenance` and `reviewed_by`. With no
+  samples present it **skips with a reason** — an empty corpus is not evidence
+  of accuracy.
+- Prompt contract in `prompts/c1a-script-review.v1.md`.
+
+Verified: `python -m pytest` — 268 passed, 3 skipped (the empty golden corpus),
+16 new in `tests/test_script_review.py`. Live against the real seed: a
+two-scene script yields two `public_security` findings at `needs_human`, each
+citing `nrta-order-16-article-5`, and the gate reports them under
+`findings_needs_human`.
+
+
 ### A — roadmap preview and confirmation
 
 - `GET /v1/projects/{pid}/roadmap` builds the plan from

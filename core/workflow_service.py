@@ -37,6 +37,7 @@ from schemas.workflow import Notification
 
 from .classify import classify
 from .classify.chain import ROADMAP_TEMPLATE_BY_TIER
+from .classify.subject_rules import load_subject_rules
 from .classify.chain import ClassificationOutcome
 from .classify.d1c import PUBLISHED_KEYS, judge_tier
 from .clock import Clock
@@ -52,6 +53,7 @@ from .gate import GateResult, evaluate_gate_d3, required_fact_keys
 from .ids import new_id
 from .llm import LLMClient
 from .materials import build_material_cards
+from .review import SCRIPT_REVIEW_PROMPT_VERSION, evidence_for, review_script
 from .roadmap import build_roadmap
 from .state_machine import GateContext, transition
 
@@ -311,6 +313,98 @@ class WorkflowService:
                 {"snapshot_version": snapshot_version},
             )
         return project
+
+    # --------------------------------------------------------- script review
+
+    def run_script_review(self, project_id: str):
+        """C1-a over the latest script version. Reports; it does not move state.
+
+        The revision loop that consumes these findings is T-A5, so a pre-check
+        deliberately leaves the project where it is.
+        """
+
+        project = self.get_project(project_id)
+        asset = self._latest_script(project_id)
+        if asset is None:
+            raise NotFoundError(
+                "this project has no uploaded script to review",
+                {"project_id": project_id},
+            )
+
+        data = self._stores.blobs.get(asset.storage_uri)
+        if data is None:
+            raise NotFoundError(
+                "the stored bytes are missing for the latest script",
+                {"asset_version": asset.version_id},
+            )
+        document = data.decode("utf-8", errors="replace")
+
+        version = self._pinned_version(project)
+        rules = load_subject_rules(
+            self._snapshots.get_pack(PackName.P2_SUBJECT_RULES, version)
+        )
+        result = review_script(document, rules, self._llm)
+
+        existing = {
+            (finding.category, finding.locator.quote)
+            for finding in self._stores.findings.list(project_id)
+            if finding.asset_version == asset.version_id
+        }
+
+        written: list[Finding] = []
+        for proposed in result.findings:
+            key = (proposed.category, proposed.scene.quote)
+            if key in existing:
+                # Re-running a pre-check is normal and must not multiply scenes.
+                continue
+            existing.add(key)
+            written.append(
+                self._stores.findings.add(
+                    project_id,
+                    Finding(
+                        finding_id=new_id("finding"),
+                        asset_version=asset.version_id,
+                        locator=Locator(
+                            quote=proposed.scene.quote,
+                            episode=proposed.scene.episode,
+                            scene=proposed.scene.scene,
+                        ),
+                        category=proposed.category,
+                        severity=proposed.severity,
+                        evidence_refs=[evidence_for(proposed.clause_id, version)],
+                        suggestion=proposed.suggestion,
+                        prompt_version=SCRIPT_REVIEW_PROMPT_VERSION,
+                        snapshot_version=version,
+                        created_at=self._clock.now(),
+                    ),
+                )
+            )
+
+        self._record_event(
+            project_id,
+            Actor.SYSTEM,
+            "review.completed",
+            {
+                "asset_version": asset.version_id,
+                "finding_count": len(written),
+                "discarded": result.discarded,
+                "pending_flags": result.pending_flags,
+                "backend": result.backend,
+            },
+        )
+        return self.get_project(project_id), written, result
+
+    def list_findings(self, project_id: str) -> list[Finding]:
+        self.get_project(project_id)
+        return self._stores.findings.list(project_id)
+
+    def _latest_script(self, project_id: str) -> AssetVersion | None:
+        scripts = [
+            asset
+            for asset in self._stores.assets.list(project_id)
+            if asset.kind is AssetKind.SCRIPT
+        ]
+        return scripts[-1] if scripts else None
 
     # --------------------------------------------------------------- roadmap
 
