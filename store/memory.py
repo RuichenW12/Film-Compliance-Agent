@@ -125,6 +125,9 @@ class InMemoryTaskStore:
     def get(self, task_id: str) -> WorkflowTask | None:
         return self._items.get(task_id)
 
+    def list(self, project_id: str) -> list[WorkflowTask]:
+        return [task for task in self._items.values() if task.project_id == project_id]
+
     def find_by_idempotency_key(self, key: str) -> WorkflowTask | None:
         task_id = self._by_key.get(key)
         return self._items.get(task_id) if task_id else None

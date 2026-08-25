@@ -41,7 +41,7 @@ Product workstream (A):
 
 - `routers/institution.py` — the demo registry, submission, the institution's decision, and filing ([D-023](../docs/decisions.md#d-023)).
 
-Still to build: tasks, and the institution console UI.
+Still to build: queueing async work behind the task list.
 
 Policy workstream (B):
 

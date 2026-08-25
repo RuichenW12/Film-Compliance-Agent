@@ -21,6 +21,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           <nav>
             <Link href="/wizard">{t("nav.wizard")}</Link>
             <Link href="/collection">{t("nav.collection")}</Link>
+            <Link href="/institution">{t("nav.institution")}</Link>
             <Link href="/dashboard">{t("nav.dashboard")}</Link>
             <Link href="/admin/policy">{t("nav.admin")}</Link>
           </nav>

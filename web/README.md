@@ -13,6 +13,7 @@ Locked decisions that shape this app:
 |---|---|---|
 | `app/wizard` | Maxine | S1/S2 intake and the classification card |
 | `app/collection` | Maxine | Uploads, material cards, roadmap, and the C1-a pre-check |
+| `app/institution` | Maxine | Demo registry, submission, the institution's decision, and filing |
 | `app/dashboard` | Maxine | Project state, gate gaps, notifications, and the audit timeline |
 | `app/admin/policy` | Richard | Policy proposals, diff view, publish gate |
 | `components/policy/` | Richard | Policy administration components |
