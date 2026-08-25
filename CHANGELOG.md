@@ -22,6 +22,29 @@ Conventions:
 
 ## 2026-08-24
 
+### A — material collection card lifecycle
+
+- `GET /v1/projects/{pid}/materials` builds the card list from the
+  `p5_form_templates` pack; `POST .../{mid}/attach`, `.../validate`, and
+  `.../waive` move a card through its statuses.
+- The D3 gate now materialises cards itself, so a pack-defined required card
+  blocks the gate even if nobody has opened the collection page.
+- Validation is deterministic only — asset attached, asset exists, bytes
+  present. Nothing in it is a compliance judgement.
+- A waiver requires a reason and records it; a waived card stops blocking.
+- Card loading lives in `core/materials.py`, the only module that knows the pack
+  layout.
+- **B: this proposes a shape for `p5_form_templates`** and writes it into the
+  seed with empty contents. See [D-016](docs/decisions.md#d-016) — it needs your
+  review before real content is published into that pack. An empty pack yields
+  no cards, and a card whose `why_clause_id` is not in the pinned snapshot keeps
+  no clause rather than pointing at a missing one.
+
+Verified: `python -m pytest` — 219 passed, 15 new in `tests/test_materials.py`.
+Live check against the real seed on a running API: the empty pack returns `[]`
+cards and the gate reports only fact gaps — no invented obligations.
+
+
 ### A — upload tickets and immutable asset versions
 
 - `POST /v1/projects/{pid}/assets/upload-url` issues a one-shot ticket;
