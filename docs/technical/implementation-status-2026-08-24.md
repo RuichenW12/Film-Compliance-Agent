@@ -12,10 +12,13 @@ Status vocabulary, used strictly:
   never executed in the environment it targets;
 - ❌ **not started** — no implementation.
 
-Evidence behind every ✅ below: `python -m pytest` (193 passed),
-`npm --prefix web test` (12 passed), and a live `python scripts/e2e_check.py`
-run against `uvicorn api.main:app --port 8080` with `INTERNAL_TOKEN` set
-(ALL CHECKS PASSED). No cloud credentials, no emulator, no network.
+Evidence behind every ✅ below: `python -m pytest` (202 passed),
+`npm --prefix web test` (17 passed), and a live `python scripts/e2e_check.py`
+run against `uvicorn api.main:app` with `INTERNAL_TOKEN` set (ALL CHECKS
+PASSED). No cloud credentials, no emulator, no network.
+
+Updated 2026-08-24 after the notification slice landed; the rows it changed name
+the commit's files.
 
 ## Ownership key
 
@@ -60,7 +63,8 @@ reaches the product only through `/v1/internal/*`; A does not edit
 | **T-A6** | Institution console and filing (steps 12–14) | Maxine | ❌ | |
 | **T-A7** | Veo teaser (step 18) | Maxine | ❌ | `flags.veo_teaser=false` |
 | **cross** | Timeline read (step 17) | Maxine | ✅ | `GET /v1/projects/{pid}/timeline` |
-| | Task and notification reads (step 17) | Maxine | ⚠️ | `schemas/workflow.py` + `store/memory.py` exist; **no route, no producer** |
+| | Notification producer and reads (step 17) | Maxine | ✅ | producer in `core/workflow_service.py`, routes in `api/routers/notifications.py`, inbox on `/dashboard` ([D-014](../decisions.md#d-014)) |
+| | Task reads (step 17) | Maxine | ❌ | `WorkflowTask` schema only |
 | | LLM port, and "missing backend is a pending flag, not a pass" | Maxine | ✅ | `core/llm.py`; `core/llm_vertex.py` never run live |
 
 ## Workstream B — policy loop (Richard), against the 11 P0 items
@@ -75,7 +79,7 @@ reaches the product only through `/v1/internal/*`; A does not edit
 | 6 | Policy administration UI | Richard | ✅ | `web/app/admin/policy/`, `web/components/policy/` |
 | 7 | Human publish transaction and minimal outbox | Richard | ✅ | `workers/policy/publish.py`, `outbox.py` |
 | 8 | Idempotent `policy.updated` consumer | Richard | ⚠️ | `consumer.py` runs against a fake recalc adapter; **not wired to the live endpoint** — see [D-010](../decisions.md#d-010) |
-| 9 | `policy_stale` and `tier_recalculated` notifications + timeline events | Split | ❌ | B triggers through `/v1/internal/*`; **A must implement the notification producer and read route** |
+| 9 | `policy_stale` and `tier_recalculated` notifications + timeline events | Split | ⚠️ | A's half done: both notifications are produced and readable. **B's half open** — the consumer must call the live internal endpoints ([D-010](../decisions.md#d-010), [D-014](../decisions.md#d-014)) |
 | 10 | Cloud Run Job, Pub/Sub, Cloud Scheduler, manual trigger | Richard | ⚠️ | manual trigger ✅, Pub/Sub adapter ✅, **no deployed infrastructure** |
 | 11 | Provisional vs frozen / FILED contrast tests | Richard | ✅ | `tests/policy/test_consumer.py:76,96`, `tests/test_api_intake.py:162` |
 
@@ -92,7 +96,7 @@ The loop is closed on paper and open in wiring.
 | `publish v2 → recalc-tier v2` reads the same snapshot | Shared | ✅ Gate 5-a, local HTTP only |
 | `policy.updated` delivered from B's outbox to A's `/v1/internal/*` | Richard (T-B3, [D-010](../decisions.md#d-010)) | ❌ |
 | Project enumeration and impact filtering | Richard | ❌ |
-| `policy_stale` / `tier_recalculated` notification fan-out | Split: B triggers, A produces and serves | ❌ |
+| `policy_stale` / `tier_recalculated` notification fan-out | Split: B triggers, A produces and serves | ⚠️ A's half done, B's half open |
 | One router directory, one auth helper | Shared ([D-011](../decisions.md#d-011)) | ⚠️ one directory done, the two auth helpers remain |
 
 ## What has never executed anywhere
@@ -110,11 +114,12 @@ system.
 
 ## Next step per owner
 
-- **Maxine:** the Firestore adapter behind the existing ports, then T-A3
-  (roadmap templates, collection cards, upload URLs, `FactExtractor`), then T-A4.
-  Nothing needs manual setup first — T-A3 builds and tests in memory, and the
-  `FactExtractor` should be written against the LLM port's unavailable-backend
-  path before real Vertex is wired.
+- **Maxine:** T-A3 (roadmap templates, collection cards, upload URLs,
+  `FactExtractor`), then T-A4. Nothing needs manual setup first — T-A3 builds
+  and tests in memory, and the `FactExtractor` should be written against the LLM
+  port's unavailable-backend path before real Vertex is wired. The Firestore
+  adapter can slot in behind the ports at any time; nothing is blocked on it and
+  Docker is not installed here to verify it.
 - **Richard:** Gate 5-b — wire the consumer to the live recalc endpoint per
   [D-010](../decisions.md#d-010), add project enumeration and impact filtering,
   then the notification trigger. The named-project cloud smoke is what turns
