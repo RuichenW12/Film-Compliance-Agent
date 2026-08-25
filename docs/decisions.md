@@ -29,6 +29,7 @@ status becomes `Superseded by D-0xx`. That way the reasoning trail survives.
 | [D-013](#d-013) | B | Gate 4 adds cloud adapters without claiming deployment | Accepted |
 | [D-014](#d-014) | Shared | The policy loop triggers notifications; the product produces them | Accepted |
 | [D-015](#d-015) | A | Uploads go through a one-shot ticket, not a bare route | Accepted |
+| [D-016](#d-016) | Shared | `p5_form_templates` card shape proposed by A, pending B's review | Proposed |
 
 ---
 
@@ -354,3 +355,49 @@ Two rules the ticket enforces, both tested:
 
 Revisit when the GCS adapter lands: the ticket store becomes the place to record
 the signed url's expiry, which the local path does not need.
+
+## D-016
+
+**`p5_form_templates` gets a card shape now, proposed by A and pending B's review** · Area: Shared · Status: Proposed, needs B · 2026-08-24
+
+`p5_form_templates` was `{}`. Building the collection UI against an undefined
+pack means either guessing the shape or not building. Guessing quietly is the
+worse option, so the shape is written down and named as a proposal:
+
+```yaml
+p5_form_templates:
+  required_facts: [title, applicant_entity]
+  material_cards:
+    - material_id: mat_synopsis
+      name_key: material.synopsis
+      required: true
+      why_clause_id: nrta-order-16-article-19
+      template_uri: https://...
+      common_rejects_key: material.synopsis.rejects
+```
+
+Three properties the loader enforces, each of which is really a product rule
+rather than a formatting preference:
+
+1. **An empty pack yields no cards.** Not a default set, not a placeholder set.
+   A missing pack must be visible as missing; invented cards would look
+   official and are exactly what ground rule 3 forbids.
+2. **`why_clause_id` is resolved against the pinned snapshot,** and a card whose
+   clause is absent keeps `why_clause` empty. A card that tells a creator "you
+   must submit this" is a compliance assertion, so without a clause behind it
+   the card still appears but claims no legal basis.
+3. **A malformed entry is skipped, not rendered.** A card with no
+   `material_id` or `name_key` has no meaning to show a creator.
+
+The seed now carries this shape with empty contents, so the structure is
+reviewable before any real form exists.
+
+Why A proposed it rather than waiting: `p5` is B-owned policy content but the
+product is the only consumer, and the alternative was to stop building. **This
+needs B's review before real content is published into it.** If B publishes a
+different shape, `core/materials.py` is the single place that changes — the
+loader is deliberately the only code that knows the pack layout.
+
+Revisit when the real filing form is sourced: the field list may force
+`material_cards` to carry per-card `kind`, size, or format constraints, none of
+which are guessed here.

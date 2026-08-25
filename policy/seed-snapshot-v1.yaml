@@ -26,7 +26,12 @@ packs:
     thresholds_published: false
     thresholds: null
   p4_process_templates: {}
-  p5_form_templates: {}
+  # Shape the product reads; contents stay empty until a real filing form is
+  # sourced. An empty pack yields no cards and no required-fact override, which
+  # is visible, rather than invented cards that look official.
+  p5_form_templates:
+    required_facts: []
+    material_cards: []
   p6_legal_clauses:
     source_name: 国家广播电视总局令第16号《微短剧发展管理办法》
     clauses:

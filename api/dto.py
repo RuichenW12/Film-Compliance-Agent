@@ -101,3 +101,11 @@ class UploadTicketResponse(ApiModel):
     method: str
     backend: str
     storage_uri: str
+
+
+class AttachMaterialRequest(ApiModel):
+    asset_version: str
+
+
+class WaiveMaterialRequest(ApiModel):
+    reason: str

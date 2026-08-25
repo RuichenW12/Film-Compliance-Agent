@@ -9,11 +9,12 @@ from __future__ import annotations
 import hashlib
 from dataclasses import dataclass
 
-from schemas.assets import AssetVersion, UploadTicket
+from schemas.assets import AssetVersion, MaterialCard, UploadTicket
 from schemas.common import AuditEntry, Fact, SourceRef, TimelineEvent
 from schemas.enums import (
     Actor,
     AssetKind,
+    MaterialStatus,
     BudgetBand,
     FactStatus,
     FindingSeverity,
@@ -42,6 +43,7 @@ from .errors import (
 from .gate import GateResult, evaluate_gate_d3
 from .ids import new_id
 from .llm import LLMClient
+from .materials import build_material_cards
 from .state_machine import GateContext, transition
 
 # States where a recalculation must not touch anything any more.
@@ -98,7 +100,9 @@ class WorkflowService:
             project,
             self._stores.findings.list(project_id),
             self._stores.facts.list(project_id),
-            self._stores.materials.list(project_id),
+            # Through material_cards, so a pack-defined card blocks the gate
+            # even if nobody has opened the collection page yet.
+            self.material_cards(project_id),
             form_pack,
         )
 
@@ -298,6 +302,132 @@ class WorkflowService:
                 {"snapshot_version": snapshot_version},
             )
         return project
+
+    # -------------------------------------------------------------- materials
+
+    def material_cards(self, project_id: str) -> list[MaterialCard]:
+        """The pack defines which cards exist; stored state defines where each is.
+
+        Cards are materialised on first read and then kept, so a snapshot that
+        later drops a card does not erase the creator's work on it.
+        """
+
+        project = self.get_project(project_id)
+        stored = {card.material_id: card for card in self._stores.materials.list(project_id)}
+        version = self._pinned_version(project)
+        defined = build_material_cards(
+            self._snapshots.get_pack(PackName.P5_FORM_TEMPLATES, version),
+            self._snapshots,
+            version,
+        )
+
+        cards: list[MaterialCard] = []
+        for card in defined:
+            existing = stored.pop(card.material_id, None)
+            if existing is None:
+                existing = self._stores.materials.put(project_id, card)
+            cards.append(existing)
+        # Cards the pack no longer defines stay visible rather than vanishing.
+        cards.extend(stored.values())
+        return cards
+
+    def get_material(self, project_id: str, material_id: str) -> MaterialCard:
+        for card in self.material_cards(project_id):
+            if card.material_id == material_id:
+                return card
+        raise NotFoundError(
+            f"material card not found: {material_id}", {"material_id": material_id}
+        )
+
+    def attach_material(
+        self, project_id: str, material_id: str, asset_version: str
+    ) -> MaterialCard:
+        card = self.get_material(project_id, material_id)
+        if self._stores.assets.get(project_id, asset_version) is None:
+            raise NotFoundError(
+                f"asset version not found: {asset_version}",
+                {"asset_version": asset_version},
+            )
+        updated = card.model_copy(
+            update={
+                "asset_version": asset_version,
+                "status": MaterialStatus.UPLOADED,
+                "invalid_reasons": [],
+            }
+        )
+        self._stores.materials.put(project_id, updated)
+        self._record_event(
+            project_id,
+            Actor.CREATOR,
+            "material.attached",
+            {"material_id": material_id, "asset_version": asset_version},
+        )
+        return updated
+
+    def validate_material(self, project_id: str, material_id: str) -> MaterialCard:
+        """Deterministic checks only. Nothing here is a compliance judgement."""
+
+        card = self.get_material(project_id, material_id)
+        reasons = self._material_defects(project_id, card)
+        updated = card.model_copy(
+            update={
+                "status": MaterialStatus.INVALID if reasons else MaterialStatus.VALID,
+                "invalid_reasons": reasons,
+            }
+        )
+        self._stores.materials.put(project_id, updated)
+        self._record_event(
+            project_id,
+            Actor.SYSTEM,
+            "material.validated",
+            {
+                "material_id": material_id,
+                "status": updated.status.value,
+                "invalid_reasons": reasons,
+            },
+        )
+        return updated
+
+    def waive_material(
+        self, project_id: str, material_id: str, reason: str
+    ) -> MaterialCard:
+        """A human waives a card, and the reason is recorded with the waiver."""
+
+        if not reason.strip():
+            raise ValidationFailedError("a waiver must carry a reason")
+        card = self.get_material(project_id, material_id)
+        updated = card.model_copy(
+            update={
+                "status": MaterialStatus.WAIVED,
+                "waive_reason": reason.strip(),
+                "invalid_reasons": [],
+            }
+        )
+        self._stores.materials.put(project_id, updated)
+        self._record_event(
+            project_id,
+            Actor.CREATOR,
+            "material.waived",
+            {"material_id": material_id, "reason": updated.waive_reason},
+        )
+        return updated
+
+    def _material_defects(self, project_id: str, card: MaterialCard) -> list[str]:
+        if card.asset_version is None:
+            return ["no_asset_attached"]
+        asset = self._stores.assets.get(project_id, card.asset_version)
+        if asset is None:
+            return ["asset_version_missing"]
+        if not self._stores.blobs.get(asset.storage_uri):
+            return ["stored_bytes_missing"]
+        return []
+
+    def _pinned_version(self, project: Project) -> str:
+        """Judgements use the project's pinned snapshot, not whatever is latest."""
+
+        if project.classification is not None:
+            return project.classification.policy_snapshot_version
+        return self._snapshots.latest_version()
 
     # ---------------------------------------------------------------- uploads
 

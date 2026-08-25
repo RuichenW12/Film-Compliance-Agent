@@ -31,7 +31,9 @@ Product workstream (A):
 
 - `routers/assets.py` — upload tickets, `PUT /v1/uploads/{tid}`, asset listing and content reads ([D-015](../docs/decisions.md#d-015)).
 
-Still to build: material cards, fact extraction, review triggers, findings actions, form preview/freeze, institution console, tasks.
+- `routers/materials.py` — collection cards from `p5_form_templates`: list, attach, validate, waive ([D-016](../docs/decisions.md#d-016)).
+
+Still to build: fact extraction, review triggers, findings actions, form preview/freeze, institution console, tasks.
 
 Policy workstream (B):
 
