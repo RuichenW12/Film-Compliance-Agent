@@ -13,11 +13,12 @@ from fastapi import APIRouter, Depends, Request, Response, status
 from core.errors import ForbiddenError
 from core.workflow_service import WorkflowService
 from schemas.assets import AssetVersion
+from schemas.common import Fact
 from schemas.enums import Role
 
 from ..deps.demo_auth import Principal, get_principal
 from ..deps.services import get_context, get_workflow
-from ..dto import UploadTicketResponse, UploadUrlRequest
+from ..dto import ExtractFactsResponse, UploadTicketResponse, UploadUrlRequest
 
 router = APIRouter(tags=["assets"])
 
@@ -100,3 +101,35 @@ def read_asset(
         media_type="application/octet-stream",
         headers={"X-Asset-Sha256": asset.sha256},
     )
+
+
+@router.post(
+    "/v1/projects/{project_id}/assets/{version_id}/extract-facts",
+    response_model=ExtractFactsResponse,
+)
+def extract_facts(
+    project_id: str,
+    version_id: str,
+    principal: Principal = Depends(get_principal),
+    workflow: WorkflowService = Depends(get_workflow),
+) -> ExtractFactsResponse:
+    """Facts the uploaded document backs verbatim. Anything else is discarded."""
+
+    _assert_owner(principal, workflow.get_project(project_id).owner_uid)
+    stored, result = workflow.extract_asset_facts(project_id, version_id)
+    return ExtractFactsResponse(
+        facts=stored,
+        discarded=result.discarded,
+        pending_flags=result.pending_flags,
+        backend=result.backend,
+    )
+
+
+@router.get("/v1/projects/{project_id}/facts", response_model=list[Fact])
+def list_facts(
+    project_id: str,
+    principal: Principal = Depends(get_principal),
+    workflow: WorkflowService = Depends(get_workflow),
+) -> list[Fact]:
+    _assert_owner(principal, workflow.get_project(project_id).owner_uid)
+    return workflow.list_facts(project_id)

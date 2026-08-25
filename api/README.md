@@ -33,7 +33,9 @@ Product workstream (A):
 
 - `routers/materials.py` — collection cards from `p5_form_templates`: list, attach, validate, waive ([D-016](../docs/decisions.md#d-016)).
 
-Still to build: fact extraction, review triggers, findings actions, form preview/freeze, institution console, tasks.
+- `routers/assets.py` also serves `extract-facts` and the project fact list.
+
+Still to build: review triggers, findings actions, form preview/freeze, institution console, tasks.
 
 Policy workstream (B):
 
