@@ -7,7 +7,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from schemas.enums import AssetKind, BudgetBand, ClaimedFormType, ExitKind, ProjectState
 from schemas.common import Fact
 from schemas.findings import Finding
-from schemas.workflow import InstitutionReview
+from schemas.workflow import InstitutionReview, WorkflowTask
 from schemas.project import Classification, Roadmap
 
 
@@ -191,3 +191,15 @@ class FilingRequest(ApiModel):
 class FilingResponse(ApiModel):
     state: ProjectState
     registration_number: str | None = None
+
+
+class TeaserRequestBody(ApiModel):
+    seconds: int = 8
+
+
+class TeaserResponse(ApiModel):
+    """`task.status` is `needs_human` when no video backend is configured, so an
+    absent teaser is never mistaken for a generated one."""
+
+    task: WorkflowTask
+    promotional_only: bool = True

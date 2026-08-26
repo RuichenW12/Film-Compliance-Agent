@@ -35,6 +35,7 @@ from .routers import (
     notifications,
     projects,
     review,
+    teaser,
 )
 from .settings import Settings
 
@@ -96,6 +97,7 @@ def create_app(
     app.include_router(review.router)
     app.include_router(forms.router)
     app.include_router(institution.router)
+    app.include_router(teaser.router)
     app.include_router(notifications.router)
     app.include_router(internal.router)
     app.include_router(admin_policy_router)

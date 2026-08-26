@@ -41,7 +41,9 @@ Product workstream (A):
 
 - `routers/institution.py` — the demo registry, submission, the institution's decision, and filing ([D-023](../docs/decisions.md#d-023)).
 
-Still to build: queueing async work behind the task list.
+- `routers/teaser.py` — the Veo teaser, behind `FLAG_VEO_TEASER`.
+
+Still to build: running the async jobs behind the task list out of process.
 
 Policy workstream (B):
 

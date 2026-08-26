@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from functools import lru_cache
 
 from fastapi import Request
 
 from core.clock import Clock, SystemClock
 from core.llm import LLMClient, UnavailableLLM
+from core.teaser import UnavailableVideo, VideoBackend
 from core.workflow_service import WorkflowService
 from schemas.snapshot import FileSnapshotService, SnapshotService
 from store.memory import InMemoryStores
@@ -23,10 +24,13 @@ class AppContext:
     snapshots: SnapshotService
     clock: Clock
     llm: LLMClient
+    video: VideoBackend = field(default_factory=UnavailableVideo)
 
     @property
     def workflow(self) -> WorkflowService:
-        return WorkflowService(self.stores, self.snapshots, self.clock, self.llm)
+        return WorkflowService(
+            self.stores, self.snapshots, self.clock, self.llm, self.video
+        )
 
 
 def build_llm(settings: Settings) -> LLMClient:
@@ -55,6 +59,7 @@ def build_context(
         snapshots=snapshots or FileSnapshotService(settings.snapshot_path),
         clock=SystemClock(),
         llm=build_llm(settings),
+        video=UnavailableVideo(),
     )
 
 
