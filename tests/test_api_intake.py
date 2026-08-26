@@ -199,10 +199,20 @@ def test_recalc_tier_requires_the_internal_token(client):
     assert response.status_code == 403
 
 
-def test_recalc_tier_only_touches_provisional_projects(client):
+def test_recalc_tier_only_touches_provisional_projects(client, monkeypatch):
+    """A settled tier is left alone. Since the seed's subject rules are still
+    unconfirmed, a special-subject project is provisional (D-026), so this uses
+    a project whose tier really is final."""
+
     project_id = create_project(client)
     client.post(f"/v1/projects/{project_id}/intent", json=CRIME_INTENT)
     client.post(f"/v1/projects/{project_id}/classify")
+
+    stored = client.app.state.context.stores.projects.get(project_id)
+    settled = stored.classification.model_copy(update={"tier_provisional": False})
+    client.app.state.context.stores.projects.save(
+        stored.model_copy(update={"classification": settled})
+    )
 
     response = client.post(
         f"/v1/internal/projects/{project_id}/recalc-tier",
