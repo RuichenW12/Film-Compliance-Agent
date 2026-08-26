@@ -473,10 +473,13 @@ def test_an_unsubmitted_project_has_no_review(loaded_client):
     )
 
 
-def test_the_task_list_is_empty_until_async_work_exists(loaded_client):
-    """The route exists; nothing queues tasks yet, and it says so honestly."""
+def test_the_task_list_records_the_work_a_project_has_had_done(loaded_client):
+    """Every long-running job is a task first, whether or not it ran inline."""
 
     project_id = frozen_project(loaded_client)
     tasks = loaded_client.get(f"/v1/projects/{project_id}/tasks", headers=OWNER)
+
     assert tasks.status_code == 200
-    assert tasks.json() == []
+    types = {task["type"] for task in tasks.json()}
+    assert "review_full" in types
+    assert all(task["idempotency_key"].startswith(project_id) for task in tasks.json())

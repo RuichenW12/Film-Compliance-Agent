@@ -38,6 +38,7 @@ status becomes `Superseded by D-0xx`. That way the reasoning trail survives.
 | [D-022](#d-022) | A | A form field is filled only from a confirmed fact; freezing hashes it | Accepted |
 | [D-023](#d-023) | A | The institution registry ships empty; an unknown institution is unverifiable, not invalid | Accepted |
 | [D-024](#d-024) | A | One C1-a finding per scene, with every matching line kept | Accepted |
+| [D-025](#d-025) | A | Every long job is a task first; the runner decides where it executes | Accepted |
 
 ---
 
@@ -711,3 +712,52 @@ now and expensive after data exists.
 Revisit when the semantic stage runs for real: it could rank matches within a
 scene, at which point the locator should quote the strongest line rather than
 the first.
+
+## D-025
+
+**Every long job is a task first, and the runner decides where it executes** · Area: A · Status: Accepted · 2026-08-26
+
+Fact extraction and script review ran inside the HTTP request and recorded
+nothing. `TaskType` declared seven job types and exactly one place in the
+codebase created a `WorkflowTask` — the teaser — so `GET /tasks` returned an
+empty list for every project that had actually had work done to it.
+
+That is survivable while the semantic stages are skipped and a review is
+instant. It stops being survivable the moment real Gemini is configured: the
+30-minute fixture is 40KB and the 70-minute one is 55KB, and a review of either
+becomes a call far longer than an HTTP request should hold open.
+
+So the job record and the execution are now separate concerns:
+
+- **the record is the contract.** Every job writes a `WorkflowTask` with its
+  idempotency key, status, and result, whether or not a worker was involved;
+- **the runner is a deployment decision.** `InlineRunner` does the work now and
+  the caller still gets its answer in the response — local development and the
+  whole test suite use it, so a demo needs no queue. `QueuedRunner` publishes
+  and leaves the task `queued`; `workers/jobs.JobWorker` finishes it.
+
+Verified against the 30-minute fixture: inline returns 9 findings in the
+response; queued returns 0 with `backend: "queued"`, and the worker then
+produces the same 9. A creator's timeline shows `job.recorded` either way, plus
+`job.completed` when a worker finished it.
+
+**Idempotency is now enforced in one place for every job type**, on
+`{project_id}:{task_type}:{asset_version}` — ground rule 6. It was previously
+load-bearing only for the teaser, because nothing else created a task, and a
+rule that only one caller honours is not a rule.
+
+One bug this shook out immediately: `review_incremental` was chosen when
+findings already existed for the version being reviewed. Re-running a review of
+the same version therefore flipped the job type, which changed the key, which
+let the replay review the same script twice. Incremental now means *relative to
+an earlier version* — decided from prior review tasks, not from findings — so a
+replay of one version is one task.
+
+A queued review answers with no findings and `backend: "queued"`. That is
+deliberately visible rather than hidden behind an empty list: nothing has
+happened yet, and a UI must be able to tell that apart from "the script is
+clean".
+
+Revisit when Pub/Sub is wired: `QueuedRunner` needs a real publisher, and the
+worker needs an entrypoint that pulls from a subscription rather than being
+handed a task. Neither changes the service, which is the point of the seam.
