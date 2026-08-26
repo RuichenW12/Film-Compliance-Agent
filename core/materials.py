@@ -27,6 +27,7 @@ from __future__ import annotations
 
 from schemas.assets import MaterialCard
 from schemas.common import EvidenceRef
+from schemas.enums import AssetKind
 from schemas.snapshot import SnapshotNotFoundError, SnapshotService
 
 CARDS_KEY = "material_cards"
@@ -55,6 +56,7 @@ def build_material_cards(
             MaterialCard(
                 material_id=str(material_id),
                 name_key=str(name_key),
+                asset_kind=AssetKind(raw["asset_kind"]),
                 required=bool(raw.get("required", True)),
                 why_clause=_evidence_for(raw.get("why_clause_id"), snapshots, version),
                 template_uri=raw.get("template_uri"),

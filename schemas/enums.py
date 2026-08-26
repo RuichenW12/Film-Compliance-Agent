@@ -167,6 +167,7 @@ class Actor(StrEnum):
 class AssetKind(StrEnum):
     SYNOPSIS = "synopsis"
     SCRIPT = "script"
+    SUPPORTING_DOCUMENT = "supporting_document"
     PROMPTS = "prompts"
     FINAL_FILM = "final_film"
     SUBTITLE_SHEET = "subtitle_sheet"

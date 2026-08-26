@@ -1396,10 +1396,19 @@ class WorkflowService:
         self, project_id: str, material_id: str, asset_version: str
     ) -> MaterialCard:
         card = self.get_material(project_id, material_id)
-        if self._stores.assets.get(project_id, asset_version) is None:
+        asset = self._stores.assets.get(project_id, asset_version)
+        if asset is None:
             raise NotFoundError(
                 f"asset version not found: {asset_version}",
                 {"asset_version": asset_version},
+            )
+        if asset.kind is not card.asset_kind:
+            raise ValidationFailedError(
+                "asset kind does not match material card",
+                {
+                    "expected_kind": card.asset_kind.value,
+                    "actual_kind": asset.kind.value,
+                },
             )
         updated = card.model_copy(
             update={

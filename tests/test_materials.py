@@ -30,6 +30,7 @@ CARD_PACK = {
         {
             "material_id": "mat_synopsis",
             "name_key": "material.synopsis",
+            "asset_kind": "synopsis",
             "required": True,
             "why_clause_id": "nrta-order-16-article-19",
             "common_rejects_key": "material.synopsis.rejects",
@@ -37,6 +38,7 @@ CARD_PACK = {
         {
             "material_id": "mat_id_scan",
             "name_key": "material.id_scan",
+            "asset_kind": "supporting_document",
             "required": False,
         },
     ],
@@ -101,10 +103,10 @@ def materials(client: TestClient, project_id: str) -> list[dict]:
     return response.json()
 
 
-def upload_script(client: TestClient, project_id: str) -> str:
+def upload_asset(client: TestClient, project_id: str, kind: str = "synopsis") -> str:
     ticket = client.post(
         f"/v1/projects/{project_id}/assets/upload-url",
-        json={"kind": "synopsis"},
+        json={"kind": kind},
         headers=OWNER,
     ).json()
     created = client.put(
@@ -121,6 +123,15 @@ def test_cards_are_built_from_the_pack(client):
     cards = materials(client, new_project(client))
     assert [card["material_id"] for card in cards] == ["mat_synopsis", "mat_id_scan"]
     assert all(card["status"] == "pending" for card in cards)
+
+
+def test_cards_expose_the_pack_asset_kind(client):
+    cards = materials(client, new_project(client))
+
+    assert {card["material_id"]: card["asset_kind"] for card in cards} == {
+        "mat_synopsis": "synopsis",
+        "mat_id_scan": "supporting_document",
+    }
 
 
 def test_a_card_with_a_clause_carries_real_evidence(client):
@@ -160,7 +171,7 @@ def test_the_card_list_is_stable_across_reads(client):
 
 def test_attaching_an_asset_moves_the_card_to_uploaded(client):
     project_id = new_project(client)
-    version_id = upload_script(client, project_id)
+    version_id = upload_asset(client, project_id)
 
     attached = client.post(
         f"/v1/projects/{project_id}/materials/mat_synopsis/attach",
@@ -170,6 +181,26 @@ def test_attaching_an_asset_moves_the_card_to_uploaded(client):
     assert attached.status_code == 200
     assert attached.json()["status"] == "uploaded"
     assert attached.json()["asset_version"] == version_id
+
+
+def test_wrong_asset_kind_is_422_and_does_not_mutate_card(client):
+    project_id = new_project(client)
+    script_version = upload_asset(client, project_id, "script")
+
+    response = client.post(
+        f"/v1/projects/{project_id}/materials/mat_synopsis/attach",
+        json={"asset_version": script_version},
+        headers=OWNER,
+    )
+
+    assert response.status_code == 422
+    assert response.json()["error"]["details"] == {
+        "expected_kind": "synopsis",
+        "actual_kind": "script",
+    }
+    card = materials(client, project_id)[0]
+    assert card["status"] == "pending"
+    assert card["asset_version"] is None
 
 
 def test_attaching_an_unknown_asset_is_a_404(client):
@@ -184,7 +215,7 @@ def test_attaching_an_unknown_asset_is_a_404(client):
 
 def test_another_creator_cannot_attach(client):
     project_id = new_project(client)
-    version_id = upload_script(client, project_id)
+    version_id = upload_asset(client, project_id)
     refused = client.post(
         f"/v1/projects/{project_id}/materials/mat_synopsis/attach",
         json={"asset_version": version_id},
@@ -198,7 +229,7 @@ def test_another_creator_cannot_attach(client):
 
 def test_validation_accepts_an_attached_asset_with_bytes(client):
     project_id = new_project(client)
-    version_id = upload_script(client, project_id)
+    version_id = upload_asset(client, project_id)
     client.post(
         f"/v1/projects/{project_id}/materials/mat_synopsis/attach",
         json={"asset_version": version_id},
@@ -278,7 +309,7 @@ def test_a_waived_card_stops_blocking_the_gate(client):
 
 def test_every_card_change_is_on_the_timeline(client):
     project_id = new_project(client)
-    version_id = upload_script(client, project_id)
+    version_id = upload_asset(client, project_id)
     client.post(
         f"/v1/projects/{project_id}/materials/mat_synopsis/attach",
         json={"asset_version": version_id},

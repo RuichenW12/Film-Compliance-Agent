@@ -14,6 +14,7 @@ from schemas.common import EvidenceRef, Fact, SourceRef
 from schemas.enums import (
     Actor,
     AlertOption,
+    AssetKind,
     FactStatus,
     FindingSeverity,
     FindingStatus,
@@ -90,7 +91,10 @@ def full_facts() -> list[Fact]:
 def validated_materials() -> list[MaterialCard]:
     return [
         MaterialCard(
-            material_id="mat_script", name_key="material.script", status=MaterialStatus.VALID
+            material_id="mat_script",
+            name_key="material.script",
+            asset_kind=AssetKind.SCRIPT,
+            status=MaterialStatus.VALID,
         )
     ]
 
@@ -163,6 +167,7 @@ def test_unvalidated_material_stops_the_gate():
         MaterialCard(
             material_id="mat_script",
             name_key="material.script",
+            asset_kind=AssetKind.SCRIPT,
             status=MaterialStatus.UPLOADED,
         )
     ]
