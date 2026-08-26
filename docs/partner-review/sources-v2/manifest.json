@@ -1,6 +1,6 @@
 {
   "archive_version": 2,
-  "generated_at": "2026-08-26T23:15:00+08:00",
+  "generated_at": "2026-08-26T23:37:00+08:00",
   "snapshot_version": "v2",
   "snapshot_status": "mock_verified",
   "status_note": "Official source status and product mapping review status are tracked separately.",
@@ -250,11 +250,19 @@
       "url": "https://m.tvoao.com/userfiles/files/%E3%80%8A%E5%BE%AE%E7%9F%AD%E5%89%A7%E5%88%9B%E4%BD%9C%E7%94%9F%E4%BA%A7%E5%8F%8A%E5%86%85%E5%AE%B9%E5%AE%A1%E6%A0%B8%E6%8A%80%E6%9C%AF%E8%A7%84%E8%8C%83%E3%80%8B.pdf",
       "publisher": "中国民族影视艺术发展促进会",
       "source_status": "group_standard_reference_only",
-      "mapping_status": "external_reference_not_archived",
-      "files": [],
+      "mapping_status": "archived_reference_only",
+      "acquisition": "user_manual_browser_download",
+      "files": [
+        {
+          "path": "reference-only/REF-001-ceap-microdrama-standard.pdf",
+          "sha256": "757691f79dd21e83b98275f490d3adbff51c1a069a35e3f398e17bd77543cac2",
+          "pages": 22
+        }
+      ],
       "notes": [
         "非行政法规且沿用旧门槛。",
-        "来源站 TLS 证书链校验失败，未绕过验证下载。"
+        "自动下载时来源站 TLS 证书链校验失败；文件由用户通过浏览器手动下载。",
+        "已验证 PDF 签名、页树、首尾文本，并抽查封面、正文、附录和末页渲染。"
       ]
     },
     {
@@ -263,11 +271,19 @@
       "url": "https://www.cnsa.cn/art/2017/6/30/art_1505_26038.html",
       "publisher": "中国网络视听节目服务协会",
       "source_status": "industry_self_regulation_reference_only",
-      "mapping_status": "external_reference_not_archived",
-      "files": [],
+      "mapping_status": "archived_reference_only",
+      "acquisition": "user_manual_browser_print_to_pdf",
+      "files": [
+        {
+          "path": "reference-only/REF-002-cnsa-content-review-standard.pdf",
+          "sha256": "92db55d97b6247420962a7ed64b15f5723166ddf676dcb4bca80157afb99344f",
+          "pages": 5
+        }
+      ],
       "notes": [
         "行业自律规范，不是行政法规。",
-        "来源站 TLS 证书校验失败，未绕过验证下载。"
+        "自动下载时来源站 TLS 证书校验失败；文件由用户通过浏览器打印为 PDF。",
+        "该文件是官方网页的浏览器打印件，不是协会发布的原生 PDF；已检查全部五页渲染及首尾文本。"
       ]
     }
   ],

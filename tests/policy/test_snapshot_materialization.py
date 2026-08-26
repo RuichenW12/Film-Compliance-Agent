@@ -36,6 +36,17 @@ def test_all_manifest_files_have_matching_hashes() -> None:
     assert verify_manifest_files(ARCHIVE, manifest) > 12
 
 
+def test_reference_only_pdfs_are_archived_without_becoming_policy_authority() -> None:
+    manifest = json.loads(MANIFEST.read_text(encoding="utf-8"))
+    sources = {source["source_id"]: source for source in manifest["sources"]}
+
+    for source_id in ("REF-001", "REF-002"):
+        source = sources[source_id]
+        assert source["mapping_status"] == "archived_reference_only"
+        assert len(source["files"]) == 1
+        assert source["files"][0]["path"].endswith(".pdf")
+
+
 def test_unknown_snapshot_source_fails_closed() -> None:
     snapshot = yaml.safe_load(SEED.read_text(encoding="utf-8"))
     snapshot["packs"]["p4_process_templates"]["source_refs"].append("SRC-999")
