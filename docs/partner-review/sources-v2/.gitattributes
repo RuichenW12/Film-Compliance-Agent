@@ -5,3 +5,7 @@ authoritative/*.html -diff -text
 authoritative/*.pdf -diff -text
 forms/*.docx -diff -text
 reference-only/*.pdf -diff -text
+text/*.txt -diff -text
+snapshot/*.yaml -diff -text
+snapshot/*.md -diff -text
+manifest.json -diff -text
