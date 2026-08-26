@@ -26,6 +26,7 @@ ROMANCE_INTENT = {
     "episode_count": 30,
     "episode_minutes": 2,
     "budget_band": "band_c",
+    "investment_amount_rmb": 1_500_000,
     "is_ai_generated": False,
 }
 
@@ -123,8 +124,8 @@ def test_publish_v2_then_product_recalc_reads_the_same_repository(
         assert recalculated.status_code == 200
         assert recalculated.json() == {
             "tier": "T3",
-            "tier_provisional": False,
-            "changed": True,
+            "tier_provisional": True,
+            "changed": False,
         }
 
         project = client.get(
@@ -134,7 +135,7 @@ def test_publish_v2_then_product_recalc_reads_the_same_repository(
         assert project.status_code == 200
         classification = project.json()["project"]["classification"]
         assert classification["policy_snapshot_version"] == "v2"
-        assert classification["tier_provisional"] is False
+        assert classification["tier_provisional"] is True
 
 
 def test_explicit_context_is_not_replaced_by_policy_composition(

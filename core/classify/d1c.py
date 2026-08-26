@@ -1,7 +1,7 @@
 """D1c TierJudge (TDD 4.5). Pure function, no LLM.
 
-Amount thresholds for the 2026-09-01 regime are not published yet, so any tier
-derived from a budget band is marked provisional and shown as "暂定/待官方".
+An amount tier is final only when the pinned pack publishes a usable threshold
+set. Budget-band fallbacks and incomplete threshold data stay provisional.
 """
 
 from __future__ import annotations
@@ -28,6 +28,7 @@ class TierDecision:
     pending_flags: list[str] = field(default_factory=list)
     reasons: list[str] = field(default_factory=list)
     comparison_card: list[dict] = field(default_factory=list)
+    clause_ref: str | None = None
 
 
 # The pack may carry the flag under either key: `thresholds_published` is what
@@ -56,46 +57,81 @@ def _tier_from_amount(amount_rmb: float, thresholds: dict) -> Tier | None:
     return None
 
 
-def judge_tier(
+def _provisional_from_band(
     budget_band: BudgetBand,
-    pack3: dict,
-    snapshot_thresholds_published: bool | None = None,
-    investment_amount_rmb: float | None = None,
+    *,
+    pending_flags: list[str],
 ) -> TierDecision:
-    thresholds = pack3.get("thresholds") or {}
-    published = _thresholds_published(pack3, snapshot_thresholds_published)
-
-    if published and investment_amount_rmb is not None:
-        tier = _tier_from_amount(investment_amount_rmb, thresholds)
-        if tier is not None:
-            return TierDecision(
-                tier=tier,
-                tier_provisional=False,
-                reasons=["tier.from_official_thresholds"],
-            )
-
     if budget_band is BudgetBand.UNKNOWN:
         return TierDecision(
             tier=STRICTER_ASSUMPTION,
             tier_provisional=True,
-            pending_flags=["budget_unknown", "amount_official"],
+            pending_flags=["budget_unknown", *pending_flags],
             reasons=["tier.assumed_stricter_pending_budget"],
             comparison_card=[
                 {"tier": tier.value, "band": band.value}
                 for band, tier in PROVISIONAL_BAND_TIER.items()
             ],
         )
-
-    tier = PROVISIONAL_BAND_TIER[budget_band]
-    if published:
-        return TierDecision(
-            tier=tier,
-            tier_provisional=False,
-            reasons=["tier.from_band_with_published_thresholds"],
-        )
     return TierDecision(
-        tier=tier,
+        tier=PROVISIONAL_BAND_TIER[budget_band],
         tier_provisional=True,
+        pending_flags=pending_flags,
+        reasons=["tier.provisional_missing_exact_inputs"],
+    )
+
+
+def _thresholds_for_mode(pack3: dict, is_ai_generated: bool | None) -> dict:
+    sets = pack3.get("threshold_sets") or {}
+    if sets:
+        if is_ai_generated is None:
+            return {}
+        key = "ai_generated" if is_ai_generated else "live_action"
+        return sets.get(key) or {}
+    return pack3.get("thresholds") or {}
+
+
+def judge_tier(
+    budget_band: BudgetBand,
+    pack3: dict,
+    snapshot_thresholds_published: bool | None = None,
+    investment_amount_rmb: float | None = None,
+    is_ai_generated: bool | None = None,
+) -> TierDecision:
+    published = _thresholds_published(pack3, snapshot_thresholds_published)
+    threshold_sets = pack3.get("threshold_sets") or {}
+
+    if threshold_sets and is_ai_generated is None:
+        return _provisional_from_band(
+            budget_band,
+            pending_flags=["generation_mode_required"],
+        )
+
+    thresholds = _thresholds_for_mode(pack3, is_ai_generated)
+
+    if published and investment_amount_rmb is not None and thresholds:
+        tier = _tier_from_amount(investment_amount_rmb, thresholds)
+        if tier is not None:
+            return TierDecision(
+                tier=tier,
+                tier_provisional=False,
+                reasons=["tier.from_official_thresholds"],
+                clause_ref=thresholds.get("clause_ref"),
+            )
+
+    if published and investment_amount_rmb is None:
+        return _provisional_from_band(
+            budget_band,
+            pending_flags=["amount_required"],
+        )
+
+    if published:
+        return _provisional_from_band(
+            budget_band,
+            pending_flags=["thresholds_unavailable"],
+        )
+
+    return _provisional_from_band(
+        budget_band,
         pending_flags=["amount_official"],
-        reasons=["tier.provisional_thresholds_unpublished"],
     )

@@ -35,6 +35,7 @@ ROMANCE_INTENT = {
     "episode_count": 30,
     "episode_minutes": 2,
     "budget_band": "band_c",
+    "investment_amount_rmb": 1_500_000,
     "is_ai_generated": False,
 }
 
@@ -225,10 +226,10 @@ def policy_state(tmp_path: Path) -> PolicyApiState:
     )
 
 
-def test_publishing_a_snapshot_notifies_the_creator(
+def test_flag_only_snapshot_does_not_notify_a_tier_change(
     policy_state: PolicyApiState, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """The demo highlight: publish v2, the tier settles, the creator is told."""
+    """A published flag without usable thresholds is not a tier change."""
 
     monkeypatch.setenv("INTERNAL_TOKEN", INTERNAL_TOKEN)
 
@@ -257,12 +258,9 @@ def test_publishing_a_snapshot_notifies_the_creator(
             headers=INTERNAL_HEADERS,
         )
         assert recalculated.status_code == 200
-        assert recalculated.json()["changed"] is True
-
-        items = notifications(client)
-        assert len(items) == 1
-        assert items[0]["kind"] == NotificationKind.TIER_RECALCULATED.value
-        assert items[0]["params"]["snapshot_version"] == "v2"
-        assert items[0]["params"]["tier"] == "T3"
-        assert items[0]["params"]["tier_provisional"] is False
-        assert items[0]["link"] == f"/dashboard?project={project_id}"
+        assert recalculated.json() == {
+            "tier": "T3",
+            "tier_provisional": True,
+            "changed": False,
+        }
+        assert notifications(client) == []

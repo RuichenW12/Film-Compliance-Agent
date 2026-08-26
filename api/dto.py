@@ -33,6 +33,7 @@ class IntentRequest(ApiModel):
     episode_count: int | None = Field(default=None, ge=1)
     episode_minutes: float | None = Field(default=None, gt=0)
     budget_band: BudgetBand | None = None
+    investment_amount_rmb: int | None = Field(default=None, ge=0)
     is_ai_generated: bool | None = None
     has_finished_film: bool | None = None
 

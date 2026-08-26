@@ -10,7 +10,7 @@ import hashlib
 from dataclasses import dataclass
 
 from schemas.assets import AssetVersion, MaterialCard, UploadTicket
-from schemas.common import AuditEntry, Fact, SourceRef, TimelineEvent
+from schemas.common import AuditEntry, EvidenceRef, Fact, SourceRef, TimelineEvent
 from schemas.enums import (
     Actor,
     TaskStatus,
@@ -266,22 +266,32 @@ class WorkflowService:
             project.intent_profile.budget_band,
             pack3,
             self._thresholds_published(snapshot_version),
+            investment_amount_rmb=project.intent_profile.investment_amount_rmb,
+            is_ai_generated=project.intent_profile.is_ai_generated,
         )
         changed = (
             decision.tier != classification.tier
             or decision.tier_provisional != classification.tier_provisional
         )
 
+        classification_updates = {
+            "tier": decision.tier,
+            "tier_provisional": decision.tier_provisional,
+            "policy_snapshot_version": snapshot_version,
+            "pending_flags": sorted(
+                set(classification.pending_flags) - {"amount_official"}
+                | set(decision.pending_flags)
+            ),
+        }
+        if decision.clause_ref:
+            classification_updates["evidence_refs"] = [
+                EvidenceRef(
+                    snapshot_version=snapshot_version,
+                    clause_id=decision.clause_ref,
+                )
+            ]
         updated_classification = classification.model_copy(
-            update={
-                "tier": decision.tier,
-                "tier_provisional": decision.tier_provisional,
-                "policy_snapshot_version": snapshot_version,
-                "pending_flags": sorted(
-                    set(classification.pending_flags) - {"amount_official"}
-                    | set(decision.pending_flags)
-                ),
-            }
+            update=classification_updates
         )
         project = project.model_copy(
             update={

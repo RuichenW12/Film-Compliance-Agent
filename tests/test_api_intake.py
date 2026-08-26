@@ -93,6 +93,45 @@ def test_partial_intent_reports_what_is_missing(client):
     assert response.json()["missing"] == ["episode_count", "episode_minutes"]
 
 
+def test_intent_accepts_and_persists_exact_investment_amount(client):
+    project_id = create_project(client)
+    response = client.post(
+        f"/v1/projects/{project_id}/intent",
+        json={**ROMANCE_INTENT, "investment_amount_rmb": 1_500_000},
+    )
+
+    assert response.status_code == 200
+    project = client.get(f"/v1/projects/{project_id}").json()["project"]
+    assert project["intent_profile"]["investment_amount_rmb"] == 1_500_000
+
+
+def test_intent_rejects_a_negative_exact_investment_amount(client):
+    project_id = create_project(client)
+    response = client.post(
+        f"/v1/projects/{project_id}/intent",
+        json={**ROMANCE_INTENT, "investment_amount_rmb": -1},
+    )
+
+    assert response.status_code == 422
+    errors = response.json()["error"]["details"]["errors"]
+    assert errors[0]["loc"][-1] == "investment_amount_rmb"
+    assert errors[0]["type"] == "greater_than_equal"
+
+
+def test_classification_projects_exact_amount_as_a_user_answer_fact(client):
+    project_id = create_project(client)
+    client.post(
+        f"/v1/projects/{project_id}/intent",
+        json={**ROMANCE_INTENT, "investment_amount_rmb": 1_500_000},
+    )
+    client.post(f"/v1/projects/{project_id}/classify")
+
+    facts = client.get(f"/v1/projects/{project_id}/facts").json()
+    amount = next(fact for fact in facts if fact["key"] == "investment_amount_rmb")
+    assert amount["value"] == 1_500_000
+    assert amount["source_ref"]["answer_id"] == "intent.investment_amount_rmb"
+
+
 def test_classify_without_enough_answers_returns_state_invalid(client):
     project_id = create_project(client)
     client.post(f"/v1/projects/{project_id}/intent", json={"logline": "一个故事"})
