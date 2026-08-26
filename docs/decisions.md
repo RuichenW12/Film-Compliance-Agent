@@ -37,6 +37,7 @@ status becomes `Superseded by D-0xx`. That way the reasoning trail survives.
 | [D-021](#d-021) | A | Confirming the roadmap starts collection in the same call | Accepted, supersedes part of D-A4 deferral |
 | [D-022](#d-022) | A | A form field is filled only from a confirmed fact; freezing hashes it | Accepted |
 | [D-023](#d-023) | A | The institution registry ships empty; an unknown institution is unverifiable, not invalid | Accepted |
+| [D-024](#d-024) | A | One C1-a finding per scene, with every matching line kept | Accepted |
 
 ---
 
@@ -664,3 +665,49 @@ Revisit when a real filing partner is involved: the capital threshold in
 read its criteria from a pack and stop being mock — at which point every
 `mock=True` in this module becomes a lie that needs removing rather than
 updating.
+
+## D-024
+
+**One C1-a finding per scene, with every matching line kept** · Area: A · Status: Accepted · 2026-08-25
+
+Findings deduplicated on `(category, quote)`, meaning one per matching *line*.
+Against the one-line-per-scene fixtures the harness shipped with, that looked
+identical to one per scene. Against a real script it is not: a courtroom scene
+that names the judge in eleven lines produced eleven findings.
+
+Eleven alerts pointing into the same scene do not give a creator eleven
+decisions. They give one decision — rewrite, waive, or escalate that scene — and
+ten rows to dismiss. Each also needed its own action, so waiving that scene meant
+clicking waive eleven times.
+
+Findings now group on `(category, episode, scene)`. The long fixture goes from 25
+findings to 14, one per scene.
+
+**Deduping must not lose the way back**, so the finding keeps every line it
+matched:
+
+- `Locator.quote` — the first matching line, verbatim, as before;
+- `Locator.line` — that line's 1-based position in the uploaded document;
+- `Locator.match_lines` — every line in the scene that matched.
+
+A creator sees one row per scene and can still open any individual line. The
+collection UI lists the line numbers under the quote.
+
+Two limits worth naming:
+
+1. **The locator quote is the first match, not the worst.** The pattern stage
+   has no notion of severity within a category, so a scene holding one incidental
+   mention and one serious one shows the earlier of them. The line list makes the
+   others reachable; ranking them would need the semantic stage.
+2. **Grouping is per scene, never across scenes.** Two courtroom scenes in
+   different episodes are two separate rewrites and stay two findings.
+
+**This changes `schemas/findings.py`, which is the shared contract boundary.**
+Both additions are optional with defaults, so nothing existing breaks and the
+policy loop is unaffected — it never reads `Locator`. Flagged for B's awareness
+rather than assumed: if the field names should differ, they are cheap to change
+now and expensive after data exists.
+
+Revisit when the semantic stage runs for real: it could rank matches within a
+scene, at which point the locator should quote the strongest line rather than
+the first.

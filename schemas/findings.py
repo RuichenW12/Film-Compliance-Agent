@@ -9,9 +9,19 @@ from .enums import AlertOption, FindingSeverity, FindingStatus
 
 
 class Locator(DomainModel):
+    """Where a finding is, precisely enough to edit it.
+
+    `quote` is the first matching line, kept verbatim so the evidence rule
+    holds. `line` is that line's 1-based position in the uploaded document and
+    `match_lines` lists every line in the same scene that matched, so a scene
+    reported once can still be traced back line by line.
+    """
+
     episode: int | None = None
     scene: int | None = None
     quote: str
+    line: int | None = None
+    match_lines: list[int] = Field(default_factory=list)
 
 
 class AlertDept(DomainModel):

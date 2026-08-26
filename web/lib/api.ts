@@ -121,7 +121,13 @@ export interface FactRecord {
 export interface Finding {
   finding_id: string;
   asset_version: string;
-  locator: { episode: number | null; scene: number | null; quote: string };
+  locator: {
+    episode: number | null;
+    scene: number | null;
+    quote: string;
+    line: number | null;
+    match_lines: number[];
+  };
   category: string;
   severity: string;
   evidence_refs: { snapshot_version: string; clause_id: string }[];

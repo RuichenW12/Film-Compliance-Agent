@@ -114,5 +114,7 @@
   "license.reason.not_in_registry": "This institution is not in the registry, so nothing can be checked. Unknown, not approved.",
   "license.reason.capital": "Registered capital is below the demo threshold.",
   "license.reason.foreign": "The entry records foreign investment.",
-  "institution.load_demo_admin_only": "Only an administrator can load the demo registry. Switch the role above to Admin."
+  "institution.load_demo_admin_only": "Only an administrator can load the demo registry. Switch the role above to Admin.",
+  "finding.line": "line",
+  "finding.matching_lines": "matching lines"
 }
