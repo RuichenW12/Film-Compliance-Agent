@@ -323,3 +323,44 @@ def test_every_card_change_is_on_the_timeline(client):
     events = [event["event"] for event in timeline]
     assert "material.attached" in events
     assert "material.validated" in events
+
+
+# ------------------------------------------------ a bad pack entry, not a 500
+
+
+def test_a_card_without_an_asset_kind_is_skipped(stores, clock):
+    """A card says "upload this sort of thing". With no kind it means nothing.
+
+    It must not take the whole collection page down with it: the pack author
+    sees one missing card, every other card still renders.
+    """
+
+    pack = {
+        "material_cards": [
+            {"material_id": "mat_ok", "name_key": "material.synopsis", "asset_kind": "synopsis"},
+            {"material_id": "mat_no_kind", "name_key": "material.id_scan"},
+        ]
+    }
+    client = make_client({PackName.P5_FORM_TEMPLATES.value: pack}, stores, clock)
+    cards = materials(client, new_project(client))
+
+    assert [card["material_id"] for card in cards] == ["mat_ok"]
+
+
+def test_a_card_naming_an_unknown_asset_kind_is_skipped(stores, clock):
+    """An unknown kind names something the product cannot accept."""
+
+    pack = {
+        "material_cards": [
+            {"material_id": "mat_ok", "name_key": "material.synopsis", "asset_kind": "synopsis"},
+            {
+                "material_id": "mat_weird",
+                "name_key": "material.id_scan",
+                "asset_kind": "hologram",
+            },
+        ]
+    }
+    client = make_client({PackName.P5_FORM_TEMPLATES.value: pack}, stores, clock)
+    cards = materials(client, new_project(client))
+
+    assert [card["material_id"] for card in cards] == ["mat_ok"]

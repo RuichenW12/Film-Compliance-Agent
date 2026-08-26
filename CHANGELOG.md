@@ -22,6 +22,28 @@ Conventions:
 
 ## 2026-08-26
 
+### Shared — a malformed material card skips instead of 500ing
+
+- `core/materials.py` read `raw["asset_kind"]` directly after B bound cards to
+  asset kinds, so a pack card missing the field raised `KeyError` and an unknown
+  value raised `ValueError`. Either one took down `GET /v1/projects/{pid}/materials`
+  entirely — **every card disappeared because one was wrong.**
+- That contradicted the rule three lines above it, where a card with no
+  `material_id` or `name_key` is skipped. A missing or unknown `asset_kind` is
+  now treated the same way: one card is absent, the rest still render, and the
+  pack author sees the gap.
+- The seed v2 pack always supplies `asset_kind`, so nothing was broken in
+  practice. The exposure is that the pack is authored by the policy loop:
+  publishing one card without the field would have blanked the collection page
+  for every project.
+- `build_material_cards` docstring now shows `asset_kind` in the pack shape it
+  accepts, since it is required.
+
+Verified: `python -m pytest` — 417 passed, 3 skipped, 2 new in
+`tests/test_materials.py` covering a card with no kind and a card naming an
+unknown one.
+
+
 ### Shared — complete mock-verified policy snapshot v2
 
 - The local default policy snapshot now contains all p1–p6 packs required to
