@@ -772,3 +772,28 @@ usable published threshold set** · Area: Shared · Status: Accepted · 2026-08-
 does not make a result final when the selected threshold set or exact amount is
 missing. D1c selects `live_action` or `ai_generated` from the stored intent and
 returns the selected pack evidence; it never falls through to the other mode.
+
+## D-027
+
+**A computationally final result does not imply human-verified policy** · Area: Shared · Status: Accepted · 2026-08-26
+
+The local default v2 is complete enough to drive the domestic T1/T2/T3 workflow
+without empty policy packs. It remains `mock_verified`: the amounts, process
+steps, material requirements, wording, dates, and evidence mappings have not all
+been approved by a human policy reviewer.
+
+`tier_provisional=false` answers a narrow computational question: the runtime
+had an exact amount, a known generation mode, and a usable threshold set. It
+does not promote the policy input that produced the tier. Every classification
+therefore pins both the snapshot version and its separate verification status,
+and the API and UI keep the mock warning visible through the workflow.
+
+Promotion is whole-snapshot and human-only. Automated tests may prove schema,
+cross-pack consistency, publication safety, and deterministic workflow
+behavior, but they cannot change `verification_status` to `human_verified`.
+That requires every item in
+[`policy-v2-human-review-checklist.md`](policy-v2-human-review-checklist.md) to be
+reviewed, its evidence recorded, and a human reviewer to authorize the change.
+
+This decision does not claim cloud deployment, official endorsement, or legal
+advice. Cloud bootstrap and Gate 5-b remain separate work.

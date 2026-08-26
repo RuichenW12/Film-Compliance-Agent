@@ -31,6 +31,7 @@ from .policy_snapshot import (
     RecalcTierRequest,
     RecalcTierResponse,
     SnapshotDiff,
+    VerificationStatus,
 )
 from .project import (
     ChannelProfile,
@@ -97,5 +98,6 @@ __all__ = [
     "SourceRef",
     "TimelineEvent",
     "TracksEnabled",
+    "VerificationStatus",
     "WorkflowTask",
 ]

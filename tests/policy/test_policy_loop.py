@@ -2,6 +2,8 @@ import asyncio
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
+import yaml
+
 from schemas.policy_snapshot import OutboxStatus, PackName, ProposalStatus
 from workers.policy.adapters.memory_projects import ProjectPolicyState
 from workers.policy.local_demo import build_local_policy_loop
@@ -11,6 +13,10 @@ from workers.policy.models import PolicySource, ProposalDraft
 ROOT = Path(__file__).parents[2]
 FIXTURES = ROOT / "tests" / "fixtures" / "policy"
 NOW = datetime(2026, 8, 23, 19, 0, tzinfo=timezone(timedelta(hours=8)))
+V2_SEED = ROOT / "policy" / "seed-snapshot-v2.yaml"
+V2_P3 = yaml.safe_load(V2_SEED.read_text(encoding="utf-8"))["packs"][
+    "p3_tier_thresholds"
+]
 
 
 def test_offline_policy_loop_completes_twelve_step_acceptance(tmp_path: Path) -> None:
@@ -23,24 +29,22 @@ def test_offline_policy_loop_completes_twelve_step_acceptance(tmp_path: Path) ->
         ),
         fixture_path=FIXTURES / "source-v1.html",
         blob_root=tmp_path / "blobs",
-        seed_path=ROOT / "policy" / "seed-snapshot-v1.yaml",
+        seed_path=V2_SEED,
         proposal_draft=ProposalDraft(
             summary="分类标准正式公布",
             impact=["D1c"],
             effective_from=NOW,
-            draft_pack_updates={
-                PackName.P3_TIER_THRESHOLDS: {"thresholds_published": True}
-            },
+            draft_pack_updates={PackName.P3_TIER_THRESHOLDS: V2_P3},
         ),
         now=NOW,
         recalculated_tier="T2",
     )
-    assert loop.policy.get_snapshot("v1").thresholds_published is False
+    assert loop.policy.get_snapshot("v2").thresholds_published is True
 
     loop.projects.add_project(
         ProjectPolicyState(
             project_id="project_provisional",
-            policy_snapshot_version="v1",
+            policy_snapshot_version="v2",
             impact_nodes=["D1c"],
             has_classification=True,
             has_review=False,
@@ -56,7 +60,7 @@ def test_offline_policy_loop_completes_twelve_step_acceptance(tmp_path: Path) ->
     loop.projects.add_project(
         ProjectPolicyState(
             project_id="project_frozen",
-            policy_snapshot_version="v1",
+            policy_snapshot_version="v2",
             impact_nodes=["D1c"],
             has_classification=True,
             has_review=True,
@@ -86,7 +90,7 @@ def test_offline_policy_loop_completes_twelve_step_acceptance(tmp_path: Path) ->
 
     published = loop.publisher.publish(changed.proposal_id, "admin_richard", NOW)
     pending = loop.policy.get_outbox(published.outbox_id)
-    assert published.snapshot_version == "v2"
+    assert published.snapshot_version == "v3"
     assert pending.status is OutboxStatus.PENDING
 
     dispatched = loop.dispatcher.dispatch()
@@ -101,12 +105,12 @@ def test_offline_policy_loop_completes_twelve_step_acceptance(tmp_path: Path) ->
     assert provisional.tier == "T2"
     assert provisional.tier_provisional is False
     assert (
-        "policy.updated:v2:project_provisional:tier_recalculated"
+        "policy.updated:v3:project_provisional:tier_recalculated"
         in loop.projects.notifications
     )
     assert frozen_after.policy_stale is True
     assert (
-        "policy.updated:v2:project_frozen:policy_stale"
+        "policy.updated:v3:project_frozen:policy_stale"
         in loop.projects.notifications
     )
     assert frozen_after.frozen_form_hash == frozen_before.frozen_form_hash
@@ -119,4 +123,4 @@ def test_offline_policy_loop_completes_twelve_step_acceptance(tmp_path: Path) ->
     assert replay.already_processed is True
     assert len(loop.projects.notifications) == notification_count
     assert len(loop.projects.timeline) == timeline_count
-    assert loop.recalc.calls == [("project_provisional", "v2")]
+    assert loop.recalc.calls == [("project_provisional", "v3")]

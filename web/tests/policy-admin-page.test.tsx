@@ -38,6 +38,7 @@ const SNAPSHOT = {
   effective_from: "2026-08-22T00:00:00+08:00",
   published_by: "admin_seed",
   thresholds_published: false,
+  verification_status: "mock_verified" as const,
 };
 
 
@@ -59,6 +60,8 @@ describe("PolicyAdminPage", () => {
     expect(await screen.findByText(PROPOSAL.summary)).toBeInTheDocument();
     expect(screen.getByText("v1")).toBeInTheDocument();
     expect(screen.getByText("Not published")).toBeInTheDocument();
+    expect(screen.getByRole("alert")).toHaveTextContent(/integration data/i);
+    expect(screen.getByText("mock_verified")).toBeInTheDocument();
   });
 
   it("runs a crawl to terminal state and reloads proposals", async () => {

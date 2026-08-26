@@ -149,6 +149,7 @@ def classify(
     thresholds_published: bool | None = None,
 ) -> ClassificationOutcome:
     version = snapshot_version or snapshots.latest_version()
+    verification_status = snapshots.verification_status(version)
     pack1 = snapshots.get_pack(PackName.P1_FORM_DEFINITION, version)
     pack2 = snapshots.get_pack(PackName.P2_SUBJECT_RULES, version)
     pack3 = snapshots.get_pack(PackName.P3_TIER_THRESHOLDS, version)
@@ -169,6 +170,7 @@ def classify(
                 form_type=FormType.UNDETERMINED,
                 tier=Tier.UNDETERMINED,
                 policy_snapshot_version=version,
+                policy_verification_status=verification_status,
                 pending_flags=[*form_decision.pending_flags, "human_review"],
             ),
             facts=_intent_facts(intent),
@@ -187,6 +189,7 @@ def classify(
                 form_type=form_decision.form_type,
                 tier=Tier.UNDETERMINED,
                 policy_snapshot_version=version,
+                policy_verification_status=verification_status,
                 pending_flags=form_decision.pending_flags,
                 evidence_refs=[
                     EvidenceRef(snapshot_version=version, clause_id=form_clause_id)
@@ -217,6 +220,7 @@ def classify(
             matched_rules=subject.matched_rules,
             confidence=subject.confidence,
             policy_snapshot_version=version,
+            policy_verification_status=verification_status,
             pending_flags=pending_flags,
             dept=subject.dept,
             evidence_refs=evidence
@@ -237,6 +241,7 @@ def classify(
             matched_rules=subject.edge_rules,
             confidence=subject.confidence,
             policy_snapshot_version=version,
+            policy_verification_status=verification_status,
             pending_flags=[*pending_flags, "human_review"],
             dept=subject.dept,
             evidence_refs=evidence,
@@ -268,6 +273,7 @@ def classify(
         matched_rules=[],
         confidence=0.6 if tier_decision.tier_provisional else 1.0,
         policy_snapshot_version=version,
+        policy_verification_status=verification_status,
         pending_flags=[*pending_flags, *tier_decision.pending_flags],
         evidence_refs=[
             EvidenceRef(snapshot_version=version, clause_id=tier_clause_id)

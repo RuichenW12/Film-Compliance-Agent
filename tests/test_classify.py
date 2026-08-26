@@ -11,7 +11,7 @@ from core.classify.d1c import judge_tier
 from core.llm import ScriptedLLM
 from schemas.common import EvidenceRef
 from schemas.enums import BudgetBand, ExitKind, FormType, ProjectState, Tier
-from schemas.policy_snapshot import PackName
+from schemas.policy_snapshot import PackName, VerificationStatus
 from schemas.snapshot import SnapshotService
 
 
@@ -203,6 +203,12 @@ class ThresholdSnapshots(SnapshotService):
         return self._base.clause(clause_id, "v1")
 
 
+class HumanVerifiedThresholdSnapshots(ThresholdSnapshots):
+    def verification_status(self, version: str) -> VerificationStatus:
+        assert version == "v2"
+        return VerificationStatus.HUMAN_VERIFIED
+
+
 def test_chain_reads_amount_and_mode_from_intent_and_uses_selected_evidence(
     intent_romance, channels, snapshots
 ):
@@ -221,6 +227,23 @@ def test_chain_reads_amount_and_mode_from_intent_and_uses_selected_evidence(
             clause_id="tier-live-action-2026",
         )
     ]
+
+
+def test_classification_pins_the_selected_snapshot_verification(
+    intent_romance, channels, snapshots
+):
+    verified_snapshots = HumanVerifiedThresholdSnapshots(snapshots)
+    intent = intent_romance.model_copy(
+        update={"investment_amount_rmb": 1_500_000, "is_ai_generated": False}
+    )
+
+    outcome = classify(intent, channels, verified_snapshots)
+
+    assert outcome.classification is not None
+    assert (
+        outcome.classification.policy_verification_status
+        is VerificationStatus.HUMAN_VERIFIED
+    )
 
 
 @pytest.mark.parametrize(

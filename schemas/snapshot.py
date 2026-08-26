@@ -9,7 +9,9 @@ from pathlib import Path
 
 import yaml
 
-from .policy_snapshot import Clause, PackName, PolicySnapshot
+from policy.validation import validate_snapshot
+
+from .policy_snapshot import Clause, PackName, PolicySnapshot, VerificationStatus
 
 
 class SnapshotNotFoundError(LookupError):
@@ -34,6 +36,10 @@ class SnapshotService(ABC):
     def clause(self, clause_id: str, version: str) -> Clause:
         raise NotImplementedError
 
+    def verification_status(self, version: str) -> VerificationStatus:
+        _ = version
+        return VerificationStatus.MOCK_VERIFIED
+
 
 class FileSnapshotService(SnapshotService):
     """Read and validate the Gate 1 YAML seed through the shared contract."""
@@ -41,6 +47,7 @@ class FileSnapshotService(SnapshotService):
     def __init__(self, snapshot_path: str | Path) -> None:
         raw = yaml.safe_load(Path(snapshot_path).read_text(encoding="utf-8"))
         snapshot = PolicySnapshot.model_validate(raw)
+        validate_snapshot(snapshot)
         self._snapshots = {snapshot.version: snapshot}
 
     def latest_version(self, as_of: datetime | None = None) -> str:
@@ -74,6 +81,9 @@ class FileSnapshotService(SnapshotService):
             if clause.clause_id == clause_id:
                 return clause
         raise KeyError(f"clause not found: {clause_id}")
+
+    def verification_status(self, version: str) -> VerificationStatus:
+        return self._snapshot(version).verification_status
 
     def _snapshot(self, version: str) -> PolicySnapshot:
         try:

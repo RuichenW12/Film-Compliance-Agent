@@ -18,6 +18,7 @@ from schemas.policy_snapshot import (
     ProposalStatus,
     RecalcTierRequest,
     RecalcTierResponse,
+    VerificationStatus,
 )
 ROOT = Path(__file__).parents[2]
 SEED_PATH = ROOT / "policy" / "seed-snapshot-v1.yaml"
@@ -86,6 +87,20 @@ def test_snapshot_contract_requires_effective_from_and_all_six_packs() -> None:
     missing_pack.pop("p6_legal_clauses")
     with pytest.raises(ValidationError):
         PolicyPacks.model_validate(missing_pack)
+
+
+def test_snapshot_verification_defaults_to_mock() -> None:
+    snapshot = PolicySnapshot.model_validate(snapshot_payload())
+
+    assert snapshot.verification_status is VerificationStatus.MOCK_VERIFIED
+
+
+def test_snapshot_can_be_explicitly_human_verified() -> None:
+    snapshot = PolicySnapshot.model_validate(
+        snapshot_payload(verification_status="human_verified")
+    )
+
+    assert snapshot.verification_status is VerificationStatus.HUMAN_VERIFIED
 
 
 @pytest.mark.parametrize("version", ["1", "v0", "v01", "latest", "v2.0"])

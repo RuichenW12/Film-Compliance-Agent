@@ -10,6 +10,7 @@ from schemas.policy_snapshot import (
     ImpactNode,
     PackName,
     ProposalStatus,
+    VerificationStatus,
     Version,
 )
 
@@ -63,3 +64,4 @@ class SnapshotSummary(ApiModel):
     effective_from: AwareDatetime
     published_by: str
     thresholds_published: bool
+    verification_status: VerificationStatus

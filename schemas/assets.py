@@ -26,6 +26,7 @@ class MaterialCard(DomainModel):
 
     material_id: str
     name_key: str
+    asset_kind: AssetKind
     required: bool = True
     why_clause: EvidenceRef | None = None
     template_uri: str | None = None

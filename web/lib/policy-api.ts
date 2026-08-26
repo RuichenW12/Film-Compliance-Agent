@@ -1,3 +1,5 @@
+import type { PolicyVerificationStatus } from "./api";
+
 export type ImpactNode = "D1c" | "C1-a";
 export type ProposalStatus = "pending" | "published" | "discarded";
 export type RunStatus =
@@ -47,6 +49,7 @@ export interface SnapshotSummary {
   effective_from: string;
   published_by: string;
   thresholds_published: boolean;
+  verification_status: PolicyVerificationStatus;
 }
 
 interface ErrorEnvelope {

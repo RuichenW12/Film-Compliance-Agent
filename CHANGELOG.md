@@ -22,6 +22,28 @@ Conventions:
 
 ## 2026-08-26
 
+### Shared — complete mock-verified policy snapshot v2
+
+- The local default policy snapshot now contains all p1–p6 packs required to
+  drive the domestic T1/T2/T3 creator workflow; v1 remains an explicit legacy
+  fixture.
+- Cross-pack validation rejects unusable thresholds, missing clause references,
+  incomplete process templates, and ambiguous material cards before load or
+  publication.
+- Classifications pin `verification_status` separately from computational tier
+  finality, and Wizard, Dashboard, Collection, and Policy Admin visibly label
+  `mock_verified` data ([D-027](docs/decisions.md#d-027)).
+- Material cards now declare one `asset_kind`; the service rejects wrong-kind
+  attachments and Collection selects the latest matching asset.
+- Added a deterministic HTTP integration test from default startup through T2
+  classification, roadmap, material validation, script pre-check, D3 gate, and
+  frozen v2 form. Added the human-only promotion checklist.
+- This does not claim cloud deployment, Gate 5-b completion, human policy
+  verification, or legal advice.
+
+Verified: `python -m pytest` — 417 passed, 3 skipped; `npm test` — 24 passed;
+`npm run typecheck` and `npm run build` — exit 0.
+
 ### Shared — exact-amount, mode-specific tier runtime
 
 - Intake and the Wizard now accept `investment_amount_rmb` as an optional,

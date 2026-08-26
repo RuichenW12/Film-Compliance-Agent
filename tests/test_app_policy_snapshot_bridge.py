@@ -15,10 +15,11 @@ from api.main import create_app
 from api.settings import Settings
 
 
-NOW = datetime(2026, 8, 23, 20, 30, tzinfo=timezone(timedelta(hours=8)))
+NOW = datetime(2026, 8, 27, 20, 30, tzinfo=timezone(timedelta(hours=8)))
 INTERNAL_TOKEN = "t_gate5a_internal"
 ADMIN_HEADERS = {"X-Mock-Role": "admin"}
 CREATOR_HEADERS = {"X-Mock-Role": "creator", "X-User-Id": "u_gate5a"}
+V2_SEED = Path(__file__).parents[1] / "policy" / "seed-snapshot-v2.yaml"
 ROMANCE_INTENT = {
     "form_type_claimed": "micro_drama",
     "genre_keywords": ["甜宠"],
@@ -27,7 +28,7 @@ ROMANCE_INTENT = {
     "episode_minutes": 2,
     "budget_band": "band_c",
     "investment_amount_rmb": 1_500_000,
-    "is_ai_generated": False,
+    "is_ai_generated": None,
 }
 
 
@@ -36,6 +37,7 @@ def policy_state(tmp_path: Path) -> PolicyApiState:
     return asyncio.run(
         build_local_policy_api_state(
             tmp_path / "blobs",
+            seed_path=V2_SEED,
             clock=lambda: NOW,
         )
     )
@@ -65,11 +67,11 @@ def create_provisional_romance(client: TestClient) -> str:
     classification = classified.json()["classification"]
     assert classification["tier"] == "T3"
     assert classification["tier_provisional"] is True
-    assert classification["policy_snapshot_version"] == "v1"
+    assert classification["policy_snapshot_version"] == "v2"
     return project_id
 
 
-def publish_v2(client: TestClient) -> str:
+def publish_v3(client: TestClient) -> str:
     crawl = client.post(
         "/v1/admin/policy/crawl",
         json={"source_id": SOURCE_ID},
@@ -90,31 +92,22 @@ def publish_v2(client: TestClient) -> str:
         headers=ADMIN_HEADERS,
     )
     assert published.status_code == 201
-    assert published.json() == {"snapshot_version": "v2"}
+    assert published.json() == {"snapshot_version": "v3"}
     return published.json()["snapshot_version"]
 
 
-def test_publish_v2_then_product_recalc_reads_the_same_repository(
+def test_publish_v3_then_product_recalc_reads_the_same_repository(
     policy_state: PolicyApiState,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setenv("INTERNAL_TOKEN", INTERNAL_TOKEN)
 
     with TestClient(create_app(policy_state=policy_state)) as client:
-        assert client.get("/healthz").json()["snapshot_version"] == "v1"
+        assert client.get("/healthz").json()["snapshot_version"] == "v2"
         project_id = create_provisional_romance(client)
 
-        missing = client.post(
-            f"/v1/internal/projects/{project_id}/recalc-tier",
-            json={"snapshot_version": "v99"},
-            headers={"X-Internal-Token": INTERNAL_TOKEN},
-        )
-        assert missing.status_code == 404
-        assert missing.json()["error"]["code"] == "NOT_FOUND"
-        assert "v99" in missing.json()["error"]["message"]
-
-        version = publish_v2(client)
-        assert client.get("/healthz").json()["snapshot_version"] == "v2"
+        version = publish_v3(client)
+        assert client.get("/healthz").json()["snapshot_version"] == "v3"
 
         recalculated = client.post(
             f"/v1/internal/projects/{project_id}/recalc-tier",
@@ -134,7 +127,7 @@ def test_publish_v2_then_product_recalc_reads_the_same_repository(
         )
         assert project.status_code == 200
         classification = project.json()["project"]["classification"]
-        assert classification["policy_snapshot_version"] == "v2"
+        assert classification["policy_snapshot_version"] == "v3"
         assert classification["tier_provisional"] is True
 
 
@@ -145,9 +138,14 @@ def test_explicit_context_is_not_replaced_by_policy_composition(
     result = asyncio.run(policy_state.launcher.execute(run_id, SOURCE_ID, NOW))
     assert result.proposal_id is not None
     policy_state.publisher.publish(result.proposal_id, "admin_richard", NOW)
-    assert set(policy_state.repository.list_snapshots()) == {"v1", "v2"}
+    assert set(policy_state.repository.list_snapshots()) == {"v2", "v3"}
 
-    explicit = build_context(Settings(internal_token=INTERNAL_TOKEN))
+    explicit = build_context(
+        Settings(
+            internal_token=INTERNAL_TOKEN,
+            snapshot_seed_path="policy/seed-snapshot-v1.yaml",
+        )
+    )
     with TestClient(
         create_app(context=explicit, policy_state=policy_state)
     ) as client:

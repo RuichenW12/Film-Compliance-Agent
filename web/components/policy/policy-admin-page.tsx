@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { PolicyVerificationBanner } from "@/components/policy-verification-banner";
 import {
   getRun,
   listPendingProposals,
@@ -138,6 +139,16 @@ export function PolicyAdminPage({
         </p>
       ) : null}
 
+      <PolicyVerificationBanner
+        status={
+          snapshots.some(
+            (snapshot) => snapshot.verification_status === "mock_verified",
+          )
+            ? "mock_verified"
+            : undefined
+        }
+      />
+
       <section className="panel" aria-labelledby="crawl-heading">
         <div className="section-heading">
           <div>
@@ -238,6 +249,7 @@ export function PolicyAdminPage({
                 <th>Effective</th>
                 <th>Publisher</th>
                 <th>Thresholds</th>
+                <th>Verification</th>
               </tr>
             </thead>
             <tbody>
@@ -253,6 +265,7 @@ export function PolicyAdminPage({
                       ? "Published"
                       : "Not published"}
                   </td>
+                  <td>{snapshot.verification_status}</td>
                 </tr>
               ))}
             </tbody>

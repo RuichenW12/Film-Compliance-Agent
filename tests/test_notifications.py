@@ -26,7 +26,7 @@ INTERNAL_TOKEN = "t_test_internal"
 INTERNAL_HEADERS = {"X-Internal-Token": INTERNAL_TOKEN}
 OWNER = {"X-Mock-Role": "creator", "X-User-Id": "u_owner"}
 OTHER_CREATOR = {"X-Mock-Role": "creator", "X-User-Id": "u_other"}
-NOW = datetime(2026, 8, 23, 20, 30, tzinfo=timezone(timedelta(hours=8)))
+NOW = datetime(2026, 8, 27, 20, 30, tzinfo=timezone(timedelta(hours=8)))
 
 ROMANCE_INTENT = {
     "form_type_claimed": "micro_drama",
@@ -222,14 +222,20 @@ def test_an_unknown_notification_is_a_contract_404(client):
 @pytest.fixture
 def policy_state(tmp_path: Path) -> PolicyApiState:
     return asyncio.run(
-        build_local_policy_api_state(tmp_path / "blobs", clock=lambda: NOW)
+        build_local_policy_api_state(
+            tmp_path / "blobs",
+            seed_path=Path(__file__).parents[1]
+            / "policy"
+            / "seed-snapshot-v1.yaml",
+            clock=lambda: NOW,
+        )
     )
 
 
-def test_flag_only_snapshot_does_not_notify_a_tier_change(
+def test_incomplete_snapshot_is_rejected_without_notifications(
     policy_state: PolicyApiState, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """A published flag without usable thresholds is not a tier change."""
+    """A flag-only v2 never reaches the product notification boundary."""
 
     monkeypatch.setenv("INTERNAL_TOKEN", INTERNAL_TOKEN)
 
@@ -250,17 +256,11 @@ def test_flag_only_snapshot_does_not_notify_a_tier_change(
             f"/v1/admin/policy/proposals/{run.json()['proposal_id']}/publish",
             headers={"X-Mock-Role": "admin"},
         )
-        assert published.status_code == 201
-
-        recalculated = client.post(
-            f"/v1/internal/projects/{project_id}/recalc-tier",
-            json={"snapshot_version": "v2"},
-            headers=INTERNAL_HEADERS,
-        )
-        assert recalculated.status_code == 200
-        assert recalculated.json() == {
-            "tier": "T3",
-            "tier_provisional": True,
-            "changed": False,
-        }
+        assert published.status_code == 502
+        assert published.json()["error"]["code"] == "POLICY_PROPOSAL_INVALID"
+        assert set(policy_state.repository.list_snapshots()) == {"v1"}
+        assert policy_state.repository.list_outbox() == {}
+        assert client.get(
+            f"/v1/projects/{project_id}", headers=OWNER
+        ).json()["project"]["classification"]["policy_snapshot_version"] == "v1"
         assert notifications(client) == []

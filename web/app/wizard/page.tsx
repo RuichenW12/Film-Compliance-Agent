@@ -2,7 +2,12 @@
 
 import { useState } from "react";
 
-import { ApiError, apiFetch } from "../../lib/api";
+import { PolicyVerificationBanner } from "../../components/policy-verification-banner";
+import {
+  ApiError,
+  apiFetch,
+  type PolicyVerificationStatus,
+} from "../../lib/api";
 import { BudgetBand } from "../../lib/enums";
 import { t } from "../../lib/i18n";
 
@@ -15,6 +20,7 @@ interface ClassifyResponse {
     co_review_required: boolean;
     matched_rules: { rule_id: string; quote: string }[];
     policy_snapshot_version: string;
+    policy_verification_status: PolicyVerificationStatus;
     pending_flags: string[];
     evidence_refs: { snapshot_version: string; clause_id: string }[];
   } | null;
@@ -188,6 +194,9 @@ export default function WizardPage() {
       {result ? (
         <section className="card">
           <h2>Classification</h2>
+          <PolicyVerificationBanner
+            status={result.classification?.policy_verification_status}
+          />
           {result.exit ? (
             <p>{t(result.exit.card_key)}</p>
           ) : (

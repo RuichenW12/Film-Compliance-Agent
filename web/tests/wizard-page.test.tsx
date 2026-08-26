@@ -36,6 +36,7 @@ describe("WizardPage", () => {
             co_review_required: false,
             matched_rules: [],
             policy_snapshot_version: "v2",
+            policy_verification_status: "mock_verified",
             pending_flags: [],
             evidence_refs: []
           },
@@ -58,6 +59,7 @@ describe("WizardPage", () => {
     );
 
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(4));
+    expect(screen.getByRole("alert")).toHaveTextContent(/integration data/i);
     const intent = JSON.parse(String(fetchMock.mock.calls[1][1]?.body));
     expect(intent.investment_amount_rmb).toBe(1_500_000);
   });

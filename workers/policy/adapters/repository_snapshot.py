@@ -5,7 +5,12 @@ from __future__ import annotations
 from copy import deepcopy
 from datetime import datetime, timezone
 
-from schemas.policy_snapshot import Clause, PackName, PolicySnapshot
+from schemas.policy_snapshot import (
+    Clause,
+    PackName,
+    PolicySnapshot,
+    VerificationStatus,
+)
 from schemas.snapshot import SnapshotNotFoundError, SnapshotService
 from workers.policy.interfaces import SnapshotReadRepository
 
@@ -52,6 +57,9 @@ class RepositorySnapshotService(SnapshotService):
             if clause.clause_id == clause_id:
                 return clause
         raise KeyError(f"clause not found: {clause_id}")
+
+    def verification_status(self, version: str) -> VerificationStatus:
+        return self._snapshot(version).verification_status
 
     def _snapshot(self, version: str) -> PolicySnapshot:
         try:

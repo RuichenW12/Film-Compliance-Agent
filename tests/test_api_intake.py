@@ -56,6 +56,7 @@ def test_healthz_reports_the_pinned_snapshot(client):
     body = client.get("/healthz").json()
     assert body["status"] == "ok"
     assert body["snapshot_version"] == "v1"
+    assert body["snapshot_verification_status"] == "mock_verified"
 
 
 def test_full_intake_to_classification(client):

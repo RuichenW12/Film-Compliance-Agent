@@ -24,7 +24,7 @@ class Settings:
     pubsub_emulator_host: str = ""
     gcs_bucket: str = ""
     vertex_model_gemini: str = ""
-    snapshot_seed_path: str = "policy/seed-snapshot-v1.yaml"
+    snapshot_seed_path: str = "policy/seed-snapshot-v2.yaml"
     internal_token: str = ""
     flag_veo_teaser: bool = False
     flag_us_track: bool = False
@@ -40,7 +40,7 @@ class Settings:
             gcs_bucket=os.getenv("GCS_BUCKET", ""),
             vertex_model_gemini=os.getenv("VERTEX_MODEL_GEMINI", ""),
             snapshot_seed_path=os.getenv(
-                "SNAPSHOT_SEED_PATH", "policy/seed-snapshot-v1.yaml"
+                "SNAPSHOT_SEED_PATH", "policy/seed-snapshot-v2.yaml"
             ),
             internal_token=os.getenv("INTERNAL_TOKEN", ""),
             flag_veo_teaser=_flag("FLAG_VEO_TEASER"),

@@ -4,7 +4,12 @@ from pathlib import Path
 import pytest
 import yaml
 
-from schemas.policy_snapshot import PackName, PolicyPacks, PolicySnapshot
+from schemas.policy_snapshot import (
+    PackName,
+    PolicyPacks,
+    PolicySnapshot,
+    VerificationStatus,
+)
 from schemas.snapshot import SnapshotNotFoundError
 from workers.policy.adapters.repository_snapshot import RepositorySnapshotService
 from workers.policy.repository import InMemoryPolicyRepository
@@ -92,3 +97,12 @@ def test_clause_lookup_matches_the_file_adapter_contract() -> None:
     assert clause.clause_id == "nrta-order-16-article-2"
     with pytest.raises(KeyError, match="clause not found"):
         service.clause("missing_clause", "v1")
+
+
+def test_repository_exposes_snapshot_verification_status() -> None:
+    repository, _ = seed_repository()
+    service = RepositorySnapshotService(repository)
+
+    assert service.verification_status("v1") is VerificationStatus.MOCK_VERIFIED
+    with pytest.raises(SnapshotNotFoundError, match="v99"):
+        service.verification_status("v99")

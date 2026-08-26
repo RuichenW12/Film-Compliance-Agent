@@ -50,6 +50,11 @@ class OutboxStatus(StrEnum):
     SENT = "sent"
 
 
+class VerificationStatus(StrEnum):
+    MOCK_VERIFIED = "mock_verified"
+    HUMAN_VERIFIED = "human_verified"
+
+
 def _validate_pack(value: dict[str, Any]) -> dict[str, Any]:
     """A pack is inline data or exactly one GCS blob reference."""
 
@@ -95,6 +100,7 @@ class PolicySnapshot(ContractModel):
     packs: PolicyPacks
     diff_from_prev: SnapshotDiff
     thresholds_published: bool
+    verification_status: VerificationStatus = VerificationStatus.MOCK_VERIFIED
 
 
 class PolicyProposal(ContractModel):

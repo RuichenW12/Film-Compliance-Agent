@@ -47,11 +47,13 @@ def create_app(
     context: AppContext | None = None,
     policy_state: PolicyApiState | None = None,
 ) -> FastAPI:
+    settings = Settings.from_env()
+
     def install_policy_state(app: FastAPI, resolved: PolicyApiState) -> None:
         app.state.policy = resolved
         if context is None:
             app.state.context = build_context(
-                Settings.from_env(),
+                settings,
                 snapshots=RepositorySnapshotService(resolved.repository),
             )
 
@@ -63,7 +65,8 @@ def create_app(
             return
         with TemporaryDirectory(prefix="film-compliance-policy-") as temp_dir:
             resolved = await build_local_policy_api_state(
-                Path(temp_dir) / "blobs"
+                Path(temp_dir) / "blobs",
+                seed_path=settings.snapshot_path,
             )
             install_policy_state(app, resolved)
             yield
