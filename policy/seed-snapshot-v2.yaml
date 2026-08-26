@@ -1,0 +1,164 @@
+version: v2
+published_at: "2026-08-26T00:05:00+08:00"
+effective_from: "2026-08-26T00:00:00+08:00"
+published_by: mock_seed
+verification_status: mock_verified
+packs:
+  p1_form_definition:
+    episode_max_minutes_exclusive: 20
+    continuous_plot_required: true
+    clause_ref: nrta-order-16-article-2
+  p2_subject_rules:
+    subject_rules:
+      - rule_id: SR-001
+        category: political
+        trigger_patterns: [政治]
+        expert_pending: true
+        clause_ref: nrta-order-16-article-5
+      - rule_id: SR-002
+        category: military
+        trigger_patterns: [军事]
+        expert_pending: true
+        clause_ref: nrta-order-16-article-5
+      - rule_id: SR-003
+        category: diplomatic
+        trigger_patterns: [外交]
+        expert_pending: true
+        clause_ref: nrta-order-16-article-5
+      - rule_id: SR-004
+        category: national_security
+        trigger_patterns: [国家安全]
+        expert_pending: true
+        clause_ref: nrta-order-16-article-5
+      - rule_id: SR-005
+        category: united_front
+        trigger_patterns: [统战]
+        expert_pending: true
+        clause_ref: nrta-order-16-article-5
+      - rule_id: SR-006
+        category: ethnic
+        trigger_patterns: [民族]
+        expert_pending: true
+        clause_ref: nrta-order-16-article-5
+      - rule_id: SR-007
+        category: religious
+        trigger_patterns: [宗教]
+        expert_pending: true
+        clause_ref: nrta-order-16-article-5
+      - rule_id: SR-008
+        category: judicial
+        trigger_patterns: [司法]
+        expert_pending: true
+        clause_ref: nrta-order-16-article-5
+      - rule_id: SR-009
+        category: public_security
+        trigger_patterns: [公安]
+        expert_pending: true
+        clause_ref: nrta-order-16-article-5
+  p3_tier_thresholds:
+    thresholds_published: true
+    threshold_sets:
+      live_action:
+        effective_from: "2026-01-01T00:00:00+08:00"
+        T1_min_rmb: 3000000
+        T2_min_rmb: 1000000
+        clause_ref: tier-live-action-2026
+      ai_generated:
+        effective_from: "2026-07-01T00:00:00+08:00"
+        T1_min_rmb: 800000
+        T2_min_rmb: 300000
+        clause_ref: tier-ai-generated-2026
+  p4_process_templates:
+    templates:
+      T1_7steps:
+        steps:
+          - name: roadmap.step.confirm_classification
+            owner: creator
+          - name: roadmap.step.materials
+            owner: creator
+            material_refs: [mat_synopsis, mat_script]
+          - name: roadmap.step.script_precheck
+            owner: system
+          - name: roadmap.step.resolve_coreview
+            owner: creator
+          - name: roadmap.step.freeze_form
+            owner: creator
+          - name: roadmap.step.authority_review
+            owner: institution
+          - name: roadmap.step.record_filing
+            owner: institution
+      T2_5steps:
+        steps:
+          - name: roadmap.step.materials
+            owner: creator
+            material_refs: [mat_synopsis, mat_script]
+          - name: roadmap.step.self_check
+            owner: creator
+          - name: roadmap.step.freeze_form
+            owner: creator
+          - name: roadmap.step.institution_review
+            owner: institution
+          - name: roadmap.step.record_filing
+            owner: institution
+      T3_4steps:
+        steps:
+          - name: roadmap.step.materials
+            owner: creator
+            material_refs: [mat_synopsis, mat_script]
+          - name: roadmap.step.freeze_form
+            owner: creator
+          - name: roadmap.step.institution_review
+            owner: institution
+          - name: roadmap.step.record_filing
+            owner: institution
+  p5_form_templates:
+    required_facts:
+      - title
+      - episode_count
+      - episode_minutes
+      - investment_amount_rmb
+      - applicant_entity
+    material_cards:
+      - material_id: mat_synopsis
+        name_key: material.synopsis
+        asset_kind: synopsis
+        required: true
+      - material_id: mat_script
+        name_key: material.script
+        asset_kind: script
+        required: true
+      - material_id: mat_supporting_document
+        name_key: material.supporting_document
+        asset_kind: supporting_document
+        required: false
+      - material_id: mat_prompts
+        name_key: material.prompts
+        asset_kind: prompts
+        required: false
+      - material_id: mat_subtitle_sheet
+        name_key: material.subtitle_sheet
+        asset_kind: subtitle_sheet
+        required: false
+  p6_legal_clauses:
+    source_name: Mock-verified integration sources
+    clauses:
+      - clause_id: nrta-order-16-article-2
+        title: 第二条
+        text: 本办法所称微短剧，是指单集时长少于二十分钟，主题主线明确、故事情节连续完整、人物角色突出的剧集。
+        source_url: https://www.nrta.gov.cn/art/2026/7/31/art_113_73785.html
+      - clause_id: nrta-order-16-article-5
+        title: 第五条
+        text: 特殊题材类别与较大投资额度的一类微短剧定义。
+        source_url: https://www.nrta.gov.cn/art/2026/7/31/art_113_73785.html
+      - clause_id: tier-live-action-2026
+        title: 真人微短剧联调门槛候选
+        text: 联调值：T1 300万元，T2 100万元。
+        source_url: https://whhlyj.baoji.gov.cn/zzzb/xygl/202601/t20260115_1240723.html
+      - clause_id: tier-ai-generated-2026
+        title: AI微短剧联调门槛候选
+        text: 联调值：T1 80万元，T2 30万元。
+        source_url: https://wxb.xzdw.gov.cn/wlcb/cbgz/202606/t20260626_680352.html
+diff_from_prev:
+  summary: Complete mock-verified v2 for domestic integration
+  impact: [D1c, C1-a]
+thresholds_published: true
