@@ -96,6 +96,17 @@ def _intent_facts(intent: IntentProfile) -> list[ProposedFact]:
                 ),
             )
         )
+    if intent.investment_amount_rmb is not None:
+        facts.append(
+            ProposedFact(
+                "investment_amount_rmb",
+                intent.investment_amount_rmb,
+                SourceRef(
+                    type=SourceRefType.USER_ANSWER,
+                    answer_id="intent.investment_amount_rmb",
+                ),
+            )
+        )
     return facts
 
 
@@ -136,12 +147,12 @@ def classify(
     llm: LLMClient | None = None,
     snapshot_version: str | None = None,
     thresholds_published: bool | None = None,
-    investment_amount_rmb: float | None = None,
 ) -> ClassificationOutcome:
     version = snapshot_version or snapshots.latest_version()
     pack1 = snapshots.get_pack(PackName.P1_FORM_DEFINITION, version)
     pack2 = snapshots.get_pack(PackName.P2_SUBJECT_RULES, version)
     pack3 = snapshots.get_pack(PackName.P3_TIER_THRESHOLDS, version)
+    form_clause_id = str(pack1.get("clause_ref") or FORM_CLAUSE_ID)
 
     form_decision = judge_form_type(intent, pack1, llm)
 
@@ -178,7 +189,7 @@ def classify(
                 policy_snapshot_version=version,
                 pending_flags=form_decision.pending_flags,
                 evidence_refs=[
-                    EvidenceRef(snapshot_version=version, clause_id=FORM_CLAUSE_ID)
+                    EvidenceRef(snapshot_version=version, clause_id=form_clause_id)
                 ],
             ),
             exit=ExitOutcome(
@@ -241,8 +252,13 @@ def classify(
         )
 
     tier_decision = judge_tier(
-        intent.budget_band, pack3, thresholds_published, investment_amount_rmb
+        intent.budget_band,
+        pack3,
+        thresholds_published,
+        investment_amount_rmb=intent.investment_amount_rmb,
+        is_ai_generated=intent.is_ai_generated,
     )
+    tier_clause_id = tier_decision.clause_ref or TIER_CLAUSE_ID
     classification = Classification(
         form_type=FormType.MICRO_DRAMA,
         tier=tier_decision.tier,
@@ -254,7 +270,7 @@ def classify(
         policy_snapshot_version=version,
         pending_flags=[*pending_flags, *tier_decision.pending_flags],
         evidence_refs=[
-            EvidenceRef(snapshot_version=version, clause_id=TIER_CLAUSE_ID)
+            EvidenceRef(snapshot_version=version, clause_id=tier_clause_id)
         ],
     )
     return ClassificationOutcome(

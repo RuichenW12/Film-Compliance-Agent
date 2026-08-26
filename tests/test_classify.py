@@ -9,7 +9,10 @@ import pytest
 from core.classify import classify
 from core.classify.d1c import judge_tier
 from core.llm import ScriptedLLM
+from schemas.common import EvidenceRef
 from schemas.enums import BudgetBand, ExitKind, FormType, ProjectState, Tier
+from schemas.policy_snapshot import PackName
+from schemas.snapshot import SnapshotService
 
 
 def test_special_subject_profile_is_t1_with_co_review(
@@ -182,6 +185,42 @@ PUBLISHED_THRESHOLD_PACK = {
         },
     },
 }
+
+
+class ThresholdSnapshots(SnapshotService):
+    def __init__(self, base: SnapshotService) -> None:
+        self._base = base
+
+    def latest_version(self, as_of=None) -> str:
+        return "v2"
+
+    def get_pack(self, name: PackName, version: str | None = None) -> dict:
+        if PackName(name) is PackName.P3_TIER_THRESHOLDS:
+            return dict(PUBLISHED_THRESHOLD_PACK)
+        return self._base.get_pack(name, "v1")
+
+    def clause(self, clause_id: str, version: str):
+        return self._base.clause(clause_id, "v1")
+
+
+def test_chain_reads_amount_and_mode_from_intent_and_uses_selected_evidence(
+    intent_romance, channels, snapshots
+):
+    threshold_snapshots = ThresholdSnapshots(snapshots)
+    intent = intent_romance.model_copy(
+        update={"investment_amount_rmb": 1_500_000, "is_ai_generated": False}
+    )
+
+    outcome = classify(intent, channels, threshold_snapshots)
+
+    assert outcome.classification.tier is Tier.T2
+    assert outcome.classification.tier_provisional is False
+    assert outcome.classification.evidence_refs == [
+        EvidenceRef(
+            snapshot_version="v2",
+            clause_id="tier-live-action-2026",
+        )
+    ]
 
 
 @pytest.mark.parametrize(
