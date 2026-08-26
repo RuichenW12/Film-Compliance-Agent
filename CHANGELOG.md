@@ -22,6 +22,38 @@ Conventions:
 
 ## 2026-08-25
 
+### A — scene attribution in C1-a, found by B's synthetic scripts
+
+Running the three fixtures from #27 through the real reviewer exposed four
+faults in the scene parser. None were visible against the one-line-per-scene
+scripts the harness shipped with.
+
+- **Findings attributed to bare lines.** Only lines that themselves carried a
+  heading got an episode and scene; everything else reported `None`. A finding a
+  creator cannot navigate to is not much use. A line now inherits the episode
+  and scene it sits inside, and the markdown form — `### 第N集` followed by
+  `**内景·…**` slug lines — is supported alongside `第一集 场景二`.
+- **The documents' own disclaimers were reviewed.** The judicial fixture's
+  blockquote mentions 庭审 and 审判, so the file's warning that it is synthetic
+  produced a finding. Blockquotes and everything above the first episode heading
+  are commentary about a script, not script.
+- **`第47版` became scene 47.** The 场 in the scene pattern was optional, so any
+  `第N…` line reset the scene number.
+- **Appendix text was filed under episode 7.** A section heading that is not an
+  episode now closes the one before it.
+
+Effect on the long fixture: 38 findings down to 25, every one carrying an
+episode, and all seven scenes the fixture names as expected are covered.
+
+A plain script with no episode headings is still reviewed whole, so nothing that
+worked before stopped working.
+
+Verified: `python -m pytest` — 344 passed, 3 skipped, 12 new in
+`tests/test_scene_parsing.py`. Each case there came from running the fixtures,
+not from imagination, and four of them assert the statements written into the
+fixtures themselves so a fixture and the reviewer cannot drift apart silently.
+
+
 ### A — institution console, the way back from a return, and task reads
 
 - New `/institution` page: the demo registry, submission with its licence

@@ -30,9 +30,23 @@ SCRIPT_REVIEW_PROMPT_ID = "c1a_script_review"
 SCRIPT_REVIEW_PROMPT_VERSION = "v1"
 PENDING_FLAG = "script_semantic_check_pending"
 
-# 第一集 场景二 / 第1集 场景2 — the heading form the sample scripts use.
-_HEADING = re.compile(r"第\s*([0-9一二三四五六七八九十]+)\s*集.{0,4}?场景\s*([0-9一二三四五六七八九十]+)")
+_CN = "0-9一二三四五六七八九十"
 _CN_DIGITS = {"一": 1, "二": 2, "三": 3, "四": 4, "五": 5, "六": 6, "七": 7, "八": 8, "九": 9, "十": 10}
+
+# Both heading styles the sample scripts use:
+#   "第一集 场景二"  — episode and scene on one line
+#   "### 第1集《…》" then "**内景·…**"  — episode heading, then scene markers
+_ONE_LINE = re.compile(rf"第\s*([{_CN}]+)\s*集.{{0,4}}?场景\s*([{_CN}]+)")
+_EPISODE = re.compile(rf"^#*\s*第\s*([{_CN}]+)\s*集")
+_SCENE_NUMBERED = re.compile(
+    rf"^#*\s*\**\s*(?:场景\s*([{_CN}]+)|第\s*([{_CN}]+)\s*场)"
+)
+# A screenplay slug line: 内景/外景 (INT/EXT) opens a new scene.
+_SCENE_SLUG = re.compile(r"^[*#\s]*(内景|外景|内|外)[·、．.:：]")
+# Commentary, not script content.
+_BLOCKQUOTE = re.compile(r"^\s*>")
+# Any markdown section heading, used to tell an episode from an appendix.
+_SECTION = re.compile(r"^#+\s*\S")
 
 INSTRUCTION = (
     "Review the script for scenes touching the listed special-subject "
@@ -87,21 +101,64 @@ class ReviewResult:
 
 
 def split_scenes(document: str) -> list[Scene]:
-    """One scene per non-empty line, numbered from its heading when it has one."""
+    """Every content line, carrying the episode and scene it sits inside.
+
+    A line is quoted verbatim so the evidence rule still holds, but its episode
+    and scene come from the last headings above it. Attributing a finding to the
+    bare line loses the location a creator needs to find the scene again.
+
+    Two things are deliberately not reviewed:
+
+    - **blockquotes**, which are commentary in these documents;
+    - **everything above the first episode heading**, which is a title page,
+      test metadata, or a synopsis rather than script content. A document with
+      no episode headings at all is reviewed whole, so a plain text script is
+      unaffected.
+    """
+
+    lines = document.splitlines()
+    has_episodes = any(_EPISODE.match(line.strip()) for line in lines)
 
     scenes: list[Scene] = []
-    for line in document.splitlines():
+    episode: int | None = None
+    scene: int | None = None
+    started = not has_episodes
+
+    for line in lines:
         text = line.strip()
-        if not text:
+        if not text or _BLOCKQUOTE.match(text):
             continue
-        match = _HEADING.search(text)
-        scenes.append(
-            Scene(
-                quote=text,
-                episode=_number(match.group(1)) if match else None,
-                scene=_number(match.group(2)) if match else None,
-            )
-        )
+
+        one_line = _ONE_LINE.search(text)
+        if one_line:
+            episode = _number(one_line.group(1))
+            scene = _number(one_line.group(2))
+            started = True
+        elif _EPISODE.match(text):
+            episode = _number(_EPISODE.match(text).group(1))
+            scene = None
+            started = True
+            continue
+        elif has_episodes and _SECTION.match(text):
+            # A section heading that is not an episode closes the one before it.
+            # Everything under "附录" belongs to the appendix, not to episode 7.
+            episode = None
+            scene = None
+            started = False
+            continue
+        elif started and _SCENE_SLUG.match(text):
+            scene = (scene or 0) + 1
+        elif started:
+            numbered = _SCENE_NUMBERED.match(text)
+            if numbered:
+                found = _number(numbered.group(1) or numbered.group(2))
+                if found is not None:
+                    scene = found
+
+        if not started:
+            continue
+        scenes.append(Scene(quote=text, episode=episode, scene=scene))
+
     return scenes
 
 
