@@ -31,6 +31,7 @@ export default function WizardPage() {
   const [episodeCount, setEpisodeCount] = useState("24");
   const [episodeMinutes, setEpisodeMinutes] = useState("3");
   const [budgetBand, setBudgetBand] = useState<BudgetBand>("band_b");
+  const [investmentAmount, setInvestmentAmount] = useState("");
   const [isAiGenerated, setIsAiGenerated] = useState(true);
   const [platforms, setPlatforms] = useState("hongguo,douyin");
 
@@ -63,6 +64,9 @@ export default function WizardPage() {
           episode_count: Number(episodeCount),
           episode_minutes: Number(episodeMinutes),
           budget_band: budgetBand,
+          ...(investmentAmount === ""
+            ? {}
+            : { investment_amount_rmb: Number(investmentAmount) }),
           is_ai_generated: isAiGenerated
         })
       });
@@ -146,6 +150,16 @@ export default function WizardPage() {
               </option>
             ))}
           </select>
+        </label>
+        <label>
+          <span>{t("wizard.investment_amount_rmb")}</span>
+          <input
+            type="number"
+            min={0}
+            step={1}
+            value={investmentAmount}
+            onChange={(event) => setInvestmentAmount(event.target.value)}
+          />
         </label>
         <label>
           <span>AI generated content</span>
