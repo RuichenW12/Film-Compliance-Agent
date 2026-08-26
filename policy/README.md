@@ -17,6 +17,15 @@ Policy facts must retain source and effective-time information. AI-drafted place
 
 `policy_sources.yaml` currently enables the official NRTA micro-drama management-measures page and requires an HTTPS URL plus a non-empty content selector. `seed-snapshot-v2.yaml` is complete enough for deterministic local integration, but every pack is still `mock_verified`; it is not human-reviewed policy or legal advice. `seed-snapshot-v1.yaml` remains available only as the legacy A/B handshake fixture.
 
+The p4/p5 candidate now cites national rules plus Shanghai public service-guide
+and form evidence archived under
+[`docs/partner-review/sources-v2/`](../docs/partner-review/sources-v2/). Shanghai
+fields and operational steps are jurisdictional references, not nationwide
+requirements. The NRTA Order No. 16 data represents the regime effective from
+2026-09-01; before that date this default seed remains integration-only mock
+data. Run `python scripts/materialize_policy_snapshot_v2.py --check` to verify
+the archive hashes, cited source IDs, and frozen snapshot copy.
+
 The YAML files are packaged runtime assets and are loaded through `importlib.resources`; cloud startup does not assume a repository checkout path.
 
 Mock-to-human promotion applies to the whole snapshot, not individual packs.

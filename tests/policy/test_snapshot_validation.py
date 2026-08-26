@@ -37,9 +37,12 @@ def test_missing_clause_fails_closed() -> None:
 
 def test_missing_material_fails_closed() -> None:
     payload = _payload()
-    payload["packs"]["p4_process_templates"]["templates"]["T2_5steps"][
+    steps = payload["packs"]["p4_process_templates"]["templates"]["T2_5steps"][
         "steps"
-    ][0]["material_refs"].append("mat_unknown")
+    ]
+    next(step for step in steps if step.get("material_refs"))["material_refs"].append(
+        "mat_unknown"
+    )
 
     with pytest.raises(SnapshotSemanticError, match="missing material"):
         _validate(payload)

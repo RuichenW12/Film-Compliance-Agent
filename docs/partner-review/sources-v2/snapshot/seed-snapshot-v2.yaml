@@ -1,5 +1,5 @@
 version: v2
-published_at: "2026-08-26T00:05:00+08:00"
+published_at: "2026-08-26T23:15:00+08:00"
 effective_from: "2026-08-26T00:00:00+08:00"
 published_by: mock_seed
 verification_status: mock_verified
@@ -69,78 +69,153 @@ packs:
         T2_min_rmb: 300000
         clause_ref: tier-ai-generated-2026
   p4_process_templates:
+    mapping_status: mock_pending_human_review
+    source_refs: [SRC-001, SRC-005, SRC-006, SRC-007]
+    applicability: national_rules_with_shanghai_operational_reference
+    jurisdiction_note: 上海办事指南仅用于字段和操作步骤参考，不自动推广为全国统一流程。
     templates:
       T1_7steps:
+        source_refs: [SRC-001, SRC-006, SRC-007]
         steps:
           - name: roadmap.step.confirm_classification
             owner: creator
-          - name: roadmap.step.materials
+          - name: roadmap.step.prepare_planning_filing
             owner: creator
-            material_refs: [mat_synopsis, mat_script]
-          - name: roadmap.step.script_precheck
-            owner: system
+            material_refs: [mat_administrative_documents, mat_synopsis]
           - name: roadmap.step.resolve_coreview
             owner: creator
-          - name: roadmap.step.freeze_form
-            owner: creator
-          - name: roadmap.step.authority_review
+          - name: roadmap.step.planning_review
             owner: institution
-          - name: roadmap.step.record_filing
+          - name: roadmap.step.produce_final_film
+            owner: creator
+            material_refs: [mat_final_film]
+          - name: roadmap.step.submit_content_review
+            owner: creator
+            material_refs: [mat_administrative_documents, mat_final_film, mat_subtitle_sheet]
+          - name: roadmap.step.record_license
             owner: institution
       T2_5steps:
+        source_refs: [SRC-001, SRC-006, SRC-007]
         steps:
-          - name: roadmap.step.materials
+          - name: roadmap.step.confirm_classification
             owner: creator
-            material_refs: [mat_synopsis, mat_script]
-          - name: roadmap.step.self_check
+          - name: roadmap.step.prepare_planning_filing
             owner: creator
-          - name: roadmap.step.freeze_form
-            owner: creator
+            material_refs: [mat_administrative_documents, mat_synopsis]
           - name: roadmap.step.institution_review
             owner: institution
-          - name: roadmap.step.record_filing
+          - name: roadmap.step.submit_content_review
+            owner: creator
+            material_refs: [mat_administrative_documents, mat_final_film, mat_subtitle_sheet]
+          - name: roadmap.step.record_approval
             owner: institution
       T3_4steps:
+        source_refs: [SRC-001]
         steps:
-          - name: roadmap.step.materials
+          - name: roadmap.step.confirm_classification
             owner: creator
-            material_refs: [mat_synopsis, mat_script]
-          - name: roadmap.step.freeze_form
+          - name: roadmap.step.prepare_broadcast_materials
             owner: creator
-          - name: roadmap.step.institution_review
+            material_refs: [mat_final_film, mat_subtitle_sheet]
+          - name: roadmap.step.broadcaster_review
             owner: institution
-          - name: roadmap.step.record_filing
+          - name: roadmap.step.record_program_number
             owner: institution
   p5_form_templates:
+    mapping_status: mock_pending_human_review
+    source_refs: [SRC-001, SRC-005, SRC-006, SRC-007, FORM-001, FORM-002, FORM-003]
+    applicability: national_rules_with_shanghai_field_reference
     required_facts:
       - title
       - episode_count
       - episode_minutes
       - investment_amount_rmb
       - applicant_entity
+    reference_fields:
+      - field_id: title
+      - field_id: production_license_number
+      - field_id: intended_platform
+      - field_id: story_source
+      - field_id: joint_production_entities
+      - field_id: investment_amount_rmb
+      - field_id: episode_count
+      - field_id: episode_minutes
+      - field_id: subject_type
+      - field_id: content_summary
+      - field_id: ideological_connotation
+      - field_id: contact_name
+      - field_id: contact_phone
+      - field_id: applicant_entity
+        mapping_note: 由指引中的制作机构/申报机构字段归并，名称待伙伴确认。
+    required_fact_source:
+      source_id: SRC-005
+      status: jurisdiction_reference_pending_partner_review
+      warning: 该指南含旧分类门槛；只采用表单字段，不采用其中金额阈值。
     material_cards:
       - material_id: mat_synopsis
         name_key: material.synopsis
         asset_kind: synopsis
         required: true
+        why_clause_id: nrta-order-16-article-14
       - material_id: mat_script
         name_key: material.script
         asset_kind: script
         required: true
-      - material_id: mat_supporting_document
+      - material_id: mat_administrative_documents
         name_key: material.supporting_document
         asset_kind: supporting_document
         required: false
+        why_clause_id: nrta-order-16-article-14
+        grouped_document_requirements:
+          - planning_filing_form
+          - production_or_broadcast_license
+          - planning_commitment
+          - content_review_form
+          - cost_ratio_report
+          - principal_actor_contracts
+          - foreign_personnel_approval_when_applicable
+          - special_subject_opinion_when_requested
       - material_id: mat_prompts
         name_key: material.prompts
         asset_kind: prompts
         required: false
+      - material_id: mat_final_film
+        name_key: material.final_film
+        asset_kind: final_film
+        required: false
+        lifecycle_stage: content_review
+        why_clause_id: nrta-order-16-article-19
       - material_id: mat_subtitle_sheet
         name_key: material.subtitle_sheet
         asset_kind: subtitle_sheet
         required: false
+        lifecycle_stage: content_review
+        why_clause_id: nrta-order-16-article-19
+    public_form_templates:
+      - form_id: planning_commitment_example
+        source_id: FORM-001
+        status: official_public_example
+      - form_id: planning_commitment_blank
+        source_id: FORM-002
+        status: official_public_blank
+      - form_id: cost_ratio_report_blank
+        source_id: FORM-003
+        status: official_public_blank
+    system_generated_forms:
+      - form_id: microdrama_filing_publication_application
+        availability: external_system_generated
+        source_id: SRC-001
+        note: 新办法要求提交，公开空白表未找到；需登录实际备案系统后由合作方导出核对。
+      - form_id: shanghai_planning_filing_information_form
+        availability: external_system_generated
+        source_id: SRC-006
+        note: 上海一网通办明确标注为系统填报后生成。
+      - form_id: shanghai_content_review_application
+        availability: external_system_generated
+        source_id: SRC-007
+        note: 上海一网通办明确标注为线上填写并由系统生成。
   p6_legal_clauses:
-    source_name: Mock-verified integration sources
+    source_name: Official sources with mock-pending product mappings
     clauses:
       - clause_id: nrta-order-16-article-2
         title: 第二条
@@ -149,6 +224,22 @@ packs:
       - clause_id: nrta-order-16-article-5
         title: 第五条
         text: 特殊题材类别与较大投资额度的一类微短剧定义。
+        source_url: https://www.nrta.gov.cn/art/2026/7/31/art_113_73785.html
+      - clause_id: nrta-order-16-article-14
+        title: 第十四条
+        text: 一类微短剧备案公示申请机构应具备相应资质，并提交《微短剧备案公示申请表》和剧情梗概等材料；特殊题材在主管部门认为确有必要时征求相关意见。
+        source_url: https://www.nrta.gov.cn/art/2026/7/31/art_113_73785.html
+      - clause_id: nrta-order-16-article-17
+        title: 第十七条
+        text: 一类、二类微短剧播出前应申请内容审核和发行许可；三类微短剧由符合条件的播出单位进行播前审核并标注节目编号。
+        source_url: https://www.nrta.gov.cn/art/2026/7/31/art_113_73785.html
+      - clause_id: nrta-order-16-article-19
+        title: 第十九条
+        text: 一类微短剧送审材料包括报审表、机构许可证、符合审核要求的样片、片头片尾和歌曲字幕表，以及适用时的境外人员批准文件。
+        source_url: https://www.nrta.gov.cn/art/2026/7/31/art_113_73785.html
+      - clause_id: nrta-order-16-article-20
+        title: 第二十条
+        text: 主管部门应自受理一类微短剧申请之日起二十日内作出决定，其中组织专家评审的时间为十日。
         source_url: https://www.nrta.gov.cn/art/2026/7/31/art_113_73785.html
       - clause_id: tier-live-action-2026
         title: 真人微短剧联调门槛候选
@@ -159,6 +250,6 @@ packs:
         text: 联调值：T1 80万元，T2 30万元。
         source_url: https://wxb.xzdw.gov.cn/wlcb/cbgz/202606/t20260626_680352.html
 diff_from_prev:
-  summary: Complete mock-verified v2 for domestic integration
+  summary: Evidence-backed mock v2 with sourced process and form data
   impact: [D1c, C1-a]
 thresholds_published: true

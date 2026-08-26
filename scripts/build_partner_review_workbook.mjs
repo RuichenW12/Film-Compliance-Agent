@@ -34,6 +34,15 @@ const STEP_LABELS = {
   "roadmap.step.record_filing": "记录备案结果",
   "roadmap.step.self_check": "完成自查与剧本预检",
   "roadmap.step.institution_review": "机构审核",
+  "roadmap.step.prepare_planning_filing": "准备规划备案材料",
+  "roadmap.step.planning_review": "规划备案审核",
+  "roadmap.step.produce_final_film": "完成拍摄制作",
+  "roadmap.step.submit_content_review": "提交内容审核",
+  "roadmap.step.record_license": "记录发行许可证",
+  "roadmap.step.record_approval": "记录批准文件",
+  "roadmap.step.prepare_broadcast_materials": "准备播前审核材料",
+  "roadmap.step.broadcaster_review": "播出单位播前审核",
+  "roadmap.step.record_program_number": "记录节目编号",
 };
 const OWNER_LABELS = {
   creator: "创作者（creator）",
@@ -46,6 +55,15 @@ const FACT_LABELS = {
   episode_minutes: "单集时长（episode_minutes）",
   investment_amount_rmb: "实际投资金额（investment_amount_rmb）",
   applicant_entity: "申报主体（applicant_entity）",
+  production_license_number: "制作经营许可证号（production_license_number）",
+  intended_platform: "拟播平台（intended_platform）",
+  story_source: "故事来源（story_source）",
+  joint_production_entities: "联合制作机构（joint_production_entities）",
+  subject_type: "题材类型（subject_type）",
+  content_summary: "内容概要（content_summary）",
+  ideological_connotation: "思想内涵（ideological_connotation）",
+  contact_name: "联系人（contact_name）",
+  contact_phone: "联系电话（contact_phone）",
 };
 const MATERIAL_LABELS = {
   "material.synopsis": "剧本梗概（synopsis）",
@@ -53,6 +71,7 @@ const MATERIAL_LABELS = {
   "material.supporting_document": "佐证材料（supporting_document）",
   "material.prompts": "生成提示词（prompts）",
   "material.subtitle_sheet": "字幕表（subtitle_sheet）",
+  "material.final_film": "完成片（final_film）",
 };
 const ASSET_KIND_LABELS = {
   synopsis: "剧本梗概（synopsis）",
@@ -60,6 +79,7 @@ const ASSET_KIND_LABELS = {
   supporting_document: "佐证材料（supporting_document）",
   prompts: "生成提示词（prompts）",
   subtitle_sheet: "字幕表（subtitle_sheet）",
+  final_film: "完成片（final_film）",
 };
 
 const COLORS = {
@@ -209,7 +229,12 @@ function buildFlowRows(snapshot) {
     });
   }
 
-  for (const fact of packs.p5_form_templates.required_facts) {
+  const requiredFacts = packs.p5_form_templates.required_facts;
+  const referenceFields = (packs.p5_form_templates.reference_fields ?? []).map(
+    (field) => field.field_id,
+  );
+  const displayedFacts = [...new Set([...requiredFacts, ...referenceFields])];
+  for (const fact of displayedFacts) {
     rows.push([
       "P0",
       "p5_form_templates",
@@ -218,7 +243,7 @@ function buildFlowRows(snapshot) {
       FACT_LABELS[fact],
       null,
       OWNER_LABELS.creator,
-      "是",
+      requiredFacts.includes(fact) ? "是" : "待确认",
       "",
       "待确认",
       "",

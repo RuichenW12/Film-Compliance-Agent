@@ -1,3 +1,7 @@
 # Preserve downloaded evidence byte-for-byte and avoid text normalization/diff cleanup.
 raw/*.html -diff -text
 metadata/*.headers.txt -diff -text
+authoritative/*.html -diff -text
+authoritative/*.pdf -diff -text
+forms/*.docx -diff -text
+reference-only/*.pdf -diff -text

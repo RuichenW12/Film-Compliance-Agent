@@ -66,6 +66,15 @@ STEP_LABELS = {
     "roadmap.step.record_filing": "记录备案结果",
     "roadmap.step.self_check": "完成自查与剧本预检",
     "roadmap.step.institution_review": "机构审核",
+    "roadmap.step.prepare_planning_filing": "准备规划备案材料",
+    "roadmap.step.planning_review": "规划备案审核",
+    "roadmap.step.produce_final_film": "完成拍摄制作",
+    "roadmap.step.submit_content_review": "提交内容审核",
+    "roadmap.step.record_license": "记录发行许可证",
+    "roadmap.step.record_approval": "记录批准文件",
+    "roadmap.step.prepare_broadcast_materials": "准备播前审核材料",
+    "roadmap.step.broadcaster_review": "播出单位播前审核",
+    "roadmap.step.record_program_number": "记录节目编号",
 }
 
 OWNER_LABELS = {
@@ -80,6 +89,15 @@ FACT_LABELS = {
     "episode_minutes": "单集时长",
     "investment_amount_rmb": "实际投资金额",
     "applicant_entity": "申报主体",
+    "production_license_number": "制作经营许可证号",
+    "intended_platform": "拟播平台",
+    "story_source": "故事来源",
+    "joint_production_entities": "联合制作机构",
+    "subject_type": "题材类型",
+    "content_summary": "内容概要",
+    "ideological_connotation": "思想内涵",
+    "contact_name": "联系人",
+    "contact_phone": "联系电话",
 }
 
 MATERIAL_LABELS = {
@@ -88,6 +106,7 @@ MATERIAL_LABELS = {
     "material.supporting_document": "佐证材料",
     "material.prompts": "生成提示词",
     "material.subtitle_sheet": "字幕表",
+    "material.final_film": "完成片",
 }
 
 
@@ -297,6 +316,12 @@ def build_page_one(snapshot: dict) -> list:
 
 def build_page_two(snapshot: dict) -> list:
     packs = snapshot["packs"]
+    required_facts = packs["p5_form_templates"]["required_facts"]
+    reference_fields = [
+        field["field_id"]
+        for field in packs["p5_form_templates"].get("reference_fields", [])
+    ]
+    displayed_facts = list(dict.fromkeys([*required_facts, *reference_fields]))
     story = [
         p("P0 - 请优先确认真实办理流程和材料", H1),
         p(
@@ -327,8 +352,12 @@ def build_page_two(snapshot: dict) -> list:
                 [
                     ["字段", "当前设定", "请提供"],
                     *[
-                        [FACT_LABELS[fact], "必填", "真实中文字段名、是否必填、表格模板"]
-                        for fact in packs["p5_form_templates"]["required_facts"]
+                        [
+                            FACT_LABELS[fact],
+                            "联调必填" if fact in required_facts else "地方参考／待确认",
+                            "真实中文字段名、是否必填、表格模板",
+                        ]
+                        for fact in displayed_facts
                     ],
                 ],
                 [48 * mm, 28 * mm, 101 * mm],
