@@ -12,6 +12,7 @@ p5_form_templates:
   material_cards:
     - material_id: mat_synopsis      # required
       name_key: material.synopsis    # required, rendered from web/locales
+      asset_kind: synopsis           # required, one of schemas.enums.AssetKind
       required: true                 # default true
       why_clause_id: nrta-order-16-article-19   # optional
       template_uri: https://...      # optional
@@ -47,16 +48,18 @@ def build_material_cards(
     for raw in form_pack.get(CARDS_KEY) or []:
         material_id = raw.get("material_id")
         name_key = raw.get("name_key")
-        if not material_id or not name_key:
+        asset_kind = _asset_kind(raw.get("asset_kind"))
+        if not material_id or not name_key or asset_kind is None:
             # A malformed entry is skipped rather than rendered as a nameless
             # obligation. The pack author sees the gap, the creator does not
-            # see a card with no meaning.
+            # see a card with no meaning — and one bad card does not take the
+            # whole collection page down with it.
             continue
         cards.append(
             MaterialCard(
                 material_id=str(material_id),
                 name_key=str(name_key),
-                asset_kind=AssetKind(raw["asset_kind"]),
+                asset_kind=asset_kind,
                 required=bool(raw.get("required", True)),
                 why_clause=_evidence_for(raw.get("why_clause_id"), snapshots, version),
                 template_uri=raw.get("template_uri"),
@@ -64,6 +67,23 @@ def build_material_cards(
             )
         )
     return cards
+
+
+def _asset_kind(raw: object) -> AssetKind | None:
+    """An absent or unknown kind makes the card meaningless, so it is skipped.
+
+    A card says "upload this sort of thing". Without a kind there is nothing to
+    upload against it, and an unknown kind names something the product cannot
+    accept. Either way the pack and the product have drifted, and the honest
+    response is one missing card rather than a 500 that hides every other card.
+    """
+
+    if raw is None:
+        return None
+    try:
+        return AssetKind(str(raw))
+    except ValueError:
+        return None
 
 
 def _evidence_for(
