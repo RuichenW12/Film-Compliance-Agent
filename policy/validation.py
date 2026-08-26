@@ -14,6 +14,7 @@ SUPPORTED_MATERIAL_ASSET_KINDS = {
     "script",
     "supporting_document",
     "prompts",
+    "final_film",
     "subtitle_sheet",
 }
 
