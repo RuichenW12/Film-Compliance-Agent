@@ -25,6 +25,7 @@ Planned document groups include:
 - [Policy loop Gate 4 implementation plan](superpowers/plans/2026-08-24-policy-loop-gate4.md)
 - [Policy loop Gate 5-a snapshot bridge design](superpowers/specs/2026-08-24-policy-loop-gate5a-snapshot-bridge-design.md)
 - [Implementation status by owner (2026-08-24)](technical/implementation-status-2026-08-24.md)
+- [Manual test guide](manual-test-guide.md)
 
 Documentation must distinguish proposed design, local verification, deployed verification, and unresolved assumptions.
 
