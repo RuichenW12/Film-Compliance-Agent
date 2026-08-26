@@ -58,6 +58,7 @@ class PolicyApiState:
 async def build_local_policy_api_state(
     blob_root: Path,
     *,
+    seed_path: Path,
     clock: Callable[[], datetime] = utc_now,
 ) -> PolicyApiState:
     now = clock()
@@ -65,7 +66,7 @@ async def build_local_policy_api_state(
         source=SOURCE,
         fixture_path=FIXTURES / "source-v1.html",
         blob_root=blob_root,
-        seed_path=ROOT / "policy" / "seed-snapshot-v1.yaml",
+        seed_path=seed_path,
         proposal_draft=ProposalDraft(
             summary="分类标准正式公布",
             impact=[ImpactNode.D1C],

@@ -222,7 +222,13 @@ def test_an_unknown_notification_is_a_contract_404(client):
 @pytest.fixture
 def policy_state(tmp_path: Path) -> PolicyApiState:
     return asyncio.run(
-        build_local_policy_api_state(tmp_path / "blobs", clock=lambda: NOW)
+        build_local_policy_api_state(
+            tmp_path / "blobs",
+            seed_path=Path(__file__).parents[1]
+            / "policy"
+            / "seed-snapshot-v1.yaml",
+            clock=lambda: NOW,
+        )
     )
 
 

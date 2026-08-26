@@ -19,6 +19,7 @@ from workers.policy.outbox import OutboxDispatcher
 
 NOW = datetime(2026, 8, 23, 20, 30, tzinfo=timezone(timedelta(hours=8)))
 ADMIN_HEADERS = {"X-Mock-Role": "admin"}
+V1_SEED = Path(__file__).parents[2] / "policy" / "seed-snapshot-v1.yaml"
 
 
 @pytest.fixture
@@ -26,6 +27,7 @@ def policy_state(tmp_path: Path) -> PolicyApiState:
     return asyncio.run(
         build_local_policy_api_state(
             tmp_path / "blobs",
+            seed_path=V1_SEED,
             clock=lambda: NOW,
         )
     )
@@ -324,7 +326,7 @@ def test_default_app_builds_the_local_fixture_state() -> None:
         response = admin_get(client, "/v1/admin/policy/snapshots")
 
     assert response.status_code == 200
-    assert [row["version"] for row in response.json()] == ["v1"]
+    assert [row["version"] for row in response.json()] == ["v2"]
 
 
 def test_cors_allows_only_the_local_policy_ui(

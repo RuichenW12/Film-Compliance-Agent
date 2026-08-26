@@ -9,6 +9,8 @@ from pathlib import Path
 
 import yaml
 
+from policy.validation import validate_snapshot
+
 from .policy_snapshot import Clause, PackName, PolicySnapshot, VerificationStatus
 
 
@@ -45,6 +47,7 @@ class FileSnapshotService(SnapshotService):
     def __init__(self, snapshot_path: str | Path) -> None:
         raw = yaml.safe_load(Path(snapshot_path).read_text(encoding="utf-8"))
         snapshot = PolicySnapshot.model_validate(raw)
+        validate_snapshot(snapshot)
         self._snapshots = {snapshot.version: snapshot}
 
     def latest_version(self, as_of: datetime | None = None) -> str:

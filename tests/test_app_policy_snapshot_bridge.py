@@ -19,6 +19,7 @@ NOW = datetime(2026, 8, 23, 20, 30, tzinfo=timezone(timedelta(hours=8)))
 INTERNAL_TOKEN = "t_gate5a_internal"
 ADMIN_HEADERS = {"X-Mock-Role": "admin"}
 CREATOR_HEADERS = {"X-Mock-Role": "creator", "X-User-Id": "u_gate5a"}
+V1_SEED = Path(__file__).parents[1] / "policy" / "seed-snapshot-v1.yaml"
 ROMANCE_INTENT = {
     "form_type_claimed": "micro_drama",
     "genre_keywords": ["甜宠"],
@@ -36,6 +37,7 @@ def policy_state(tmp_path: Path) -> PolicyApiState:
     return asyncio.run(
         build_local_policy_api_state(
             tmp_path / "blobs",
+            seed_path=V1_SEED,
             clock=lambda: NOW,
         )
     )
@@ -147,7 +149,12 @@ def test_explicit_context_is_not_replaced_by_policy_composition(
     policy_state.publisher.publish(result.proposal_id, "admin_richard", NOW)
     assert set(policy_state.repository.list_snapshots()) == {"v1", "v2"}
 
-    explicit = build_context(Settings(internal_token=INTERNAL_TOKEN))
+    explicit = build_context(
+        Settings(
+            internal_token=INTERNAL_TOKEN,
+            snapshot_seed_path="policy/seed-snapshot-v1.yaml",
+        )
+    )
     with TestClient(
         create_app(context=explicit, policy_state=policy_state)
     ) as client:
