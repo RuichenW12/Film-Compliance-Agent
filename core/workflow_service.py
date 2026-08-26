@@ -64,6 +64,7 @@ from .errors import (
 from .forms import build_fields, draft_hash, pending_keys
 from .gate import GateResult, evaluate_gate_d3, required_fact_keys
 from .institution import check_licence
+from .jobs import InlineRunner, JobOutcome, JobRunner, idempotency_key
 from .ids import new_id
 from .llm import LLMClient
 from .materials import build_material_cards
@@ -108,12 +109,14 @@ class WorkflowService:
         clock: Clock,
         llm: LLMClient | None = None,
         video: VideoBackend | None = None,
+        jobs: JobRunner | None = None,
     ) -> None:
         self._stores = stores
         self._snapshots = snapshots
         self._clock = clock
         self._llm = llm
         self._video = video
+        self._jobs = jobs or InlineRunner()
 
     # ------------------------------------------------------------------ reads
 
@@ -341,11 +344,71 @@ class WorkflowService:
     # --------------------------------------------------------- script review
 
     def run_script_review(self, project_id: str):
-        """C1-a over the latest script version. Reports; it does not move state.
+        """C1-a over the latest script version, recorded as a review task.
 
-        The revision loop that consumes these findings is T-A5, so a pre-check
-        deliberately leaves the project where it is.
+        The first review of a version is `review_full`; a later one is
+        `review_incremental`, since prior findings carry forward. Both are keyed
+        on the asset version, so a redelivery returns the first task.
         """
+
+        asset = self._latest_script(project_id)
+        if asset is None:
+            raise NotFoundError(
+                "this project has no uploaded script to review",
+                {"project_id": project_id},
+            )
+        # Incremental means "relative to an earlier version", not "findings
+        # already exist". Deciding it from findings made the job type flip
+        # between two runs of the same version, which changed the idempotency
+        # key and let a replay review the same script twice.
+        earlier_review = any(
+            task.type in (TaskType.REVIEW_FULL, TaskType.REVIEW_INCREMENTAL)
+            and task.payload.get("asset_version") != asset.version_id
+            for task in self._stores.tasks.list(project_id)
+        )
+        task_type = (
+            TaskType.REVIEW_INCREMENTAL if earlier_review else TaskType.REVIEW_FULL
+        )
+
+        holder: list = []
+
+        def work() -> JobOutcome:
+            project, written, result = self._review_now(project_id)
+            holder.append((project, written, result))
+            return JobOutcome(
+                result={
+                    "finding_count": len(written),
+                    "discarded": result.discarded,
+                    "backend": result.backend,
+                },
+                status=TaskStatus.NEEDS_HUMAN
+                if result.pending_flags
+                else TaskStatus.SUCCEEDED,
+                error=result.pending_flags[0] if result.pending_flags else None,
+            )
+
+        self._run_job(
+            project_id,
+            task_type,
+            asset.version_id,
+            work,
+            payload={"asset_version": asset.version_id},
+        )
+        if holder:
+            return holder[0]
+        # Queued, or replayed: report the project and the findings as they stand.
+        return (
+            self.get_project(project_id),
+            [],
+            self._empty_review(),
+        )
+
+    def _empty_review(self):
+        from .review import ReviewResult
+
+        return ReviewResult(pending_flags=[], backend="queued")
+
+    def _review_now(self, project_id: str):
 
         project = self.get_project(project_id)
         asset = self._latest_script(project_id)
@@ -1054,11 +1117,196 @@ class WorkflowService:
             template, self._snapshots.get_pack(PackName.P4_PROCESS_TEMPLATES, version)
         )
 
+    # ------------------------------------------------------------------- jobs
+
+    def _run_job(
+        self,
+        project_id: str,
+        task_type: TaskType,
+        asset_version: str,
+        work,
+        payload: dict | None = None,
+    ) -> tuple[WorkflowTask, JobOutcome | None, bool]:
+        """Record the job, then let the runner decide where it executes.
+
+        Returns the task, the outcome if it ran here, and whether this call was
+        a replay. A replay returns the first task untouched: Pub/Sub redelivers,
+        and a redelivered review must not write a second set of findings.
+        """
+
+        key = idempotency_key(project_id, task_type, asset_version)
+        existing = self._stores.tasks.find_by_idempotency_key(key)
+        if existing is not None:
+            return existing, None, True
+
+        now = self._clock.now()
+        task = self._stores.tasks.add(
+            WorkflowTask(
+                task_id=new_id("task"),
+                project_id=project_id,
+                type=task_type,
+                status=TaskStatus.QUEUED,
+                idempotency_key=key,
+                payload=payload or {},
+                created_at=now,
+                updated_at=now,
+            )
+        )
+
+        task, outcome = self._jobs.run(task, work)
+        task = self._stores.tasks.save(
+            task.model_copy(update={"updated_at": self._clock.now()})
+        )
+        self._record_event(
+            project_id,
+            Actor.SYSTEM,
+            "job.recorded",
+            {
+                "task_id": task.task_id,
+                "type": task_type.value,
+                "status": task.status.value,
+                "error": task.error,
+            },
+        )
+        return task, outcome, False
+
+    def execute_task(self, task: WorkflowTask) -> WorkflowTask:
+        """Run a queued task's work and record the outcome on it.
+
+        The API's `_run_job` refuses to start a job whose key already has a
+        task, which is what makes redelivery safe. A worker holding that very
+        task needs the opposite: run the work this record stands for. Both paths
+        call the same `_*_now` method, so the work has one implementation and
+        only the trigger differs.
+        """
+
+        work = {
+            TaskType.FACT_EXTRACT: lambda: self._extract_outcome(task),
+            TaskType.REVIEW_FULL: lambda: self._review_outcome(task),
+            TaskType.REVIEW_INCREMENTAL: lambda: self._review_outcome(task),
+        }.get(task.type)
+
+        if work is None:
+            raise ValidationFailedError(
+                f"no worker handles {task.type.value}", {"type": task.type.value}
+            )
+
+        running = self._stores.tasks.save(
+            task.model_copy(
+                update={"status": TaskStatus.RUNNING, "updated_at": self._clock.now()}
+            )
+        )
+        outcome = work()
+        finished = running.model_copy(
+            update={
+                "status": outcome.status,
+                "result": outcome.result,
+                "error": outcome.error,
+                "updated_at": self._clock.now(),
+            }
+        )
+        self._stores.tasks.save(finished)
+        self._record_event(
+            task.project_id,
+            Actor.SYSTEM,
+            "job.completed",
+            {
+                "task_id": finished.task_id,
+                "type": finished.type.value,
+                "status": finished.status.value,
+                "error": finished.error,
+            },
+        )
+        return finished
+
+    def _extract_outcome(self, task: WorkflowTask) -> JobOutcome:
+        version = str(task.payload.get("asset_version"))
+        found, extraction = self._extract_now(task.project_id, version)
+        return JobOutcome(
+            result={
+                "keys": [fact.key for fact in found],
+                "discarded": extraction.discarded,
+                "backend": extraction.backend,
+            },
+            status=TaskStatus.NEEDS_HUMAN
+            if extraction.pending_flags
+            else TaskStatus.SUCCEEDED,
+            error=extraction.pending_flags[0] if extraction.pending_flags else None,
+        )
+
+    def _review_outcome(self, task: WorkflowTask) -> JobOutcome:
+        _, written, result = self._review_now(task.project_id)
+        return JobOutcome(
+            result={
+                "finding_count": len(written),
+                "discarded": result.discarded,
+                "backend": result.backend,
+            },
+            status=TaskStatus.NEEDS_HUMAN
+            if result.pending_flags
+            else TaskStatus.SUCCEEDED,
+            error=result.pending_flags[0] if result.pending_flags else None,
+        )
+
     # ------------------------------------------------------- fact extraction
 
     def extract_asset_facts(self, project_id: str, version_id: str):
-        """Read one asset and store only the facts it can back verbatim."""
+        """Read one asset and store only the facts it can back verbatim.
 
+        Recorded as a `fact_extract` task, so a redelivery of the same asset
+        version returns the first task instead of extracting twice.
+        """
+
+        # Validate before recording a job: an asset that does not exist is a
+        # 404, not a task that failed.
+        self.read_asset(project_id, version_id)
+
+        stored: list[Fact] = []
+        result_holder: list = []
+
+        def work() -> JobOutcome:
+            found, extraction = self._extract_now(project_id, version_id)
+            stored.extend(found)
+            result_holder.append(extraction)
+            return JobOutcome(
+                result={
+                    "keys": [fact.key for fact in found],
+                    "discarded": extraction.discarded,
+                    "backend": extraction.backend,
+                },
+                status=TaskStatus.NEEDS_HUMAN
+                if extraction.pending_flags
+                else TaskStatus.SUCCEEDED,
+                error=extraction.pending_flags[0] if extraction.pending_flags else None,
+            )
+
+        task, _, replayed = self._run_job(
+            project_id,
+            TaskType.FACT_EXTRACT,
+            version_id,
+            work,
+            payload={"asset_version": version_id},
+        )
+        if replayed or not result_holder:
+            # Nothing ran here: report what the document already produced.
+            return self._replayed_extraction(project_id, version_id, task)
+        return stored, result_holder[0]
+
+    def _replayed_extraction(self, project_id: str, version_id: str, task):
+        """A replay reports the first run's facts rather than extracting again."""
+
+        from .extract import ExtractionResult
+
+        recorded = task.result or {}
+        keys = set(recorded.get("keys") or [])
+        facts = [f for f in self._stores.facts.list(project_id) if f.key in keys]
+        return facts, ExtractionResult(
+            discarded=list(recorded.get("discarded") or []),
+            pending_flags=[task.error] if task.error else [],
+            backend=str(recorded.get("backend") or "unavailable"),
+        )
+
+    def _extract_now(self, project_id: str, version_id: str):
         project = self.get_project(project_id)
         asset, data = self.read_asset(project_id, version_id)
         document = data.decode("utf-8", errors="replace")

@@ -9,6 +9,7 @@ from fastapi import Request
 
 from core.clock import Clock, SystemClock
 from core.llm import LLMClient, UnavailableLLM
+from core.jobs import InlineRunner, JobRunner
 from core.teaser import UnavailableVideo, VideoBackend
 from core.workflow_service import WorkflowService
 from schemas.snapshot import FileSnapshotService, SnapshotService
@@ -25,11 +26,12 @@ class AppContext:
     clock: Clock
     llm: LLMClient
     video: VideoBackend = field(default_factory=UnavailableVideo)
+    jobs: JobRunner = field(default_factory=InlineRunner)
 
     @property
     def workflow(self) -> WorkflowService:
         return WorkflowService(
-            self.stores, self.snapshots, self.clock, self.llm, self.video
+            self.stores, self.snapshots, self.clock, self.llm, self.video, self.jobs
         )
 
 
@@ -60,6 +62,7 @@ def build_context(
         clock=SystemClock(),
         llm=build_llm(settings),
         video=UnavailableVideo(),
+        jobs=InlineRunner(),
     )
 
 

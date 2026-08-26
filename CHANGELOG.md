@@ -20,6 +20,37 @@ Conventions:
 
 ---
 
+## 2026-08-26
+
+### A — every long job is a task, and where it runs is now a choice
+
+- Fact extraction and script review ran inline and recorded nothing, so
+  `GET /tasks` was empty for projects that had had work done to them. Both now
+  write a `WorkflowTask` with its key, status, and result
+  ([D-025](docs/decisions.md#d-025)).
+- Added `core/jobs.py`: `InlineRunner` does the work now and answers in the
+  response, `QueuedRunner` publishes and leaves the task `queued`. Local
+  development and the tests use inline, so a demo still needs no queue.
+- Added `workers/jobs.JobWorker`, which finishes a queued task. A task already
+  in a terminal state is acknowledged and dropped — Pub/Sub delivers at least
+  once, and a redelivered review must not write a second set of findings. A job
+  type the worker does not know is recorded `failed` with the reason rather than
+  silently discarded.
+- **Idempotency is now enforced in one place for every job type** on
+  `{project_id}:{task_type}:{asset_version}`. It was previously load-bearing
+  only for the teaser, since nothing else created a task.
+- **Fixed while adding it:** `review_incremental` was chosen when findings
+  already existed for the version under review, so re-running a review of the
+  same version flipped the job type, changed the key, and let the replay review
+  the same script twice. Incremental now means *relative to an earlier version*.
+- A queued review answers with no findings and `backend: "queued"`, so "nothing
+  has happened yet" is distinguishable from "the script is clean".
+
+Verified: `python -m pytest` — 375 passed, 3 skipped, 14 new in
+`tests/test_jobs.py`. Driven against the 30-minute fixture both ways: inline
+returns 9 findings in the response; queued returns 0 with `backend: "queued"`,
+the worker then produces the same 9, and a redelivery leaves them at 9.
+
 ## 2026-08-25
 
 ### A — Veo teaser behind FLAG_VEO_TEASER
