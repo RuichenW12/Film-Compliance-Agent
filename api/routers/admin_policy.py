@@ -213,6 +213,7 @@ def list_snapshots(
             effective_from=snapshot.effective_from,
             published_by=snapshot.published_by,
             thresholds_published=snapshot.thresholds_published,
+            verification_status=snapshot.verification_status,
         )
         for snapshot in snapshots
     ]

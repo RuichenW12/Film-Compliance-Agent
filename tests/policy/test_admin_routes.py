@@ -83,6 +83,7 @@ def test_seed_snapshot_is_listed(api_client: TestClient) -> None:
             "effective_from": "2026-08-26T00:00:00+08:00",
             "published_by": "mock_seed",
             "thresholds_published": True,
+            "verification_status": "mock_verified",
         }
     ]
 

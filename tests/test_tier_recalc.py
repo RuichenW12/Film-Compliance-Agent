@@ -9,7 +9,12 @@ from core.clock import FixedClock
 from core.llm import UnavailableLLM
 from core.workflow_service import WorkflowService
 from schemas.enums import BudgetBand, ClaimedFormType, Tier
-from schemas.policy_snapshot import PackName, PolicyPacks, PolicySnapshot
+from schemas.policy_snapshot import (
+    PackName,
+    PolicyPacks,
+    PolicySnapshot,
+    VerificationStatus,
+)
 from store.memory import InMemoryStores
 from workers.policy.adapters.repository_snapshot import RepositorySnapshotService
 from workers.policy.repository import InMemoryPolicyRepository
@@ -46,6 +51,10 @@ def test_recalc_uses_stored_amount_mode_and_selected_evidence():
     )
     project, _ = workflow.run_classification(project.project_id)
     assert project.classification.tier_provisional is True
+    assert (
+        project.classification.policy_verification_status
+        is VerificationStatus.MOCK_VERIFIED
+    )
 
     packs = seed.packs.model_dump(mode="python")
     packs[PackName.P3_TIER_THRESHOLDS.value] = {
@@ -90,6 +99,7 @@ def test_recalc_uses_stored_amount_mode_and_selected_evidence():
         published_by="admin_richard",
         packs=PolicyPacks.model_validate(packs),
         thresholds_published=True,
+        verification_status=VerificationStatus.HUMAN_VERIFIED,
     )
     repository.put_snapshot(PolicySnapshot.model_validate(data))
 
@@ -100,6 +110,10 @@ def test_recalc_uses_stored_amount_mode_and_selected_evidence():
     assert result.tier_provisional is False
     assert result.changed is True
     assert updated.classification.policy_snapshot_version == "v2"
+    assert (
+        updated.classification.policy_verification_status
+        is VerificationStatus.HUMAN_VERIFIED
+    )
     assert (
         updated.classification.evidence_refs[0].clause_id
         == "tier-live-action-2026"

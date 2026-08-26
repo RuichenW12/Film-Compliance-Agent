@@ -278,6 +278,9 @@ class WorkflowService:
             "tier": decision.tier,
             "tier_provisional": decision.tier_provisional,
             "policy_snapshot_version": snapshot_version,
+            "policy_verification_status": self._snapshots.verification_status(
+                snapshot_version
+            ),
             "pending_flags": sorted(
                 set(classification.pending_flags) - {"amount_official"}
                 | set(decision.pending_flags)

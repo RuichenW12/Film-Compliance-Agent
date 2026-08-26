@@ -12,9 +12,11 @@ router = APIRouter(tags=["ops"])
 @router.get("/healthz")
 def healthz(request: Request) -> dict:
     context = get_context(request)
+    version = context.snapshots.latest_version()
     return {
         "status": "ok",
-        "snapshot_version": context.snapshots.latest_version(),
+        "snapshot_version": version,
+        "snapshot_verification_status": context.snapshots.verification_status(version),
         "llm_backend": context.llm.name,
         "llm_available": context.llm.available(),
         "store_backend": context.settings.store_backend,
