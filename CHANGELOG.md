@@ -22,6 +22,35 @@ Conventions:
 
 ## 2026-08-25
 
+### A — Veo teaser behind FLAG_VEO_TEASER
+
+- `POST /v1/projects/{pid}/teaser` queues a `teaser` task. The flag is off by
+  default and the route says so — a disabled feature is a fact worth telling the
+  caller, not a 404.
+- **A teaser is promotional material and carries no compliance meaning.** The
+  prompt is built from the logline alone: no tier, no clause, no filing status.
+  The task records `promotional_only: true` beside the uri and pins the snapshot
+  and prompt version, so a generated file cannot later be mistaken for a
+  reviewed artifact.
+- The logline is wrapped in `<<<DOC>>>` like every other user-supplied document,
+  so an instruction inside a logline cannot steer generation. Tested.
+- **No backend means no teaser.** With Veo unconfigured the task is
+  `needs_human` with `teaser_backend_unavailable` and no result — never a
+  placeholder uri, which would look like output. A backend that raises is
+  recorded `failed` with the reason rather than swallowed.
+- Idempotent on `{project_id}:teaser:{asset_version}` like every other job: a
+  repeated request returns the first task and does not generate twice.
+- `VideoBackend` is a port with `UnavailableVideo` as the default, mirroring the
+  LLM seam, so tests and local runs need no credentials.
+- `scripts/e2e_check.py` gains step 18, which now reports rather than listing
+  the step as pending.
+
+Verified: `python -m pytest` — 361 passed, 3 skipped, 13 new in
+`tests/test_teaser.py` covering the flag, the offline path, prompt injection in a
+logline, idempotency, a failing backend, and the absence of any compliance claim
+in the generated request.
+
+
 ### A — scene attribution in C1-a, found by B's synthetic scripts
 
 Running the three fixtures from #27 through the real reviewer exposed four

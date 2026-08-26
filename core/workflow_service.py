@@ -13,6 +13,8 @@ from schemas.assets import AssetVersion, MaterialCard, UploadTicket
 from schemas.common import AuditEntry, Fact, SourceRef, TimelineEvent
 from schemas.enums import (
     Actor,
+    TaskStatus,
+    TaskType,
     InstitutionDecision,
     AlertOption,
     AssetKind,
@@ -37,7 +39,12 @@ from schemas.project import (
     TracksEnabled,
 )
 from schemas.snapshot import SnapshotService
-from schemas.workflow import InstitutionReview, MockInstitution, Notification
+from schemas.workflow import (
+    InstitutionReview,
+    MockInstitution,
+    Notification,
+    WorkflowTask,
+)
 
 from .classify import classify
 from .classify.chain import ROADMAP_TEMPLATE_BY_TIER
@@ -62,6 +69,9 @@ from .llm import LLMClient
 from .materials import build_material_cards
 from .review import SCRIPT_REVIEW_PROMPT_VERSION, evidence_for, review_script
 from .roadmap import build_roadmap
+from .teaser import PENDING_FLAG as TEASER_PENDING
+from .teaser import PROMPT_VERSION as TEASER_PROMPT_VERSION
+from .teaser import VideoBackend, build_request
 from .state_machine import GateContext, transition
 
 # The gate is only reachable once a pre-check has run: collect, review, gate.
@@ -97,11 +107,13 @@ class WorkflowService:
         snapshots: SnapshotService,
         clock: Clock,
         llm: LLMClient | None = None,
+        video: VideoBackend | None = None,
     ) -> None:
         self._stores = stores
         self._snapshots = snapshots
         self._clock = clock
         self._llm = llm
+        self._video = video
 
     # ------------------------------------------------------------------ reads
 
@@ -598,6 +610,92 @@ class WorkflowService:
             project, ProjectState.FORM_FROZEN, Actor.CREATOR, "form.frozen"
         )
         return frozen
+
+    # ---------------------------------------------------------------- teaser
+
+    def request_teaser(self, project_id: str, seconds: int = 8) -> WorkflowTask:
+        """Ask for a promotional teaser. Records what happened, never a fake one.
+
+        Idempotent on `{project_id}:teaser:{asset_version}` like every other
+        job, so a retry returns the first task rather than generating twice.
+        """
+
+        project = self.get_project(project_id)
+        logline = (project.intent_profile.logline or "").strip()
+        if not logline:
+            raise ValidationFailedError(
+                "a teaser needs a logline to work from", {"project_id": project_id}
+            )
+
+        latest = self._latest_script(project_id)
+        version = latest.version_id if latest else "intent_profile"
+        key = f"{project_id}:{TaskType.TEASER.value}:{version}"
+
+        existing = self._stores.tasks.find_by_idempotency_key(key)
+        if existing is not None:
+            return existing
+
+        now = self._clock.now()
+        task = WorkflowTask(
+            task_id=new_id("task"),
+            project_id=project_id,
+            type=TaskType.TEASER,
+            status=TaskStatus.RUNNING,
+            idempotency_key=key,
+            payload={
+                "seconds": seconds,
+                "prompt_version": TEASER_PROMPT_VERSION,
+                "snapshot_version": self._pinned_version(project),
+            },
+            created_at=now,
+            updated_at=now,
+        )
+        self._stores.tasks.add(task)
+
+        if self._video is None or not self._video.available():
+            # No backend is a pending flag, never a placeholder video.
+            task = task.model_copy(
+                update={
+                    "status": TaskStatus.NEEDS_HUMAN,
+                    "error": TEASER_PENDING,
+                    "updated_at": self._clock.now(),
+                }
+            )
+        else:
+            try:
+                uri = self._video.generate(build_request(logline, seconds))
+                task = task.model_copy(
+                    update={
+                        "status": TaskStatus.SUCCEEDED,
+                        "result": {
+                            "uri": uri,
+                            "backend": self._video.name,
+                            "promotional_only": True,
+                        },
+                        "updated_at": self._clock.now(),
+                    }
+                )
+            except Exception as failure:  # a refused generation is not a teaser
+                task = task.model_copy(
+                    update={
+                        "status": TaskStatus.FAILED,
+                        "error": str(failure),
+                        "updated_at": self._clock.now(),
+                    }
+                )
+
+        self._stores.tasks.save(task)
+        self._record_event(
+            project_id,
+            Actor.SYSTEM,
+            "teaser.requested",
+            {
+                "task_id": task.task_id,
+                "status": task.status.value,
+                "error": task.error,
+            },
+        )
+        return task
 
     # ------------------------------------------------- institution and filing
 

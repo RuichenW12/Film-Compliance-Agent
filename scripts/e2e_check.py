@@ -58,7 +58,6 @@ PENDING_STEPS = [
     ("11. form freeze, field confirm, hash", "T-A5"),
     ("12-14. institution console and filing", "T-A6"),
     ("15-16. policy crawl, publish, stale + recalc fan-out", "T-B1..T-B3"),
-    ("18. Veo teaser", "T-A7"),
 ]
 
 
@@ -271,6 +270,19 @@ def main() -> int:
     )
 
     print()
+    print()
+    print("== 18. teaser, behind FLAG_VEO_TEASER ==")
+    status, body, _ = checker.call("POST", f"/v1/projects/{project_id}/teaser")
+    if status == 403 and body.get("error", {}).get("details", {}).get("flag"):
+        checker.check("the flag is off and says so", True, "FLAG_VEO_TEASER unset")
+    else:
+        task = body.get("task", {})
+        checker.check(
+            "no video backend means needs_human, never a placeholder",
+            status == 200 and task.get("status") == "needs_human",
+            json.dumps(task.get("error")),
+        )
+
     print("== 17. the creator inbox ==")
     status, inbox, _ = checker.call("GET", "/v1/notifications")
     stale_notice = [item for item in inbox if item["kind"] == "policy_stale"]
