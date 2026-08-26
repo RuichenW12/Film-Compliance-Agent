@@ -80,6 +80,7 @@ class Scene:
     quote: str
     episode: int | None = None
     scene: int | None = None
+    line: int | None = None
 
 
 @dataclass
@@ -90,6 +91,7 @@ class ProposedFinding:
     clause_id: str
     suggestion: str | None = None
     expert_pending: bool = False
+    match_lines: list[int] = field(default_factory=list)
 
 
 @dataclass
@@ -124,7 +126,7 @@ def split_scenes(document: str) -> list[Scene]:
     scene: int | None = None
     started = not has_episodes
 
-    for line in lines:
+    for number, line in enumerate(lines, start=1):
         text = line.strip()
         if not text or _BLOCKQUOTE.match(text):
             continue
@@ -157,7 +159,9 @@ def split_scenes(document: str) -> list[Scene]:
 
         if not started:
             continue
-        scenes.append(Scene(quote=text, episode=episode, scene=scene))
+        scenes.append(
+            Scene(quote=text, episode=episode, scene=scene, line=number)
+        )
 
     return scenes
 
@@ -171,16 +175,27 @@ def review_script(
 
     scenes = split_scenes(document)
     result = ReviewResult()
-    seen: set[tuple[str, str]] = set()
 
+    # One finding per category per scene. A courtroom scene mentioning the judge
+    # in four lines is one rewrite decision, not four, and five alerts pointing
+    # into the same scene give a creator four rows to dismiss rather than four
+    # decisions to make. Every matching line number is kept on the finding so
+    # the scene can still be traced back line by line.
+    grouped: dict[tuple[str, int | None, int | None], ProposedFinding] = {}
     for scene in scenes:
         for rule in rules:
-            if any(pattern in scene.quote for pattern in rule.trigger_patterns):
-                key = (rule.category, scene.quote)
-                if key in seen:
-                    continue
-                seen.add(key)
-                result.findings.append(_proposal(rule, scene))
+            if not any(pattern in scene.quote for pattern in rule.trigger_patterns):
+                continue
+            key = (rule.category, scene.episode, scene.scene)
+            existing = grouped.get(key)
+            if existing is None:
+                proposal = _proposal(rule, scene)
+                proposal.match_lines = [scene.line] if scene.line else []
+                grouped[key] = proposal
+            elif scene.line:
+                existing.match_lines.append(scene.line)
+    result.findings.extend(grouped.values())
+    seen = set(grouped)
 
     if llm is None or not llm.available():
         result.pending_flags.append(PENDING_FLAG)
@@ -197,7 +212,7 @@ def _semantic_pass(
     rules: list[SubjectRule],
     llm: LLMClient,
     result: ReviewResult,
-    seen: set[tuple[str, str]],
+    seen: set[tuple[str, int | None, int | None]],
 ) -> None:
     by_category = {rule.category: rule for rule in rules}
     reply = llm.structured(
@@ -220,13 +235,15 @@ def _semantic_pass(
             if category:
                 result.discarded.append(category)
             continue
-        key = (category, quote)
+        scene = _scene_for(quote, scenes)
+        key = (category, scene.episode, scene.scene)
         if key in seen:
+            # The deterministic stage already reported this scene.
             continue
         seen.add(key)
-        result.findings.append(
-            _proposal(rule, _scene_for(quote, scenes), raw.get("reason"))
-        )
+        proposal = _proposal(rule, scene, raw.get("reason"))
+        proposal.match_lines = [scene.line] if scene.line else []
+        result.findings.append(proposal)
 
 
 def _proposal(

@@ -382,6 +382,8 @@ class WorkflowService:
                             quote=proposed.scene.quote,
                             episode=proposed.scene.episode,
                             scene=proposed.scene.scene,
+                            line=proposed.scene.line,
+                            match_lines=sorted(set(proposed.match_lines)),
                         ),
                         category=proposed.category,
                         severity=proposed.severity,

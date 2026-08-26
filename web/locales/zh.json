@@ -114,5 +114,7 @@
   "license.reason.not_in_registry": "该机构不在名录中，无法核验。属于未知，而非通过。",
   "license.reason.capital": "注册资本低于演示阈值。",
   "license.reason.foreign": "该条目记录为含外资。",
-  "institution.load_demo_admin_only": "仅管理员可载入示例名录。请在上方将角色切换为「管理员」。"
+  "institution.load_demo_admin_only": "仅管理员可载入示例名录。请在上方将角色切换为「管理员」。",
+  "finding.line": "第 行",
+  "finding.matching_lines": "命中行"
 }

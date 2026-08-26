@@ -193,3 +193,54 @@ def test_a_synthetic_fixture_never_asserts_a_conclusion(rules):
         fixture("e2e-70min-judicial-long-context.md"), rules, UnavailableLLM()
     )
     assert {finding.severity.value for finding in result.findings} == {"needs_human"}
+
+
+# ------------------------------------------- one finding per scene, still traceable
+
+
+def test_a_scene_is_reported_once_however_many_lines_match(rules):
+    """A courtroom scene is one rewrite decision, not eleven."""
+
+    result = review_script(
+        fixture("e2e-70min-judicial-long-context.md"), rules, UnavailableLLM()
+    )
+    places = [(f.scene.episode, f.scene.scene) for f in result.findings]
+    assert len(places) == len(set(places)), "a scene was reported more than once"
+
+
+def test_the_finding_keeps_every_line_that_matched(rules):
+    """Deduping must not lose the way back: each line stays addressable."""
+
+    document = fixture("e2e-70min-judicial-long-context.md")
+    lines = document.splitlines()
+    result = review_script(document, rules, UnavailableLLM())
+
+    finding = next(
+        f for f in result.findings if (f.scene.episode, f.scene.scene) == (4, 3)
+    )
+    assert len(finding.match_lines) > 1
+    assert finding.scene.line == finding.match_lines[0]
+
+    # Every recorded line number resolves to a line that really matched.
+    patterns = next(r for r in rules if r.category == finding.category).trigger_patterns
+    for number in finding.match_lines:
+        text = lines[number - 1]
+        assert any(pattern in text for pattern in patterns), f"line {number}: {text}"
+
+
+def test_two_scenes_in_different_episodes_stay_separate(rules):
+    """Deduping is per scene. Two courtrooms are two rewrites."""
+
+    result = review_script(
+        fixture("e2e-70min-judicial-long-context.md"), rules, UnavailableLLM()
+    )
+    episodes = {f.scene.episode for f in result.findings}
+    assert len(episodes) > 1
+
+
+def test_the_locator_quote_is_still_verbatim(rules):
+    document = fixture("e2e-30min-public-security.md")
+    result = review_script(document, rules, UnavailableLLM())
+    assert result.findings
+    for finding in result.findings:
+        assert finding.scene.quote in document

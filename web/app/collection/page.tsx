@@ -428,6 +428,13 @@ export default function CollectionPage() {
                       </span>
                     ) : null}
                     <div>“{finding.locator.quote}”</div>
+                    {finding.locator.match_lines.length ? (
+                      <div className="muted">
+                        {finding.locator.match_lines.length > 1
+                          ? `${t("finding.matching_lines")}: ${finding.locator.match_lines.join(", ")}`
+                          : `${t("finding.line")} ${finding.locator.match_lines[0]}`}
+                      </div>
+                    ) : null}
                     <div className="muted">
                       {finding.evidence_refs
                         .map((ref) => `${ref.clause_id} @ ${ref.snapshot_version}`)

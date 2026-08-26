@@ -48,10 +48,26 @@ episode, and all seven scenes the fixture names as expected are covered.
 A plain script with no episode headings is still reviewed whole, so nothing that
 worked before stopped working.
 
-Verified: `python -m pytest` — 344 passed, 3 skipped, 12 new in
-`tests/test_scene_parsing.py`. Each case there came from running the fixtures,
-not from imagination, and four of them assert the statements written into the
-fixtures themselves so a fixture and the reviewer cannot drift apart silently.
+### A — one C1-a finding per scene, with every matching line kept
+
+- Findings deduplicated per matching *line*, so a courtroom scene naming the
+  judge in eleven lines produced eleven findings — eleven rows to dismiss for one
+  rewrite decision, and eleven clicks to waive it. They now group on
+  `(category, episode, scene)`: the long fixture goes from 25 findings to 14.
+- **Deduping does not lose the way back.** `Locator` gained `line` (the 1-based
+  position of the quoted line) and `match_lines` (every line in the scene that
+  matched), so one row per scene still opens onto each individual line. The
+  collection UI lists them under the quote. Reasoning and limits in
+  [D-024](docs/decisions.md#d-024).
+- **B: this adds two optional fields to `schemas/findings.py`**, the shared
+  contract boundary. Both default, nothing existing breaks, and the policy loop
+  never reads `Locator` — flagged for awareness rather than assumed.
+
+Verified: `python -m pytest` — 348 passed, 3 skipped, 16 new in
+`tests/test_scene_parsing.py`. Each case came from running the fixtures, not
+from imagination; four assert the statements written into the fixtures
+themselves so a fixture and the reviewer cannot drift apart silently; and one
+resolves every recorded line number back to a line that really matched.
 
 
 ### A — institution console, the way back from a return, and task reads
