@@ -9,11 +9,13 @@ import {
   FactRecord,
   Finding,
   MaterialCard,
+  PolicyVerificationStatus,
   RoadmapView,
   ReviewResult,
   attachMaterial,
   confirmRoadmap,
   extractFacts,
+  getProject,
   getRoadmap,
   listAssets,
   listFacts,
@@ -25,9 +27,18 @@ import {
   validateMaterial,
   waiveMaterial
 } from "../../lib/api";
+import { PolicyVerificationBanner } from "../../components/policy-verification-banner";
+import { latestAssetOfKind } from "../../lib/assets";
 import { t } from "../../lib/i18n";
 
-const KINDS = ["script", "synopsis", "prompts", "final_film", "subtitle_sheet"];
+const KINDS = [
+  "script",
+  "synopsis",
+  "prompts",
+  "final_film",
+  "subtitle_sheet",
+  "supporting_document"
+];
 
 // Flags the API returns when a pack or a model backend is missing. Rendered as
 // visible gaps rather than hidden, so a demo never reads as a clean result.
@@ -62,24 +73,37 @@ export default function CollectionPage() {
   const [roadmap, setRoadmap] = useState<RoadmapView | null>(null);
   const [extraction, setExtraction] = useState<ExtractResult | null>(null);
   const [review, setReview] = useState<ReviewResult | null>(null);
+  const [verificationStatus, setVerificationStatus] =
+    useState<PolicyVerificationStatus | null>(null);
 
   const [kind, setKind] = useState("script");
   const [file, setFile] = useState<File | null>(null);
 
   const refresh = useCallback(async (id: string) => {
-    const [nextAssets, nextMaterials, nextFacts, nextFindings, nextRoadmap] =
+    const [
+      nextAssets,
+      nextMaterials,
+      nextFacts,
+      nextFindings,
+      nextRoadmap,
+      nextProject
+    ] =
       await Promise.all([
         listAssets(id),
         listMaterials(id),
         listFacts(id),
         listFindings(id),
-        getRoadmap(id)
+        getRoadmap(id),
+        getProject(id)
       ]);
     setAssets(nextAssets);
     setMaterials(nextMaterials);
     setFacts(nextFacts);
     setFindings(nextFindings);
     setRoadmap(nextRoadmap);
+    setVerificationStatus(
+      nextProject.project.classification?.policy_verification_status ?? null
+    );
     setLoaded(true);
   }, []);
 
@@ -149,6 +173,7 @@ export default function CollectionPage() {
 
       {!loaded ? null : (
         <>
+          <PolicyVerificationBanner status={verificationStatus} />
           <section className="card">
             <h2>{t("collection.upload")}</h2>
             <form onSubmit={upload}>
@@ -270,39 +295,41 @@ export default function CollectionPage() {
             <h2>{t("collection.materials")}</h2>
             {materials.length ? (
               <ul>
-                {materials.map((card) => (
-                  <li key={card.material_id}>
-                    <strong>{t(card.name_key)}</strong>{" "}
-                    <span className="chip">{card.status}</span>
-                    {card.required ? null : (
-                      <span className="chip">{t("collection.optional")}</span>
-                    )}
-                    {card.why_clause ? (
-                      <span className="muted"> · {card.why_clause.clause_id}</span>
-                    ) : (
-                      <span className="muted"> · {t("collection.no_clause")}</span>
-                    )}
-                    {card.invalid_reasons.length ? (
-                      <div className="muted">{card.invalid_reasons.join(", ")}</div>
-                    ) : null}
-                    <div className="button-group">
-                      <button
-                        type="button"
-                        className="secondary-button"
-                        disabled={!latestScript || busy !== null}
-                        onClick={() =>
-                          guard("attach", async () => {
-                            await attachMaterial(
-                              projectId,
-                              card.material_id,
-                              latestScript!.version_id
-                            );
-                            await refresh(projectId);
-                          })
-                        }
-                      >
-                        {t("collection.attach_latest")}
-                      </button>
+                {materials.map((card) => {
+                  const latestMatching = latestAssetOfKind(assets, card.asset_kind);
+                  return (
+                    <li key={card.material_id}>
+                      <strong>{t(card.name_key)}</strong>{" "}
+                      <span className="chip">{card.status}</span>
+                      {card.required ? null : (
+                        <span className="chip">{t("collection.optional")}</span>
+                      )}
+                      {card.why_clause ? (
+                        <span className="muted"> · {card.why_clause.clause_id}</span>
+                      ) : (
+                        <span className="muted"> · {t("collection.no_clause")}</span>
+                      )}
+                      {card.invalid_reasons.length ? (
+                        <div className="muted">{card.invalid_reasons.join(", ")}</div>
+                      ) : null}
+                      <div className="button-group">
+                        <button
+                          type="button"
+                          className="secondary-button"
+                          disabled={!latestMatching || busy !== null}
+                          onClick={() =>
+                            guard("attach", async () => {
+                              await attachMaterial(
+                                projectId,
+                                card.material_id,
+                                latestMatching!.version_id
+                              );
+                              await refresh(projectId);
+                            })
+                          }
+                        >
+                          {t("collection.attach_latest")}
+                        </button>
                       <button
                         type="button"
                         className="secondary-button"
@@ -333,9 +360,10 @@ export default function CollectionPage() {
                       >
                         {t("collection.waive")}
                       </button>
-                    </div>
-                  </li>
-                ))}
+                      </div>
+                    </li>
+                  );
+                })}
               </ul>
             ) : (
               <p className="empty-state">{t("collection.no_materials")}</p>

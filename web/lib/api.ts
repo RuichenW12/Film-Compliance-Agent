@@ -3,6 +3,8 @@ import { authHeaders } from "./demoAuth";
 export const API_BASE =
   process.env.NEXT_PUBLIC_API_BASE ?? "http://localhost:8080";
 
+export type PolicyVerificationStatus = "mock_verified" | "human_verified";
+
 export interface ApiErrorBody {
   error: { code: string; message: string; details?: Record<string, unknown> };
 }
@@ -62,6 +64,23 @@ export interface NotificationItem {
   created_at: string | null;
 }
 
+export interface ProjectResponse {
+  project: Record<string, unknown> & {
+    state?: string;
+    policy_stale?: boolean;
+    classification: {
+      tier?: string;
+      tier_provisional?: boolean;
+      policy_verification_status: PolicyVerificationStatus;
+    } | null;
+  };
+  counts: { findings_open_block: number; materials_pending: number };
+}
+
+export async function getProject(projectId: string): Promise<ProjectResponse> {
+  return apiFetch<ProjectResponse>(`/v1/projects/${projectId}`);
+}
+
 export async function listNotifications(
   unreadOnly = false
 ): Promise<NotificationItem[]> {
@@ -100,6 +119,7 @@ export interface UploadTicket {
 export interface MaterialCard {
   material_id: string;
   name_key: string;
+  asset_kind: string;
   required: boolean;
   why_clause: { snapshot_version: string; clause_id: string } | null;
   template_uri: string | null;

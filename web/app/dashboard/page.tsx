@@ -5,20 +5,14 @@ import { useCallback, useEffect, useState } from "react";
 import {
   ApiError,
   NotificationItem,
+  ProjectResponse,
   apiFetch,
+  getProject,
   listNotifications,
   markNotificationRead
 } from "../../lib/api";
 import { format, t } from "../../lib/i18n";
-
-interface ProjectResponse {
-  project: Record<string, unknown> & {
-    state: string;
-    policy_stale: boolean;
-    classification: { tier: string; tier_provisional: boolean } | null;
-  };
-  counts: { findings_open_block: number; materials_pending: number };
-}
+import { PolicyVerificationBanner } from "../../components/policy-verification-banner";
 
 interface TimelineEvent {
   event_id: string;
@@ -60,7 +54,7 @@ export default function DashboardPage() {
     event.preventDefault();
     setError(null);
     try {
-      setProject(await apiFetch<ProjectResponse>(`/v1/projects/${projectId}`));
+      setProject(await getProject(projectId));
       setTimeline(await apiFetch<TimelineEvent[]>(`/v1/projects/${projectId}/timeline`));
       setGate(await apiFetch(`/v1/projects/${projectId}/gate`));
     } catch (caught) {
@@ -86,6 +80,9 @@ export default function DashboardPage() {
 
       {project ? (
         <section className="card">
+          <PolicyVerificationBanner
+            status={project.project.classification?.policy_verification_status}
+          />
           <h2>State</h2>
           <p>
             <span className="badge">{project.project.state}</span>
