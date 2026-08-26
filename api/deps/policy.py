@@ -34,11 +34,28 @@ SOURCE = PolicySource(
 DEMO_EFFECTIVE_FROM = datetime(
     2026,
     8,
-    22,
+    26,
     0,
     0,
     tzinfo=timezone(timedelta(hours=8)),
 )
+DEMO_THRESHOLD_PACK = {
+    "thresholds_published": True,
+    "threshold_sets": {
+        "live_action": {
+            "effective_from": "2026-01-01T00:00:00+08:00",
+            "T1_min_rmb": 3_000_000,
+            "T2_min_rmb": 1_000_000,
+            "clause_ref": "tier-live-action-2026",
+        },
+        "ai_generated": {
+            "effective_from": "2026-07-01T00:00:00+08:00",
+            "T1_min_rmb": 800_000,
+            "T2_min_rmb": 300_000,
+            "clause_ref": "tier-ai-generated-2026",
+        },
+    },
+}
 
 
 def utc_now() -> datetime:
@@ -72,9 +89,7 @@ async def build_local_policy_api_state(
             impact=[ImpactNode.D1C],
             effective_from=DEMO_EFFECTIVE_FROM,
             draft_pack_updates={
-                PackName.P3_TIER_THRESHOLDS: {
-                    "thresholds_published": True
-                }
+                PackName.P3_TIER_THRESHOLDS: DEMO_THRESHOLD_PACK
             },
         ),
         now=now,

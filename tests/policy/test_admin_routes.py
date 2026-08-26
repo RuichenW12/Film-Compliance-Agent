@@ -17,9 +17,9 @@ from workers.policy.adapters.fake_event_publisher import FakeEventPublisher
 from workers.policy.outbox import OutboxDispatcher
 
 
-NOW = datetime(2026, 8, 23, 20, 30, tzinfo=timezone(timedelta(hours=8)))
+NOW = datetime(2026, 8, 27, 20, 30, tzinfo=timezone(timedelta(hours=8)))
 ADMIN_HEADERS = {"X-Mock-Role": "admin"}
-V1_SEED = Path(__file__).parents[2] / "policy" / "seed-snapshot-v1.yaml"
+V2_SEED = Path(__file__).parents[2] / "policy" / "seed-snapshot-v2.yaml"
 
 
 @pytest.fixture
@@ -27,7 +27,7 @@ def policy_state(tmp_path: Path) -> PolicyApiState:
     return asyncio.run(
         build_local_policy_api_state(
             tmp_path / "blobs",
-            seed_path=V1_SEED,
+            seed_path=V2_SEED,
             clock=lambda: NOW,
         )
     )
@@ -78,11 +78,11 @@ def test_seed_snapshot_is_listed(api_client: TestClient) -> None:
     assert response.status_code == 200
     assert response.json() == [
         {
-            "version": "v1",
-            "published_at": "2026-08-22T00:05:00+08:00",
-            "effective_from": "2026-08-22T00:00:00+08:00",
-            "published_by": "admin_seed",
-            "thresholds_published": False,
+            "version": "v2",
+            "published_at": "2026-08-26T00:05:00+08:00",
+            "effective_from": "2026-08-26T00:00:00+08:00",
+            "published_by": "mock_seed",
+            "thresholds_published": True,
         }
     ]
 
@@ -170,9 +170,9 @@ def test_pending_proposals_are_descending_and_detail_contains_diff(
     assert detail.json()["source_diff_uri"].startswith("file://")
     assert "-分类标准尚未公布。" in detail.json()["source_diff_text"]
     assert "+分类标准正式公布。" in detail.json()["source_diff_text"]
-    assert detail.json()["draft_pack_updates"] == {
-        "p3_tier_thresholds": {"thresholds_published": True}
-    }
+    p3_update = detail.json()["draft_pack_updates"]["p3_tier_thresholds"]
+    assert p3_update["thresholds_published"] is True
+    assert set(p3_update["threshold_sets"]) == {"live_action", "ai_generated"}
 
 
 def test_unreadable_diff_uses_safe_error_without_internal_path(
@@ -230,7 +230,7 @@ def test_unknown_source_is_404_without_creating_a_run(
     assert set(policy_state.repository.list_runs()) == {"run_baseline"}
 
 
-def test_publish_creates_v2_and_snapshot_list_is_descending(
+def test_publish_creates_v3_and_snapshot_list_is_descending(
     api_client: TestClient,
     policy_state: PolicyApiState,
 ) -> None:
@@ -242,11 +242,11 @@ def test_publish_creates_v2_and_snapshot_list_is_descending(
     )
 
     assert response.status_code == 201
-    assert response.json() == {"snapshot_version": "v2"}
+    assert response.json() == {"snapshot_version": "v3"}
     snapshots = admin_get(api_client, "/v1/admin/policy/snapshots").json()
-    assert [row["version"] for row in snapshots] == ["v2", "v1"]
+    assert [row["version"] for row in snapshots] == ["v3", "v2"]
     assert policy_state.repository.get_outbox(
-        "policy.updated:v2"
+        "policy.updated:v3"
     ).status is OutboxStatus.SENT
 
 
@@ -270,7 +270,7 @@ def test_future_effective_publish_is_rejected_by_the_server(
     assert policy_state.repository.get_proposal(
         future_id
     ).status is ProposalStatus.PENDING
-    assert set(policy_state.repository.list_snapshots()) == {"v1"}
+    assert set(policy_state.repository.list_snapshots()) == {"v2"}
 
 
 def test_discard_returns_204_and_repeat_is_a_conflict(
@@ -298,7 +298,7 @@ def test_dispatch_failure_does_not_rollback_successful_publish(
     policy_state: PolicyApiState,
 ) -> None:
     proposal_id = seed_proposal(policy_state)
-    failing_publisher = FakeEventPublisher(fail_on={"policy.updated:v2"})
+    failing_publisher = FakeEventPublisher(fail_on={"policy.updated:v3"})
     state = replace(
         policy_state,
         dispatcher=OutboxDispatcher(
@@ -315,9 +315,9 @@ def test_dispatch_failure_does_not_rollback_successful_publish(
         )
 
     assert response.status_code == 201
-    assert response.json() == {"snapshot_version": "v2"}
+    assert response.json() == {"snapshot_version": "v3"}
     assert policy_state.repository.get_outbox(
-        "policy.updated:v2"
+        "policy.updated:v3"
     ).status is OutboxStatus.PENDING
 
 

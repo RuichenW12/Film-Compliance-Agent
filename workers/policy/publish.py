@@ -7,6 +7,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict
 
+from policy.validation import SnapshotSemanticError, validate_snapshot
 from schemas.policy_snapshot import (
     OutboxStatus,
     PackName,
@@ -83,6 +84,10 @@ class PolicyPublisher:
             ),
             thresholds_published=thresholds_value,
         )
+        try:
+            validate_snapshot(snapshot)
+        except SnapshotSemanticError as exc:
+            raise PolicyPublishError("POLICY_PROPOSAL_INVALID", str(exc)) from exc
         event = PolicyUpdatedEvent(
             snapshot_version=version,
             impact=proposal.impact,
