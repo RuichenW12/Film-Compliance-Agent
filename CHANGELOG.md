@@ -22,6 +22,18 @@ Conventions:
 
 ## 2026-08-26
 
+### Shared — exact-amount, mode-specific tier runtime
+
+- Intake and the Wizard now accept `investment_amount_rmb` as an optional,
+  non-negative whole-RMB value.
+- D1c selects `live_action` or `ai_generated` threshold data from the pinned p3
+  pack. A missing amount, missing generation mode, or flag-only publication
+  remains provisional ([D-026](docs/decisions.md#d-026)).
+- Final amount tiers and recalculation carry the selected pack `clause_ref`
+  instead of always citing the hard-coded future NRTA article.
+- This changes the shared intake and policy-pack seam. It does not activate a
+  static v2 seed or change Gate 5-b.
+
 ### A — every long job is a task, and where it runs is now a choice
 
 - Fact extraction and script review ran inline and recorded nothing, so

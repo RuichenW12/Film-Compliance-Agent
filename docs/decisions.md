@@ -39,6 +39,7 @@ status becomes `Superseded by D-0xx`. That way the reasoning trail survives.
 | [D-023](#d-023) | A | The institution registry ships empty; an unknown institution is unverifiable, not invalid | Accepted |
 | [D-024](#d-024) | A | One C1-a finding per scene, with every matching line kept | Accepted |
 | [D-025](#d-025) | A | Every long job is a task first; the runner decides where it executes | Accepted |
+| [D-026](#d-026) | Shared | Final amount tiers require amount, mode, and usable thresholds | Accepted |
 
 ---
 
@@ -761,3 +762,13 @@ clean".
 Revisit when Pub/Sub is wired: `QueuedRunner` needs a real publisher, and the
 worker needs an entrypoint that pulls from a subscription rather than being
 handed a task. Neither changes the service, which is the point of the seam.
+
+## D-026
+
+**A final amount tier requires an exact amount, a known generation mode, and a
+usable published threshold set** · Area: Shared · Status: Accepted · 2026-08-26
+
+`budget_band` remains a provisional comparison aid. `thresholds_published=true`
+does not make a result final when the selected threshold set or exact amount is
+missing. D1c selects `live_action` or `ai_generated` from the stored intent and
+returns the selected pack evidence; it never falls through to the other mode.
