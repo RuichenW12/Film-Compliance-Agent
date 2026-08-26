@@ -2,7 +2,9 @@
 
 **Date:** 2026-08-26
 
-**Status:** Approved for implementation planning
+**Status:** Superseded for the remaining v2 data scope by
+`2026-08-26-policy-snapshot-v2-complete-mock-design.md`. The exact-amount and
+mode-specific tier runtime described here has already been implemented.
 
 **Primary owner:** Richard (policy workstream)
 
