@@ -1,0 +1,5 @@
+sources:
+  - source_id: nrta_micro_drama_management_measures
+    url: https://www.nrta.gov.cn/art/2026/7/31/art_113_73785.html
+    content_selector: "#zoom"
+    enabled: true

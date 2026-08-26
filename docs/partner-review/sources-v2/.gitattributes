@@ -1,0 +1,3 @@
+# Preserve downloaded evidence byte-for-byte and avoid text normalization/diff cleanup.
+raw/*.html -diff -text
+metadata/*.headers.txt -diff -text

@@ -1,0 +1,139 @@
+{
+  "archive_version": 1,
+  "generated_at": "2026-08-26T14:34:17Z",
+  "snapshot_version": "v2",
+  "snapshot_status": "mock_verified",
+  "status_note": "Government source pages are real; snapshot mappings remain MOCK until human review.",
+  "sources": [
+    {
+      "source_id": "SRC-001",
+      "title": "国家广播电视总局令第16号：《微短剧发展管理办法》",
+      "url": "https://www.nrta.gov.cn/art/2026/7/31/art_113_73785.html",
+      "publisher": "国家广播电视总局",
+      "published_at": "2026-07-31T16:15:00+08:00",
+      "document_effective_from": "2026-09-01T00:00:00+08:00",
+      "source_status": "official_primary",
+      "snapshot_mapping_status": "mock_pending_human_review",
+      "used_by": [
+        "p1_form_definition",
+        "p2_subject_rules",
+        "p6_legal_clauses.nrta-order-16-article-2",
+        "p6_legal_clauses.nrta-order-16-article-5"
+      ],
+      "files": [
+        {
+          "path": "raw/SRC-001-nrta-order-16.html",
+          "sha256": "04c2b294cd306d4e53b4248d6cd50e55c9db8bafabfbebe598dbed850b67bae8"
+        },
+        {
+          "path": "text/SRC-001-nrta-order-16.txt",
+          "sha256": "026da9f20e36093e357fadb466fa9698aecd5ed92a51ea788c2210b3d6a4773e"
+        },
+        {
+          "path": "metadata/SRC-001-nrta-order-16.headers.txt",
+          "sha256": "f9d70ba8e71d0c5b312270ebb20797e13a309fc014ae2c0f5b488c51d71787b1"
+        }
+      ],
+      "attachments": [],
+      "review_notes": [
+        "Article 2 and Article 5 are present in the official text.",
+        "The document takes effect on 2026-09-01, which conflicts with the snapshot top-level effective_from 2026-08-26.",
+        "Article 14 calls for consultation only when the authority considers it necessary."
+      ]
+    },
+    {
+      "source_id": "SRC-002",
+      "title": "调整微短剧分类分层标准",
+      "url": "https://whhlyj.baoji.gov.cn/zzzb/xygl/202601/t20260115_1240723.html",
+      "publisher": "宝鸡市文化和旅游局",
+      "page_claimed_source": "国家广播电视总局",
+      "published_at": "2026-02-02T08:42:00+08:00",
+      "claimed_effective_from": "2026-01-01T00:00:00+08:00",
+      "source_status": "official_government_republication",
+      "snapshot_mapping_status": "mock_pending_primary_source_and_human_review",
+      "used_by": [
+        "p3_tier_thresholds.live_action",
+        "p6_legal_clauses.tier-live-action-2026"
+      ],
+      "files": [
+        {
+          "path": "raw/SRC-002-baoji-live-thresholds.html",
+          "sha256": "c267b239f96ba8fa9f91882f8effc4d8931fe8bf9995f6c4d5b072c86e9d30c2"
+        },
+        {
+          "path": "text/SRC-002-baoji-live-thresholds.txt",
+          "sha256": "6a65ebde4bfb4f72f0cd65a2960cc736f8b7cce735984dae24a18fdd481cb938"
+        },
+        {
+          "path": "metadata/SRC-002-baoji-live-thresholds.headers.txt",
+          "sha256": "2e5db6fb29dbaa9909651efe6c9d2b6689898935fb90b59063cbce28bbe0dd77"
+        }
+      ],
+      "attachments": [],
+      "review_notes": [
+        "No original NRTA notice is attached or linked.",
+        "The same page uses both '达到300万元及以上' and '达到300万元以上'; equality at 3,000,000 RMB requires confirmation."
+      ]
+    },
+    {
+      "source_id": "SRC-003",
+      "title": "广电总局发布AI微短剧分类分层标准",
+      "url": "https://wxb.xzdw.gov.cn/wlcb/cbgz/202606/t20260626_680352.html",
+      "publisher": "中共西藏自治区委员会网络安全和信息化委员会办公室",
+      "page_claimed_source": "广电总局",
+      "published_at": "2026-06-26",
+      "claimed_effective_from": "2026-07-01T00:00:00+08:00",
+      "source_status": "official_government_republication",
+      "snapshot_mapping_status": "mock_pending_primary_source_and_human_review",
+      "used_by": [
+        "p3_tier_thresholds.ai_generated",
+        "p6_legal_clauses.tier-ai-generated-2026"
+      ],
+      "files": [
+        {
+          "path": "raw/SRC-003-tibet-ai-thresholds.html",
+          "sha256": "0c52c1944346047fd8b77fcf7000ca5bb814549b830d8920f2ce8f69b8813315"
+        },
+        {
+          "path": "text/SRC-003-tibet-ai-thresholds.txt",
+          "sha256": "35292f98f5636d52757740ae08c3285e6f941fb06b2fe4077732fa4841e31097"
+        },
+        {
+          "path": "metadata/SRC-003-tibet-ai-thresholds.headers.txt",
+          "sha256": "fca9678b83ef817c8885ff94317f8fc26be604ef351fd3b155e491e5c14b6258"
+        }
+      ],
+      "attachments": [],
+      "review_notes": [
+        "No original NRTA management prompt is attached or linked.",
+        "The 800,000 and 300,000 RMB thresholds are retained only as integration candidates."
+      ]
+    }
+  ],
+  "packs_without_direct_source": [
+    {
+      "pack": "p4_process_templates",
+      "status": "mock",
+      "reason": "No direct policy or handling-guide source is referenced by v2."
+    },
+    {
+      "pack": "p5_form_templates",
+      "status": "mock",
+      "reason": "No direct form or material-list source is referenced by v2."
+    }
+  ],
+  "snapshot_files": [
+    {
+      "path": "snapshot/seed-snapshot-v2.yaml",
+      "sha256": "dc9684e7186477cff6d43ca6dc4d2af4a2036a1230e1f5ec30a0f821187f8b07"
+    },
+    {
+      "path": "snapshot/policy_sources.yaml",
+      "sha256": "b309cc433f6abdac86fd529c2e3269acf2875b0ac69fded7b1df2bc1e1c854dd"
+    },
+    {
+      "path": "snapshot/policy-v2-human-review-checklist.md",
+      "sha256": "7ae96eec1657301ebba64b2759370d00dfa2370783965355709150646e6538a5"
+    }
+  ]
+}
