@@ -13,6 +13,7 @@ from .enums import (
     ProjectState,
     Tier,
 )
+from .policy_snapshot import VerificationStatus
 
 
 class IntentProfile(DomainModel):
@@ -76,6 +77,7 @@ class Classification(DomainModel):
     matched_rules: list[MatchedRule] = Field(default_factory=list)
     confidence: float = Field(default=0.0, ge=0.0, le=1.0)
     policy_snapshot_version: str
+    policy_verification_status: VerificationStatus = VerificationStatus.MOCK_VERIFIED
     pending_flags: list[str] = Field(default_factory=list)
     # Ground rule 2: a classification that asserts a tier or a special subject
     # must point at the clauses it read, in the snapshot it was pinned to.

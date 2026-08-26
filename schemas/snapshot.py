@@ -9,7 +9,7 @@ from pathlib import Path
 
 import yaml
 
-from .policy_snapshot import Clause, PackName, PolicySnapshot
+from .policy_snapshot import Clause, PackName, PolicySnapshot, VerificationStatus
 
 
 class SnapshotNotFoundError(LookupError):
@@ -33,6 +33,10 @@ class SnapshotService(ABC):
     @abstractmethod
     def clause(self, clause_id: str, version: str) -> Clause:
         raise NotImplementedError
+
+    def verification_status(self, version: str) -> VerificationStatus:
+        _ = version
+        return VerificationStatus.MOCK_VERIFIED
 
 
 class FileSnapshotService(SnapshotService):
@@ -74,6 +78,9 @@ class FileSnapshotService(SnapshotService):
             if clause.clause_id == clause_id:
                 return clause
         raise KeyError(f"clause not found: {clause_id}")
+
+    def verification_status(self, version: str) -> VerificationStatus:
+        return self._snapshot(version).verification_status
 
     def _snapshot(self, version: str) -> PolicySnapshot:
         try:

@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 
 from core.classify.subject_rules import load_subject_rules
-from schemas.policy_snapshot import PackName
+from schemas.policy_snapshot import PackName, VerificationStatus
 from schemas.snapshot import SnapshotNotFoundError
 
 
@@ -13,6 +13,10 @@ def test_seed_snapshot_serves_all_six_packs(snapshots):
     assert snapshots.latest_version() == "v1"
     for pack in PackName:
         assert isinstance(snapshots.get_pack(pack), dict)
+
+
+def test_legacy_seed_is_conservatively_mock_verified(snapshots):
+    assert snapshots.verification_status("v1") is VerificationStatus.MOCK_VERIFIED
 
 
 def test_clause_lookup_returns_the_cited_text(snapshots):
