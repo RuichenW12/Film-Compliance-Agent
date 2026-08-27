@@ -211,17 +211,29 @@ def classify(
     ]
 
     if subject.special_subject_hit:
+        # The strict operational reading is T1 plus co-review. The cited article
+        # is narrower: the authority consults when it considers it necessary, so
+        # a hit is a strong indication rather than a settled tier. While the
+        # rules that produced the hit are themselves unconfirmed, the tier is
+        # reported provisional with a flag, and the co-review requirement is
+        # kept because it is the safer of the two readings for a creator to plan
+        # around. See D-026.
+        rules_unconfirmed = subject.expert_pending
+        subject_flags = [
+            *pending_flags,
+            *(["subject_disposal_unconfirmed"] if rules_unconfirmed else []),
+        ]
         classification = Classification(
             form_type=FormType.MICRO_DRAMA,
             tier=Tier.T1,
-            tier_provisional=False,
+            tier_provisional=rules_unconfirmed,
             special_subject_hit=True,
             co_review_required=True,
             matched_rules=subject.matched_rules,
             confidence=subject.confidence,
             policy_snapshot_version=version,
             policy_verification_status=verification_status,
-            pending_flags=pending_flags,
+            pending_flags=subject_flags,
             dept=subject.dept,
             evidence_refs=evidence
             or [EvidenceRef(snapshot_version=version, clause_id=TIER_CLAUSE_ID)],

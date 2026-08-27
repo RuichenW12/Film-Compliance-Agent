@@ -23,10 +23,16 @@ def test_special_subject_profile_is_t1_with_co_review(
 
     assert classification.form_type is FormType.MICRO_DRAMA
     assert classification.tier is Tier.T1
-    assert classification.tier_provisional is False
     assert classification.special_subject_hit is True
     assert classification.co_review_required is True
     assert outcome.roadmap_preview["template"] == "T1_7steps"
+
+    # The rules that produced the hit are the placeholder list, and the cited
+    # article says the authority consults when it considers it necessary. So
+    # the tier is reported provisional and flagged rather than settled, while
+    # co-review is kept as the safer reading to plan around. See D-026.
+    assert classification.tier_provisional is True
+    assert "subject_disposal_unconfirmed" in classification.pending_flags
 
     # The hit quotes the triggering text verbatim, and the quote really occurs.
     assert classification.matched_rules
@@ -247,21 +253,29 @@ def test_classification_pins_the_selected_snapshot_verification(
 
 
 @pytest.mark.parametrize(
-    ("is_ai_generated", "amount", "expected"),
+    ("is_ai_generated", "amount", "expected", "on_boundary"),
     [
-        (False, 2_999_999, Tier.T2),
-        (False, 3_000_000, Tier.T1),
-        (False, 999_999, Tier.T3),
-        (False, 1_000_000, Tier.T2),
-        (True, 799_999, Tier.T2),
-        (True, 800_000, Tier.T1),
-        (True, 299_999, Tier.T3),
-        (True, 300_000, Tier.T2),
+        (False, 2_999_999, Tier.T2, False),
+        (False, 3_000_000, Tier.T1, True),
+        (False, 999_999, Tier.T3, False),
+        (False, 1_000_000, Tier.T2, True),
+        (True, 799_999, Tier.T2, False),
+        (True, 800_000, Tier.T1, True),
+        (True, 299_999, Tier.T3, False),
+        (True, 300_000, Tier.T2, True),
     ],
 )
 def test_published_threshold_sets_use_mode_and_exact_amount(
-    is_ai_generated, amount, expected
+    is_ai_generated, amount, expected, on_boundary
 ):
+    """An amount exactly on a threshold keeps the inclusive tier, provisionally.
+
+    The published source writes the boundary two ways in one page, so the tier
+    of an amount equal to a threshold depends on which sentence is
+    authoritative. The inclusive reading is reported; it is not reported as
+    settled. See D-026.
+    """
+
     decision = judge_tier(
         BudgetBand.UNKNOWN,
         PUBLISHED_THRESHOLD_PACK,
@@ -271,7 +285,11 @@ def test_published_threshold_sets_use_mode_and_exact_amount(
     )
 
     assert decision.tier is expected
-    assert decision.tier_provisional is False
+    assert decision.tier_provisional is on_boundary
+    if on_boundary:
+        assert "threshold_boundary_disputed" in decision.pending_flags
+    else:
+        assert decision.pending_flags == []
     expected_clause = (
         "tier-ai-generated-2026"
         if is_ai_generated
@@ -348,3 +366,64 @@ def test_chain_stays_well_under_the_five_second_budget(
     started = time.perf_counter()
     classify(intent_crime, channels, snapshots)
     assert time.perf_counter() - started < 5.0
+
+
+def test_an_amount_just_over_a_boundary_is_settled(snapshots):
+    """Only exact equality is disputed. One yuan over is not a judgement call."""
+
+    from core.classify.d1c import on_threshold_boundary
+
+    thresholds = {"T1_min_rmb": 3_000_000, "T2_min_rmb": 1_000_000}
+    assert on_threshold_boundary(3_000_000, thresholds) is True
+    assert on_threshold_boundary(3_000_001, thresholds) is False
+    assert on_threshold_boundary(2_999_999, thresholds) is False
+    assert on_threshold_boundary(1_000_000, thresholds) is True
+
+
+def test_confirmed_subject_rules_settle_the_tier(intent_crime, channels):
+    """The provisional marking is tied to the rules being unconfirmed, not to
+    special subjects in general: partner-confirmed rules settle it."""
+
+    from datetime import datetime
+
+    from core.classify import classify
+    from schemas.policy_snapshot import Clause, PackName
+    from schemas.snapshot import SnapshotService
+
+    confirmed = {
+        "subject_rules": [
+            {
+                "rule_id": "SR-CONFIRMED",
+                "category": "public_security",
+                "trigger_patterns": ["缉毒", "卧底"],
+                "expert_pending": False,
+                "clause_ref": "nrta-order-16-article-5",
+            }
+        ]
+    }
+
+    class Snapshots(SnapshotService):
+        def latest_version(self, as_of: datetime | None = None) -> str:
+            return "v1"
+
+        def get_pack(self, name: PackName, version: str | None = None) -> dict:
+            if PackName(name) is PackName.P2_SUBJECT_RULES:
+                return dict(confirmed)
+            if PackName(name) is PackName.P1_FORM_DEFINITION:
+                return {"episode_max_minutes_exclusive": 20, "continuous_plot_required": True}
+            return {}
+
+        def clause(self, clause_id: str, version: str) -> Clause:
+            return Clause(
+                clause_id=clause_id,
+                title="第五条",
+                text="微短剧特殊题材。",
+                source_url="https://www.nrta.gov.cn/art/2026/7/31/art_113_73785.html",
+            )
+
+    outcome = classify(intent_crime, channels, Snapshots())
+    classification = outcome.classification
+
+    assert classification.special_subject_hit is True
+    assert classification.tier_provisional is False
+    assert "subject_disposal_unconfirmed" not in classification.pending_flags

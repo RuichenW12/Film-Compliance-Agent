@@ -45,6 +45,23 @@ def _thresholds_published(pack3: dict, snapshot_thresholds_published: bool | Non
     return False
 
 
+def on_threshold_boundary(amount_rmb: float, thresholds: dict) -> bool:
+    """True when the amount sits exactly on a threshold.
+
+    The published source states the live-action boundary two ways in one page —
+    「300万元及以上」(>=) and 「300万元以上」(>) — so the tier of an amount
+    exactly equal to a threshold depends on which sentence is authoritative.
+    The code has to pick one to compute anything; `>=` is the inclusive reading.
+    But an answer that depends on an unresolved contradiction is not a settled
+    answer, so it is returned provisional with a flag rather than as fact.
+    """
+
+    return any(
+        thresholds.get(key) is not None and amount_rmb == float(thresholds[key])
+        for key in ("T1_min_rmb", "T2_min_rmb")
+    )
+
+
 def _tier_from_amount(amount_rmb: float, thresholds: dict) -> Tier | None:
     t1_min = thresholds.get("T1_min_rmb")
     t2_min = thresholds.get("T2_min_rmb")
@@ -112,10 +129,19 @@ def judge_tier(
     if published and investment_amount_rmb is not None and thresholds:
         tier = _tier_from_amount(investment_amount_rmb, thresholds)
         if tier is not None:
+            boundary = on_threshold_boundary(investment_amount_rmb, thresholds)
             return TierDecision(
                 tier=tier,
-                tier_provisional=False,
-                reasons=["tier.from_official_thresholds"],
+                # Exactly on the line, the source contradicts itself. Report the
+                # inclusive reading, but never as a settled tier.
+                tier_provisional=boundary,
+                reasons=[
+                    "tier.from_official_thresholds",
+                    *(["tier.on_threshold_boundary"] if boundary else []),
+                ],
+                pending_flags=(
+                    ["threshold_boundary_disputed"] if boundary else []
+                ),
                 clause_ref=thresholds.get("clause_ref"),
             )
 

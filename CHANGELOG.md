@@ -22,6 +22,39 @@ Conventions:
 
 ## 2026-08-26
 
+### Shared — two disputed policy readings stop being reported as settled
+
+Verifying the v2 source archive turned up two places where the product asserted
+more than its sources support. Both were written down in the archive and
+invisible in the running system. Reasoning in
+[D-026](docs/decisions.md#d-026).
+
+- **The threshold boundary.** `SRC-002` writes the live-action boundary two ways
+  on the same page — 「300万元及以上」(`>=`) and 「300万元以上」(`>`). The code
+  picks the inclusive reading, which is fine, but returned it as final: exactly
+  ¥3,000,000 gave `T1` with `tier_provisional: False`, with a test locking it
+  in. An amount **exactly on** a threshold now returns the same tier with
+  `tier_provisional: True` and `threshold_boundary_disputed`. One yuan either
+  side is unaffected — only equality is disputed.
+- **The special-subject disposal.** A hit set `tier=T1, tier_provisional=False`
+  unconditionally, but the cited article says the authority consults *when it
+  considers it necessary*. While the rules that produced the hit carry
+  `expert_pending`, the tier is now provisional with
+  `subject_disposal_unconfirmed`. **Co-review is kept** — of the two readings it
+  is the safer one for a creator to plan around, and it is advice about
+  preparation rather than a claim about the law.
+- Confirmed rules settle both with no code change, and there is a test for that
+  path so the provisional marking cannot quietly become permanent.
+
+Also verified, and correct: all 12 checksums in the archive match, the archived
+snapshot is byte-identical to `policy/seed-snapshot-v2.yaml` apart from line
+endings, and every claim the manifest makes about the source text holds —
+including that the 300万 contradiction really is on the page.
+
+Verified: `python -m pytest` — 421 passed, 3 skipped, 2 new in
+`tests/test_classify.py` plus updated boundary parametrisation.
+
+
 ### Shared — a malformed material card skips instead of 500ing
 
 - `core/materials.py` read `raw["asset_kind"]` directly after B bound cards to
