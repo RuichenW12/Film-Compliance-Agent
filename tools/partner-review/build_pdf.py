@@ -24,7 +24,7 @@ from reportlab.platypus import (
 )
 
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 SNAPSHOT_PATH = ROOT / "policy" / "seed-snapshot-v2.yaml"
 OUTPUT_DIR = ROOT / "docs" / "partner-review"
 OUTPUT_PATH = OUTPUT_DIR / "影视伙伴政策数据复核说明-v1.pdf"

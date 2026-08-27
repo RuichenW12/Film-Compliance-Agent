@@ -5,7 +5,7 @@ import path from "node:path";
 import { SpreadsheetFile, Workbook } from "@oai/artifact-tool";
 
 
-const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname), "..");
+const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname), "..", "..");
 const SNAPSHOT_PATH = path.join(ROOT, "policy", "seed-snapshot-v2.yaml");
 const OUTPUT_DIR = path.join(ROOT, "docs", "partner-review");
 const PREVIEW_DIR = path.join(ROOT, "tmp", "partner-review");

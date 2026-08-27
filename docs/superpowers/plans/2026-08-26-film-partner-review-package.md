@@ -13,7 +13,7 @@
 ### Task 1: 建立 Excel 生成器和五张工作表
 
 **Files:**
-- Create: `scripts/build_partner_review_workbook.mjs`
+- Create: `tools/partner-review/build_workbook.mjs`
 - Create: `docs/partner-review/影视伙伴政策数据确认表-v1.xlsx`
 
 - [ ] **Step 1: 读取真实输入并构造可追溯行**
@@ -81,7 +81,7 @@ statusRange.dataValidation = {
 ```bash
 NODE_PATH=/Users/ruichenwang/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules \
 /Users/ruichenwang/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node \
-scripts/build_partner_review_workbook.mjs
+tools/partner-review/build_workbook.mjs
 ```
 
 生成器必须使用 `workbook.inspect` 检查五张工作表和关键范围，并扫描
@@ -121,7 +121,7 @@ await workbook.render({
 ### Task 3: 生成 PDF 说明页
 
 **Files:**
-- Create: `scripts/build_partner_review_pdf.py`
+- Create: `tools/partner-review/build_pdf.py`
 - Create: `docs/partner-review/影视伙伴政策数据复核说明-v1.pdf`
 
 - [ ] **Step 1: 创建一致的四页内容**
@@ -142,7 +142,7 @@ await workbook.render({
 
 ```bash
 /Users/ruichenwang/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 \
-scripts/build_partner_review_pdf.py
+tools/partner-review/build_pdf.py
 ```
 
 预期：输出 PDF 存在，包含 4 页，无异常退出。
