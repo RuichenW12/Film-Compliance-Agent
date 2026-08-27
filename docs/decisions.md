@@ -40,6 +40,7 @@ status becomes `Superseded by D-0xx`. That way the reasoning trail survives.
 | [D-024](#d-024) | A | One C1-a finding per scene, with every matching line kept | Accepted |
 | [D-025](#d-025) | A | Every long job is a task first; the runner decides where it executes | Accepted |
 | [D-026](#d-026) | Shared | Final amount tiers require amount, mode, and usable thresholds | Accepted |
+| [D-026](#d-026) | Shared | A disputed policy reading is reported provisional, never settled | Accepted, revisit when the primary sources arrive |
 
 ---
 
@@ -797,3 +798,59 @@ reviewed, its evidence recorded, and a human reviewer to authorize the change.
 
 This decision does not claim cloud deployment, official endorsement, or legal
 advice. Cloud bootstrap and Gate 5-b remain separate work.
+
+## D-026
+
+**A disputed policy reading is reported provisional, never settled** · Area: Shared · Status: Accepted, revisit when the primary sources arrive · 2026-08-26
+
+The v2 source archive records two places where the product was asserting more
+than its sources support. Both were documented in the archive and invisible in
+the running system, which is the failure this repository exists to avoid: a gap
+presented as a result.
+
+### The threshold boundary
+
+`SRC-002` states the live-action boundary two ways **on the same page** —
+「达到300万元及以上」(`>=`) and 「达到300万元以上」(`>`). The code has to pick
+one reading to compute anything, and picks the inclusive `>=`. That is a
+reasonable default and it was silently final: an amount of exactly ¥3,000,000
+returned `T1` with `tier_provisional: False`, and a test locked that in.
+
+An answer that depends on an unresolved contradiction is not a settled answer.
+An amount **exactly equal** to a threshold now returns the inclusive tier with
+`tier_provisional: True` and `threshold_boundary_disputed`. One yuan either side
+is unaffected — only equality is in dispute, and treating the whole range as
+uncertain would be its own kind of dishonesty.
+
+### The special-subject disposal
+
+A subject hit set `tier=T1, tier_provisional=False, co_review_required=True`
+unconditionally. The cited article is narrower: the authority consults **when it
+considers it necessary**. So a hit is a strong indication, not a settled tier.
+
+While the rules that produced the hit carry `expert_pending` — as the seed's do,
+since the trigger vocabulary was written by this codebase and not by a regulator
+([D-002](#d-002), [D-018](#d-018)) — the tier is reported provisional with
+`subject_disposal_unconfirmed`.
+
+**Co-review is deliberately kept.** Of the two readings it is the safer one for a
+creator to plan around: preparing for co-review that turns out unnecessary costs
+time, and skipping co-review that turns out required costs the filing. The tier
+is a claim about the law; the co-review prompt is advice about preparation, and
+they do not need the same standard of proof.
+
+Confirmed rules settle both: when the pack publishes `expert_pending: false`, the
+tier is final again with no flag, and no code changes. There is a test for that
+path so the provisional marking cannot quietly become permanent.
+
+### Why this is shared
+
+The readings are B's to resolve — they come from the policy sources — but the
+assertions were being made in A's classification code. Neither the snapshot nor
+the archive needed changing; what changed is that the product now says what it
+does not know.
+
+Revisit when the primary sources arrive: the original NRTA notice behind
+`SRC-002` settles the boundary, and a filing partner settles whether a subject
+hit fixes the tier. Both should then flip to settled by publishing confirmed
+rules rather than by editing this logic.
