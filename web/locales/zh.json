@@ -138,5 +138,8 @@
   "license.reason.foreign": "该条目记录为含外资。",
   "institution.load_demo_admin_only": "仅管理员可载入示例名录。请在上方将角色切换为「管理员」。",
   "finding.line": "第 行",
-  "finding.matching_lines": "命中行"
+  "finding.matching_lines": "命中行",
+  "wizard.platform_promoted": "平台招商主推或首页首屏推荐播出",
+  "wizard.voluntary_key": "自愿按重点微短剧申报",
+  "wizard.key_conditions_note": "以上任一条件成立，即按重点微短剧处理，与投资额无关——广电办发〔2024〕35号。"
 }

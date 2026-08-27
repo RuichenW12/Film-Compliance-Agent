@@ -27,12 +27,11 @@ def test_special_subject_profile_is_t1_with_co_review(
     assert classification.co_review_required is True
     assert outcome.roadmap_preview["template"] == "T1_7steps"
 
-    # The rules that produced the hit are the placeholder list, and the cited
-    # article says the authority consults when it considers it necessary. So
-    # the tier is reported provisional and flagged rather than settled, while
-    # co-review is kept as the safer reading to plan around. See D-026.
+    # 广电办发〔2024〕35号 backs the disposal itself — 特殊题材 follows the
+    # 协审工作机制 — so that is no longer flagged. What stays provisional is the
+    # match: the trigger vocabulary was written by this codebase. See D-026.
     assert classification.tier_provisional is True
-    assert "subject_disposal_unconfirmed" in classification.pending_flags
+    assert "subject_match_unconfirmed" in classification.pending_flags
 
     # The hit quotes the triggering text verbatim, and the quote really occurs.
     assert classification.matched_rules
@@ -253,27 +252,26 @@ def test_classification_pins_the_selected_snapshot_verification(
 
 
 @pytest.mark.parametrize(
-    ("is_ai_generated", "amount", "expected", "on_boundary"),
+    ("is_ai_generated", "amount", "expected"),
     [
-        (False, 2_999_999, Tier.T2, False),
-        (False, 3_000_000, Tier.T1, True),
-        (False, 999_999, Tier.T3, False),
-        (False, 1_000_000, Tier.T2, True),
-        (True, 799_999, Tier.T2, False),
-        (True, 800_000, Tier.T1, True),
-        (True, 299_999, Tier.T3, False),
-        (True, 300_000, Tier.T2, True),
+        (False, 2_999_999, Tier.T2),
+        (False, 3_000_000, Tier.T1),
+        (False, 999_999, Tier.T3),
+        (False, 1_000_000, Tier.T2),
+        (True, 799_999, Tier.T2),
+        (True, 800_000, Tier.T1),
+        (True, 299_999, Tier.T3),
+        (True, 300_000, Tier.T2),
     ],
 )
 def test_published_threshold_sets_use_mode_and_exact_amount(
-    is_ai_generated, amount, expected, on_boundary
+    is_ai_generated, amount, expected
 ):
-    """An amount exactly on a threshold keeps the inclusive tier, provisionally.
+    """Boundaries are inclusive and settled unless the pack disputes one.
 
-    The published source writes the boundary two ways in one page, so the tier
-    of an amount equal to a threshold depends on which sentence is
-    authoritative. The inclusive reading is reported; it is not reported as
-    settled. See D-026.
+    广电办发〔2024〕35号 writes 「达到100万元及以上」 and 「30万元（含）—100万元
+    之间」, the same inclusive pattern the 2026 adjustment uses, so equality is
+    not by itself uncertain. See D-026.
     """
 
     decision = judge_tier(
@@ -285,17 +283,45 @@ def test_published_threshold_sets_use_mode_and_exact_amount(
     )
 
     assert decision.tier is expected
-    assert decision.tier_provisional is on_boundary
-    if on_boundary:
-        assert "threshold_boundary_disputed" in decision.pending_flags
-    else:
-        assert decision.pending_flags == []
+    assert decision.tier_provisional is False
+    assert decision.pending_flags == []
+
     expected_clause = (
-        "tier-ai-generated-2026"
-        if is_ai_generated
-        else "tier-live-action-2026"
+        "tier-ai-generated-2026" if is_ai_generated else "tier-live-action-2026"
     )
     assert decision.clause_ref == expected_clause
+
+
+def test_a_pack_can_still_declare_one_boundary_disputed():
+    """If a source really is ambiguous, the pack says so and only that edge
+    goes provisional. Nothing else moves."""
+
+    disputed = {
+        "thresholds_published": True,
+        "threshold_sets": {
+            "live_action": {
+                "T1_min_rmb": 3_000_000,
+                "T2_min_rmb": 1_000_000,
+                "disputed_boundaries": ["T1_min_rmb"],
+                "clause_ref": "tier-live-action-2026",
+            }
+        },
+    }
+
+    on_edge = judge_tier(
+        BudgetBand.UNKNOWN, disputed, True,
+        investment_amount_rmb=3_000_000, is_ai_generated=False,
+    )
+    assert on_edge.tier is Tier.T1
+    assert on_edge.tier_provisional is True
+    assert "threshold_boundary_disputed" in on_edge.pending_flags
+
+    other_edge = judge_tier(
+        BudgetBand.UNKNOWN, disputed, True,
+        investment_amount_rmb=1_000_000, is_ai_generated=False,
+    )
+    assert other_edge.tier_provisional is False
+    assert other_edge.pending_flags == []
 
 
 def test_exact_amount_without_generation_mode_stays_provisional():
@@ -368,16 +394,18 @@ def test_chain_stays_well_under_the_five_second_budget(
     assert time.perf_counter() - started < 5.0
 
 
-def test_an_amount_just_over_a_boundary_is_settled(snapshots):
-    """Only exact equality is disputed. One yuan over is not a judgement call."""
+def test_only_a_boundary_the_pack_disputes_is_flagged():
+    """Which edge is uncertain is policy data, not a rule in the code."""
 
     from core.classify.d1c import on_threshold_boundary
 
-    thresholds = {"T1_min_rmb": 3_000_000, "T2_min_rmb": 1_000_000}
-    assert on_threshold_boundary(3_000_000, thresholds) is True
-    assert on_threshold_boundary(3_000_001, thresholds) is False
-    assert on_threshold_boundary(2_999_999, thresholds) is False
-    assert on_threshold_boundary(1_000_000, thresholds) is True
+    quiet = {"T1_min_rmb": 3_000_000, "T2_min_rmb": 1_000_000}
+    assert on_threshold_boundary(3_000_000, quiet) is False
+
+    noisy = {**quiet, "disputed_boundaries": ["T1_min_rmb"]}
+    assert on_threshold_boundary(3_000_000, noisy) is True
+    assert on_threshold_boundary(3_000_001, noisy) is False
+    assert on_threshold_boundary(1_000_000, noisy) is False
 
 
 def test_confirmed_subject_rules_settle_the_tier(intent_crime, channels):
@@ -426,4 +454,75 @@ def test_confirmed_subject_rules_settle_the_tier(intent_crime, channels):
 
     assert classification.special_subject_hit is True
     assert classification.tier_provisional is False
-    assert "subject_disposal_unconfirmed" not in classification.pending_flags
+    assert "subject_match_unconfirmed" not in classification.pending_flags
+
+
+# ------------- 广电办发〔2024〕35号: 重点微短剧 is any one of four conditions
+
+
+def test_platform_promotion_makes_a_small_drama_a_key_drama():
+    """A 300,000 RMB ordinary drama on a platform front page is 重点微短剧.
+
+    35号 lists 「长短视频平台招商主推或在各终端首页首屏推荐播出」 as one of the
+    four alternative conditions. On amount alone this project is T3.
+    """
+
+    decision = judge_tier(
+        BudgetBand.UNKNOWN,
+        PUBLISHED_THRESHOLD_PACK,
+        True,
+        investment_amount_rmb=300_000,
+        is_ai_generated=False,
+        platform_promoted=True,
+    )
+
+    assert decision.tier is Tier.T1
+    assert decision.tier_provisional is False
+    assert "tier.platform_promoted" in decision.reasons
+
+
+def test_declaring_voluntarily_makes_it_a_key_drama():
+    """「自愿按重点微短剧申报」 is also enough on its own."""
+
+    decision = judge_tier(
+        BudgetBand.UNKNOWN,
+        PUBLISHED_THRESHOLD_PACK,
+        True,
+        investment_amount_rmb=50_000,
+        is_ai_generated=True,
+        voluntary_key_declaration=True,
+    )
+
+    assert decision.tier is Tier.T1
+    assert "tier.voluntary_key_declaration" in decision.reasons
+
+
+def test_neither_condition_leaves_the_amount_in_charge():
+    """Unanswered or false must not quietly promote a project."""
+
+    for promoted, voluntary in ((None, None), (False, False)):
+        decision = judge_tier(
+            BudgetBand.UNKNOWN,
+            PUBLISHED_THRESHOLD_PACK,
+            True,
+            investment_amount_rmb=300_000,
+            is_ai_generated=False,
+            platform_promoted=promoted,
+            voluntary_key_declaration=voluntary,
+        )
+        assert decision.tier is Tier.T3, (promoted, voluntary)
+
+
+def test_the_condition_beats_the_amount_not_the_other_way_round():
+    """Any one condition is enough, so a large amount cannot cancel it out."""
+
+    decision = judge_tier(
+        BudgetBand.UNKNOWN,
+        PUBLISHED_THRESHOLD_PACK,
+        True,
+        investment_amount_rmb=5_000_000,
+        is_ai_generated=False,
+        platform_promoted=True,
+    )
+    assert decision.tier is Tier.T1
+    assert "tier.key_drama_by_condition" in decision.reasons

@@ -138,5 +138,8 @@
   "license.reason.foreign": "The entry records foreign investment.",
   "institution.load_demo_admin_only": "Only an administrator can load the demo registry. Switch the role above to Admin.",
   "finding.line": "line",
-  "finding.matching_lines": "matching lines"
+  "finding.matching_lines": "matching lines",
+  "wizard.platform_promoted": "Platform will feature it (招商主推 or 首页首屏推荐)",
+  "wizard.voluntary_key": "Declaring voluntarily as a key micro-drama 重点微短剧",
+  "wizard.key_conditions_note": "Either of these makes a project 重点微短剧 on its own, whatever the investment amount — 广电办发〔2024〕35号."
 }

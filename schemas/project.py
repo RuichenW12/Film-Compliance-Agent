@@ -28,6 +28,10 @@ class IntentProfile(DomainModel):
     investment_amount_rmb: int | None = Field(default=None, ge=0)
     is_ai_generated: bool | None = None
     has_finished_film: bool | None = None
+    # 广电办发〔2024〕35号 makes 重点微短剧 any one of four conditions. Amount and
+    # special subject were already modelled; these are the other two.
+    platform_promoted: bool | None = None
+    voluntary_key_declaration: bool | None = None
     source: str = "user_stated"
 
     def missing_fields(self) -> list[str]:
