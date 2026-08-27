@@ -141,5 +141,6 @@
   "finding.matching_lines": "matching lines",
   "wizard.platform_promoted": "Platform will feature it (招商主推 or 首页首屏推荐)",
   "wizard.voluntary_key": "Declaring voluntarily as a key micro-drama 重点微短剧",
-  "wizard.key_conditions_note": "Either of these makes a project 重点微短剧 on its own, whatever the investment amount — 广电办发〔2024〕35号."
+  "wizard.key_conditions_note": "Either of these makes a project 重点微短剧 on its own, whatever the investment amount — 广电办发〔2024〕35号.",
+  "flag.clause_not_yet_in_force": "This result cites 《微短剧发展管理办法》, which takes effect on 2026-09-01. It is not yet in force."
 }

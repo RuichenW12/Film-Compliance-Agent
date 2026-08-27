@@ -42,6 +42,7 @@ status becomes `Superseded by D-0xx`. That way the reasoning trail survives.
 | [D-026](#d-026) | Shared | Final amount tiers require amount, mode, and usable thresholds | Accepted |
 | [D-026](#d-026) | Shared | A disputed policy reading is reported provisional, never settled | Narrowed 2026-08-26 by [D-027](#d-027) |
 | [D-027](#d-027) | Shared | 广电办发〔2024〕35号 settles two readings and adds two tier triggers | Accepted |
+| [D-028](#d-028) | Shared | A clause carries its own document's effective date | Accepted |
 
 ---
 
@@ -916,3 +917,55 @@ project.
 
 Revisit when M-001 arrives: it may restate these conditions, and if the 2026
 adjustment changed them, this is where it shows.
+
+## D-028
+
+**A clause carries its own document's effective date** · Area: Shared · Status: Accepted · 2026-08-26
+
+The snapshot's `effective_from` said 2026-08-26 while 微短剧发展管理办法 — the
+document `p1`, `p2` and `p6` are built from — takes effect **2026-09-01**. The
+obvious fix is to change the snapshot date to match. It breaks the product:
+
+```
+effective_from: 2026-09-01  ->  latest_version() raises SNAPSHOT_NOT_FOUND
+```
+
+`SnapshotService.latest_version()` only considers snapshots whose
+`effective_from` has passed, so a future-dated snapshot cannot be selected and
+nothing classifies until that date. Verified rather than assumed.
+
+The two fields answer different questions:
+
+- **snapshot `effective_from`** — from when may this snapshot be used at all;
+- **a clause's effective date** — from when does the provision itself apply.
+
+One snapshot legitimately holds both: the tier thresholds have applied since
+2026-01-01 and 2026-07-01, while Order 16 applies from 2026-09-01. A single
+snapshot-level date cannot be true for all of them, which is why the conflict
+looked like a mistake and was not one.
+
+`Clause` therefore gains an optional `effective_from` and an `in_force(as_of)`
+that returns `None` when the date is unknown — unknown is not the same as
+already in force, the same distinction the licence check draws in
+[D-023](#d-023). The seeds record the dates their own sources state.
+
+A classification whose evidence cites a provision not yet in force now carries
+`clause_not_yet_in_force`, and the UI says which document and from when in plain
+language rather than showing a flag name.
+
+The check runs once over the finished classification rather than in each branch
+of the chain. Each branch cites different clauses, and the first attempt at this
+only inspected the subject rules — which meant a project citing a tier clause
+was silently unflagged. A rule only some paths honour is not a rule.
+
+**What this does not do:** it does not stop the product applying a
+not-yet-effective provision. On 2026-08-27 the definition of a micro-drama is
+Order 16's, five days early. That is a deliberate limit — the output is an
+advisory pre-check, the alternative is refusing to classify at all for five
+days, and the flag makes the situation visible. Revisit if a future snapshot
+carries a provision months rather than days away, where continuing to apply it
+would be harder to defend.
+
+There was already a `Regime` enum with `CURRENT` and `FROM_2026_09_01`, unused
+and unwired. It is left alone: a date on the clause is the fact that is actually
+true, while an enum member naming one specific date will age badly.

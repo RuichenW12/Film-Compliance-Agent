@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from datetime import datetime
+
 from enum import StrEnum
 from typing import Annotated, Any, Literal
 
@@ -174,10 +176,30 @@ class PolicyOutbox(ContractModel):
 
 
 class Clause(ContractModel):
+    """One cited provision, and the date its own document takes effect.
+
+    `effective_from` is a property of the source, not of the snapshot. A single
+    snapshot can carry clauses from documents that come into force on different
+    dates — 微短剧发展管理办法 applies from 2026-09-01 while the tier thresholds
+    have applied since 2026-01-01 — and the snapshot's own `effective_from`
+    answers a different question: from when may this snapshot be used at all.
+
+    Optional, because most clauses in the seed predate the distinction and a
+    missing date means "not recorded", never "already in force".
+    """
+
     clause_id: str = Field(min_length=1)
     title: str = Field(min_length=1)
     text: str = Field(min_length=1)
     source_url: str = Field(pattern=r"^https://")
+    effective_from: AwareDatetime | None = None
+
+    def in_force(self, as_of: datetime) -> bool | None:
+        """None when the date is unknown: unknown is not the same as in force."""
+
+        if self.effective_from is None:
+            return None
+        return self.effective_from <= as_of
 
 
 class RecalcTierRequest(ContractModel):

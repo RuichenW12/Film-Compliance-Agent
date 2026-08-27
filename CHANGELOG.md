@@ -22,6 +22,37 @@ Conventions:
 
 ## 2026-08-26
 
+### Shared — a clause carries its own document's effective date
+
+- The snapshot said `effective_from: 2026-08-26` while 微短剧发展管理办法 takes
+  effect **2026-09-01**. Changing the snapshot date to match **breaks the
+  product**: `latest_version()` only selects snapshots whose date has passed, so
+  a future-dated snapshot means nothing classifies at all. Verified, not assumed.
+- The two dates answer different questions, and one snapshot legitimately holds
+  both — the tier thresholds have applied since January and July, Order 16
+  applies from September. `Clause` gains an optional `effective_from` and
+  `in_force(as_of)`, which returns `None` for an unknown date: unknown is not
+  already in force. Both seeds now record the dates their sources state.
+- A classification citing a provision not yet in force carries
+  `clause_not_yet_in_force`, and the wizard says which document and from when in
+  plain language. The check runs once over the finished classification — the
+  first attempt only inspected the subject rules, so a project citing a tier
+  clause went silently unflagged.
+- **This does not stop the product applying a not-yet-effective provision**, and
+  says so: the output is advisory, the alternative is refusing to classify for
+  five days, and the flag makes it visible. Reasoning and the revisit condition
+  in [D-028](docs/decisions.md#d-028).
+- **B:** this adds one optional field to `schemas/policy_snapshot.py::Clause`
+  and dates the clauses in both seeds. The frozen archive copy was re-materialised
+  with `scripts/materialize_policy_snapshot_v2.py`, and its integrity test caught
+  the drift before I did.
+
+Verified: `python -m pytest` — 436 passed, 3 skipped, 4 new;
+`npm --prefix web test` — 24 passed; `npm --prefix web run build`. Live against a
+running API: a classification citing `nrta-order-16-article-5` comes back with
+`clause_not_yet_in_force` among its flags.
+
+
 ### Shared — 广电办发〔2024〕35号 corrects two readings and adds two tier triggers
 
 The original 35号 arrived in the policy library, and reading it changed three

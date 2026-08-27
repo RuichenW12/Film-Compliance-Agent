@@ -141,5 +141,6 @@
   "finding.matching_lines": "命中行",
   "wizard.platform_promoted": "平台招商主推或首页首屏推荐播出",
   "wizard.voluntary_key": "自愿按重点微短剧申报",
-  "wizard.key_conditions_note": "以上任一条件成立，即按重点微短剧处理，与投资额无关——广电办发〔2024〕35号。"
+  "wizard.key_conditions_note": "以上任一条件成立，即按重点微短剧处理，与投资额无关——广电办发〔2024〕35号。",
+  "flag.clause_not_yet_in_force": "本结果引用了《微短剧发展管理办法》，该办法自 2026 年 9 月 1 日起施行，目前尚未生效。"
 }

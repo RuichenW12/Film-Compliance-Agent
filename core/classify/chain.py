@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from datetime import datetime, timezone
+
+from dataclasses import dataclass, field, replace
 
 from schemas.common import EvidenceRef, SourceRef
 from schemas.enums import (
@@ -17,7 +19,7 @@ from schemas.enums import (
 from schemas.findings import Alert, AlertChoice, AlertDept
 from schemas.policy_snapshot import PackName
 from schemas.project import ChannelProfile, Classification, IntentProfile
-from schemas.snapshot import SnapshotService
+from schemas.snapshot import SnapshotNotFoundError, SnapshotService
 
 from ..llm import LLMClient
 from .d1a import judge_form_type
@@ -110,6 +112,33 @@ def _intent_facts(intent: IntentProfile) -> list[ProposedFact]:
     return facts
 
 
+def clauses_not_yet_in_force(
+    snapshots: SnapshotService, version: str, clause_ids, as_of: datetime
+) -> list[str]:
+    """Which cited clauses take effect after `as_of`.
+
+    A snapshot may legitimately carry clauses from documents with different
+    effective dates: the tier thresholds have applied since January, while
+    微短剧发展管理办法 applies from 2026-09-01. The snapshot's own
+    `effective_from` answers a different question — from when the snapshot may
+    be used — so it cannot express this, and a classification that rests on a
+    provision not yet in force should say so rather than read as settled law.
+
+    A clause with no recorded date is not reported: unknown is not the same as
+    future-dated. See D-028.
+    """
+
+    future: list[str] = []
+    for clause_id in clause_ids:
+        try:
+            clause = snapshots.clause(clause_id, version)
+        except (SnapshotNotFoundError, KeyError):
+            continue
+        if clause.in_force(as_of) is False:
+            future.append(clause_id)
+    return sorted(set(future))
+
+
 def _edge_alert(dept: dict | None) -> Alert:
     mapping = dept or {}
     return Alert(
@@ -140,6 +169,55 @@ def _edge_alert(dept: dict | None) -> Alert:
 
 
 def classify(
+    intent: IntentProfile,
+    channels: ChannelProfile,
+    snapshots: SnapshotService,
+    *,
+    llm: LLMClient | None = None,
+    snapshot_version: str | None = None,
+    thresholds_published: bool | None = None,
+) -> ClassificationOutcome:
+    """Run the chain, then say whether it rested on a provision not yet in force.
+
+    The check sits here rather than in each branch because every branch cites
+    different clauses, and a rule that only some paths honour is not a rule.
+    See D-028.
+    """
+
+    outcome = _classify(
+        intent,
+        channels,
+        snapshots,
+        llm=llm,
+        snapshot_version=snapshot_version,
+        thresholds_published=thresholds_published,
+    )
+    classification = outcome.classification
+    if classification is None:
+        return outcome
+
+    future = clauses_not_yet_in_force(
+        snapshots,
+        classification.policy_snapshot_version,
+        [ref.clause_id for ref in classification.evidence_refs],
+        datetime.now(timezone.utc),
+    )
+    if not future:
+        return outcome
+
+    return replace(
+        outcome,
+        classification=classification.model_copy(
+            update={
+                "pending_flags": sorted(
+                    {*classification.pending_flags, "clause_not_yet_in_force"}
+                )
+            }
+        ),
+    )
+
+
+def _classify(
     intent: IntentProfile,
     channels: ChannelProfile,
     snapshots: SnapshotService,
