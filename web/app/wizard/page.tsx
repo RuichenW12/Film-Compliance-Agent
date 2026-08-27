@@ -39,6 +39,10 @@ export default function WizardPage() {
   const [budgetBand, setBudgetBand] = useState<BudgetBand>("band_b");
   const [investmentAmount, setInvestmentAmount] = useState("");
   const [isAiGenerated, setIsAiGenerated] = useState(true);
+  // 广电办发〔2024〕35号: platform promotion and voluntary declaration each make
+  // a project 重点微短剧 on their own, whatever the investment amount says.
+  const [platformPromoted, setPlatformPromoted] = useState(false);
+  const [voluntaryKey, setVoluntaryKey] = useState(false);
   const [platforms, setPlatforms] = useState("hongguo,douyin");
 
   const [busy, setBusy] = useState(false);
@@ -73,7 +77,9 @@ export default function WizardPage() {
           ...(investmentAmount === ""
             ? {}
             : { investment_amount_rmb: Number(investmentAmount) }),
-          is_ai_generated: isAiGenerated
+          is_ai_generated: isAiGenerated,
+          platform_promoted: platformPromoted,
+          voluntary_key_declaration: voluntaryKey
         })
       });
 
@@ -175,6 +181,23 @@ export default function WizardPage() {
             onChange={(event) => setIsAiGenerated(event.target.checked)}
           />
         </label>
+        <label>
+          <span>{t("wizard.platform_promoted")}</span>
+          <input
+            type="checkbox"
+            checked={platformPromoted}
+            onChange={(event) => setPlatformPromoted(event.target.checked)}
+          />
+        </label>
+        <label>
+          <span>{t("wizard.voluntary_key")}</span>
+          <input
+            type="checkbox"
+            checked={voluntaryKey}
+            onChange={(event) => setVoluntaryKey(event.target.checked)}
+          />
+        </label>
+        <p className="muted">{t("wizard.key_conditions_note")}</p>
         <h2>{t("wizard.channels.title")}</h2>
         <label>
           <span>Domestic platforms</span>

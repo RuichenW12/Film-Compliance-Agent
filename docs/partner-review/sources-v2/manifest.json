@@ -1,0 +1,295 @@
+{
+  "archive_version": 2,
+  "generated_at": "2026-08-26T23:37:00+08:00",
+  "snapshot_version": "v2",
+  "snapshot_status": "mock_verified",
+  "status_note": "Official source status and product mapping review status are tracked separately.",
+  "sources": [
+    {
+      "source_id": "SRC-001",
+      "title": "国家广播电视总局令第16号：《微短剧发展管理办法》",
+      "url": "https://www.nrta.gov.cn/art/2026/7/31/art_113_73785.html",
+      "publisher": "国家广播电视总局",
+      "source_status": "official_primary",
+      "mapping_status": "mock_pending_human_review",
+      "effective_from": "2026-09-01T00:00:00+08:00",
+      "files": [
+        {
+          "path": "raw/SRC-001-nrta-order-16.html",
+          "sha256": "04c2b294cd306d4e53b4248d6cd50e55c9db8bafabfbebe598dbed850b67bae8"
+        },
+        {
+          "path": "text/SRC-001-nrta-order-16.txt",
+          "sha256": "026da9f20e36093e357fadb466fa9698aecd5ed92a51ea788c2210b3d6a4773e"
+        },
+        {
+          "path": "metadata/SRC-001-nrta-order-16.headers.txt",
+          "sha256": "f9d70ba8e71d0c5b312270ebb20797e13a309fc014ae2c0f5b488c51d71787b1"
+        }
+      ],
+      "notes": [
+        "第十四、十七、十九、二十条用于 p4/p5/p6。",
+        "2026-09-01 前仅作为未来制度联调候选。"
+      ]
+    },
+    {
+      "source_id": "SRC-002",
+      "title": "调整微短剧分类分层标准",
+      "url": "https://whhlyj.baoji.gov.cn/zzzb/xygl/202601/t20260115_1240723.html",
+      "publisher": "宝鸡市文化和旅游局",
+      "source_status": "official_government_republication",
+      "mapping_status": "mock_pending_primary_source_and_human_review",
+      "files": [
+        {
+          "path": "raw/SRC-002-baoji-live-thresholds.html",
+          "sha256": "c267b239f96ba8fa9f91882f8effc4d8931fe8bf9995f6c4d5b072c86e9d30c2"
+        },
+        {
+          "path": "text/SRC-002-baoji-live-thresholds.txt",
+          "sha256": "6a65ebde4bfb4f72f0cd65a2960cc736f8b7cce735984dae24a18fdd481cb938"
+        },
+        {
+          "path": "metadata/SRC-002-baoji-live-thresholds.headers.txt",
+          "sha256": "2e5db6fb29dbaa9909651efe6c9d2b6689898935fb90b59063cbce28bbe0dd77"
+        }
+      ],
+      "notes": [
+        "未附总局原始通知。",
+        "页面对 300 万元等号边界表述不一致。"
+      ]
+    },
+    {
+      "source_id": "SRC-003",
+      "title": "广电总局发布AI微短剧分类分层标准",
+      "url": "https://wxb.xzdw.gov.cn/wlcb/cbgz/202606/t20260626_680352.html",
+      "publisher": "西藏自治区网信办",
+      "source_status": "official_government_republication",
+      "mapping_status": "mock_pending_primary_source_and_human_review",
+      "files": [
+        {
+          "path": "raw/SRC-003-tibet-ai-thresholds.html",
+          "sha256": "0c52c1944346047fd8b77fcf7000ca5bb814549b830d8920f2ce8f69b8813315"
+        },
+        {
+          "path": "text/SRC-003-tibet-ai-thresholds.txt",
+          "sha256": "35292f98f5636d52757740ae08c3285e6f941fb06b2fe4077732fa4841e31097"
+        },
+        {
+          "path": "metadata/SRC-003-tibet-ai-thresholds.headers.txt",
+          "sha256": "fca9678b83ef817c8885ff94317f8fc26be604ef351fd3b155e491e5c14b6258"
+        }
+      ],
+      "notes": [
+        "未附总局原始管理提示。",
+        "80/30 万元继续仅作联调候选。"
+      ]
+    },
+    {
+      "source_id": "SRC-004",
+      "title": "国家广播电视总局办公厅关于国产网络剧片发行许可服务管理有关事项的通知（广电发〔2022〕128号）",
+      "url": "https://www.beijing.gov.cn/zhengce/zhengcefagui/qtwj/202307/W020230731337679393399.pdf",
+      "publisher": "国家广播电视总局办公厅（北京市政府归档）",
+      "source_status": "official_document_archive",
+      "mapping_status": "historical_context_only",
+      "files": [
+        {
+          "path": "authoritative/SRC-004-nrta-2022-128.pdf",
+          "sha256": "091b8c8ed9d420ad273057e7d37aa1f88fe3dedfd4af38942bf5618cc0c26e86"
+        }
+      ],
+      "notes": [
+        "正式 PDF；用于制度沿革，不覆盖 2026 年第16号令。"
+      ]
+    },
+    {
+      "source_id": "SRC-005",
+      "title": "上海市松江区微短剧依法经营指引",
+      "url": "https://www.songjiang.gov.cn/shsj_main/bb30c2b5-49f3-477c-8799-3a6590544678/85c416b7-6e20-42a2-9aeb-495e03f2a7b1/20251219%E4%B8%8A%E6%B5%B7%E5%B8%82%E6%9D%BE%E6%B1%9F%E5%8C%BA%E5%BE%AE%E7%9F%AD%E5%89%A7%E4%BE%9D%E6%B3%95%E7%BB%8F%E8%90%A5%E6%8C%87%E5%BC%95.pdf",
+      "publisher": "上海市松江区人民政府",
+      "source_status": "official_local_guide",
+      "mapping_status": "field_reference_pending_human_review",
+      "jurisdiction": "CN-SH-Songjiang",
+      "files": [
+        {
+          "path": "authoritative/SRC-005-songjiang-microdrama-guide.pdf",
+          "sha256": "f715a0851d822a47b5d158948bb9e7487ce2fee05725653a8842a258c9135ec0"
+        }
+      ],
+      "notes": [
+        "57页完整 PDF。",
+        "字段/流程可参考；其中 100/30 万元旧门槛不得进入 p3。"
+      ]
+    },
+    {
+      "source_id": "SRC-006",
+      "title": "上海一网通办：国产网络剧片规划备案",
+      "url": "https://zwdt.sh.gov.cn/govPortals/bsfw/item/54c4cbb1-2bcb-4d42-94c7-42ff0651a6e8",
+      "publisher": "上海市文化和旅游局",
+      "source_status": "official_current_service_page",
+      "mapping_status": "jurisdiction_reference_pending_human_review",
+      "jurisdiction": "CN-SH",
+      "files": [
+        {
+          "path": "authoritative/SRC-006-shanghai-planning-service.html",
+          "sha256": "a11c63395cdb37358713fb8c113f2e55f6e76fa320ba2ebb3def1167d2e62242"
+        }
+      ],
+      "notes": [
+        "规划信息表为系统填报后生成。",
+        "公开规划备案承诺书模板。"
+      ]
+    },
+    {
+      "source_id": "SRC-007",
+      "title": "上海一网通办：国产网络剧片内容审查",
+      "url": "https://zwdt.sh.gov.cn/govPortals/bsfw/item/0e044fff-da40-425a-9bf9-faed54a3bf1c",
+      "publisher": "上海市文化和旅游局",
+      "source_status": "official_current_service_page",
+      "mapping_status": "jurisdiction_reference_pending_human_review",
+      "jurisdiction": "CN-SH",
+      "files": [
+        {
+          "path": "authoritative/SRC-007-shanghai-content-review-service.html",
+          "sha256": "1d5c5499bd54a83a65d15b7caad7bd9ac7478d3b98c31ac9859731a3712fb53f"
+        }
+      ],
+      "notes": [
+        "列出完成片、字幕表、承诺书、分集梗概、成本比例、演员合同及条件性材料。"
+      ]
+    },
+    {
+      "source_id": "SRC-008",
+      "title": "北京市政务服务网：重点网络影视剧备案",
+      "url": "https://banshi.beijing.gov.cn/pubtask/task/1/110000000000/87cdb786-ae6e-404f-82ad-9611b26b844e.html",
+      "publisher": "北京市政务服务管理局",
+      "source_status": "official_current_service_page",
+      "mapping_status": "cross_jurisdiction_reference_only",
+      "jurisdiction": "CN-BJ",
+      "files": [
+        {
+          "path": "authoritative/SRC-008-beijing-filing-service.html",
+          "sha256": "472f7e85d26bafc6c57f79c04a79b18261bbfa2c2b269da8be97a1ba133ddb2f"
+        }
+      ]
+    },
+    {
+      "source_id": "SRC-009",
+      "title": "北京市重点网络影视剧备案办理流程图",
+      "url": "https://banshi.beijing.gov.cn/pubtask/download/995b044e-47c3-4ca6-9bfd-a7b60087fe47.pdf",
+      "publisher": "北京市政务服务管理局",
+      "source_status": "official_workflow_attachment",
+      "mapping_status": "cross_jurisdiction_reference_only",
+      "jurisdiction": "CN-BJ",
+      "files": [
+        {
+          "path": "authoritative/SRC-009-beijing-workflow.pdf",
+          "sha256": "9e1aee7e5136b6f0cfae504b039bc1672d473690ab09e2bc441c939780ec8a82"
+        }
+      ]
+    },
+    {
+      "source_id": "SRC-010",
+      "title": "重点网络影视剧如何申请规划备案？",
+      "url": "https://gbdsj.gd.gov.cn/dawenku/gb/content/post_4845794.html",
+      "publisher": "广东省广播电视局",
+      "source_status": "official_current_faq",
+      "mapping_status": "cross_jurisdiction_reference_only",
+      "jurisdiction": "CN-GD",
+      "files": [
+        {
+          "path": "authoritative/SRC-010-guangdong-planning-faq.html",
+          "sha256": "b6c0d20d775281976f513a128427fd51f38aeb43ca538f73b31637718bdc114c"
+        }
+      ]
+    },
+    {
+      "source_id": "FORM-001",
+      "title": "规划备案承诺书示例样表",
+      "url": "https://zwdt.sh.gov.cn/group1/M00/CC/E6/rBJ9Jml6LX6AGIdtAAAyYj2rM_g43.docx?attname=%E7%A4%BA%E4%BE%8B%E6%A0%B7%E8%A1%A8.docx",
+      "publisher": "上海一网通办",
+      "source_status": "official_public_example_form",
+      "mapping_status": "jurisdiction_reference_pending_human_review",
+      "files": [
+        {
+          "path": "forms/FORM-001-planning-commitment-example.docx",
+          "sha256": "a7c3927137154ea95ccfd608895dd310567c1537d6ab4fdd4a50a4b9cde02fcf"
+        }
+      ]
+    },
+    {
+      "source_id": "FORM-002",
+      "title": "规划备案承诺书空白表格",
+      "url": "https://zwdt.sh.gov.cn/group1/M00/CC/E6/rBJ9Jml6LX2AZFXlAAAxi-E2jvA24.docx?attname=%E7%A9%BA%E7%99%BD%E8%A1%A8%E6%A0%BC.docx",
+      "publisher": "上海一网通办",
+      "source_status": "official_public_blank_form",
+      "mapping_status": "jurisdiction_reference_pending_human_review",
+      "files": [
+        {
+          "path": "forms/FORM-002-planning-commitment-blank.docx",
+          "sha256": "064d30a2eb806319ddbd89a27030865e74a2e2dbf82986d8eda441069f832fb0"
+        }
+      ]
+    },
+    {
+      "source_id": "FORM-003",
+      "title": "重点网络影视剧成本配置比例情况报告空白表格",
+      "url": "https://zwdt.sh.gov.cn/group1/M00/CC/E6/rBJ9Jml6LX-ARha8AAA9Q15KDX832.docx?attname=%E7%A9%BA%E7%99%BD%E8%A1%A8%E6%A0%BC.docx",
+      "publisher": "上海一网通办",
+      "source_status": "official_public_blank_form",
+      "mapping_status": "jurisdiction_reference_pending_human_review",
+      "files": [
+        {
+          "path": "forms/FORM-003-cost-ratio-report-blank.docx",
+          "sha256": "2f9690e4300b5b96a03d390686923e0fed55151427f402615183f87de90a9f1a"
+        }
+      ]
+    },
+    {
+      "source_id": "REF-001",
+      "title": "T/CEAP 1—2025 微短剧创作生产及内容审核技术规范",
+      "url": "https://m.tvoao.com/userfiles/files/%E3%80%8A%E5%BE%AE%E7%9F%AD%E5%89%A7%E5%88%9B%E4%BD%9C%E7%94%9F%E4%BA%A7%E5%8F%8A%E5%86%85%E5%AE%B9%E5%AE%A1%E6%A0%B8%E6%8A%80%E6%9C%AF%E8%A7%84%E8%8C%83%E3%80%8B.pdf",
+      "publisher": "中国民族影视艺术发展促进会",
+      "source_status": "group_standard_reference_only",
+      "mapping_status": "archived_reference_only",
+      "acquisition": "user_manual_browser_download",
+      "files": [
+        {
+          "path": "reference-only/REF-001-ceap-microdrama-standard.pdf",
+          "sha256": "757691f79dd21e83b98275f490d3adbff51c1a069a35e3f398e17bd77543cac2",
+          "pages": 22
+        }
+      ],
+      "notes": [
+        "非行政法规且沿用旧门槛。",
+        "自动下载时来源站 TLS 证书链校验失败；文件由用户通过浏览器手动下载。",
+        "已验证 PDF 签名、页树、首尾文本，并抽查封面、正文、附录和末页渲染。"
+      ]
+    },
+    {
+      "source_id": "REF-002",
+      "title": "网络视听节目内容审核通则",
+      "url": "https://www.cnsa.cn/art/2017/6/30/art_1505_26038.html",
+      "publisher": "中国网络视听节目服务协会",
+      "source_status": "industry_self_regulation_reference_only",
+      "mapping_status": "archived_reference_only",
+      "acquisition": "user_manual_browser_print_to_pdf",
+      "files": [
+        {
+          "path": "reference-only/REF-002-cnsa-content-review-standard.pdf",
+          "sha256": "92db55d97b6247420962a7ed64b15f5723166ddf676dcb4bca80157afb99344f",
+          "pages": 5
+        }
+      ],
+      "notes": [
+        "行业自律规范，不是行政法规。",
+        "自动下载时来源站 TLS 证书校验失败；文件由用户通过浏览器打印为 PDF。",
+        "该文件是官方网页的浏览器打印件，不是协会发布的原生 PDF；已检查全部五页渲染及首尾文本。"
+      ]
+    }
+  ],
+  "snapshot_materialized_at": "2026-08-26T23:15:00+08:00",
+  "snapshot_file": {
+    "path": "snapshot/seed-snapshot-v2.yaml",
+    "sha256": "3c82e4f371791ffc1a08aada74d77a960fcb83683db630d07f8e26bb79951d8c"
+  }
+}

@@ -211,17 +211,20 @@ def classify(
     ]
 
     if subject.special_subject_hit:
-        # The strict operational reading is T1 plus co-review. The cited article
-        # is narrower: the authority consults when it considers it necessary, so
-        # a hit is a strong indication rather than a settled tier. While the
-        # rules that produced the hit are themselves unconfirmed, the tier is
-        # reported provisional with a flag, and the co-review requirement is
-        # kept because it is the safer of the two readings for a creator to plan
-        # around. See D-026.
+        # T1 plus co-review had looked stronger than its source: Order 16
+        # article 14 has the authority consult only when it considers it
+        # necessary. 广电办发〔2024〕35号 then turned up and is explicit —
+        # 特殊题材的微短剧「按有关协审工作机制落实审核要求」 — so the disposal
+        # itself is well founded and no longer flagged.
+        #
+        # What stays provisional is narrower and still true: the trigger
+        # vocabulary that decided this scene *is* special subject was written by
+        # this codebase, not by a regulator. The tier rests on that match.
+        # See D-026 and D-002.
         rules_unconfirmed = subject.expert_pending
         subject_flags = [
             *pending_flags,
-            *(["subject_disposal_unconfirmed"] if rules_unconfirmed else []),
+            *(["subject_match_unconfirmed"] if rules_unconfirmed else []),
         ]
         classification = Classification(
             form_type=FormType.MICRO_DRAMA,
@@ -274,6 +277,8 @@ def classify(
         thresholds_published,
         investment_amount_rmb=intent.investment_amount_rmb,
         is_ai_generated=intent.is_ai_generated,
+        platform_promoted=intent.platform_promoted,
+        voluntary_key_declaration=intent.voluntary_key_declaration,
     )
     tier_clause_id = tier_decision.clause_ref or TIER_CLAUSE_ID
     classification = Classification(

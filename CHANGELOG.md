@@ -22,6 +22,50 @@ Conventions:
 
 ## 2026-08-26
 
+### Shared — 广电办发〔2024〕35号 corrects two readings and adds two tier triggers
+
+The original 35号 arrived in the policy library, and reading it changed three
+things. Two are corrections to [D-026](docs/decisions.md#d-026), written a day
+earlier on weaker evidence. Reasoning in
+[D-027](docs/decisions.md#d-027).
+
+- **重点微短剧 has four triggers and two were missing.** 35号 defines it as
+  meeting *any one* of: special subject, the investment threshold, **platform
+  promotion or front-page placement**, and **voluntary declaration**. A 300,000
+  RMB ordinary drama on a platform front page is a 重点微短剧; the product
+  called it T3 on amount alone. `IntentProfile` gains `platform_promoted` and
+  `voluntary_key_declaration`, the wizard asks both, and either alone returns T1
+  without consulting the amount. Unanswered is never treated as true.
+- **The threshold boundary is not disputed after all.** 35号 writes
+  「达到100万元及以上」 and 「30万元（含）—100万元之间」; the 2026 adjustment uses
+  the same pattern and the AI standard has no variant. D-026 flagged every
+  equality on the strength of one republished page, which marked the AI
+  thresholds uncertain when their source is clear. A threshold set may now carry
+  `disputed_boundaries`, and nothing is flagged unless the policy data says so.
+- **The special-subject disposal is well founded.** 35号 says 特殊题材 follows
+  the 协审工作机制 explicitly, so that is no longer flagged. The remaining
+  provisional marking is renamed `subject_match_unconfirmed`, because what is
+  unconfirmed is the keyword match, not the disposal.
+
+### Shared — one policy library, and a stray wheel removed
+
+- Added `docs/policy-library/`: the deduplicated set of documents the product's
+  policy claims rest on, with `MISSING.md` listing what is still needed and
+  where to look for it. Newly archived: **广电办发〔2024〕35号**, 总局令第63号
+  《电视剧内容管理规定》, and 《网络短视频内容审核标准细则（2021）》.
+- Two documents were already archived as scraped HTML or as a scan; the library
+  keeps the official PDF and the copy with a text layer instead. Documents that
+  exist unchanged in `docs/partner-review/sources-v2/` are **referenced, not
+  copied** — that directory is frozen and has its own integrity tests, so the
+  manifest is a single index rather than a second copy.
+- Removed `httpx2check/httpx2-2.12.0-py3-none-any.whl`, a 93 KB wheel checked in
+  during the `httpx2`-vs-`httpx` investigation. The finding is recorded in the
+  CHANGELOG and the status note; the wheel itself served nothing.
+
+Verified: `python -m pytest` — 432 passed, 3 skipped;
+`npm --prefix web run build`.
+
+
 ### Shared — two disputed policy readings stop being reported as settled
 
 Verifying the v2 source archive turned up two places where the product asserted

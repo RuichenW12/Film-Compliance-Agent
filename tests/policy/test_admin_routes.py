@@ -79,7 +79,7 @@ def test_seed_snapshot_is_listed(api_client: TestClient) -> None:
     assert response.json() == [
         {
             "version": "v2",
-            "published_at": "2026-08-26T00:05:00+08:00",
+            "published_at": "2026-08-26T23:15:00+08:00",
             "effective_from": "2026-08-26T00:00:00+08:00",
             "published_by": "mock_seed",
             "thresholds_published": True,

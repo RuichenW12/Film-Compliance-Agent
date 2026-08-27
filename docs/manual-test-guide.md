@@ -105,8 +105,9 @@ The empty card list and stepless roadmap are correct. The `p4` and `p5` policy
 packs have no content, and the product shows the gap rather than inventing a
 plan. See D-016 and D-017 in `docs/decisions.md`.
 
-**Upload a script.** Make a `.txt` file with a couple of lines, kind `script`,
-**Upload**.
+**Upload a script and a synopsis.** Ready-made files are in
+[`docs/sample-uploads/`](sample-uploads/README.md) — `synopsis.txt` and
+`script.txt`. Upload each with its matching **Kind**.
 
 Expect a version row: an `av_…` id, a real sha256, and **`first version`** under
 *Previous version*. Upload a second, different file and the new row should show
@@ -120,8 +121,21 @@ was extracted. This is not a clean result."*
 **This is the most important check on the page.** An empty result that looked
 like success would be the product implying your document contained nothing.
 
-**Click Confirm roadmap.** The badge should read `confirmed`, and the amber
-warning should stay — confirming a plan does not publish the policy behind it.
+**Click Confirm roadmap.** With snapshot v2 the roadmap now has **real steps**
+and no amber warning, because the process template is published.
+
+### A2b. Attach and validate the material cards
+
+**New, and easy to miss.** Snapshot v2 publishes six cards, two of them
+required: `mat_synopsis` and `mat_script`. **They block the gate.** Before v2
+the pack was empty, so this step did nothing and the guide skipped it.
+
+For each required card: **Attach latest script** — note this attaches the latest
+asset, so upload the synopsis *last* before attaching `mat_synopsis` — then
+**Validate**. The status should go `pending` → `uploaded` → `valid`.
+
+A card you genuinely cannot supply can be **Waived** with a reason instead. Both
+satisfy the gate; only one of them claims the material exists.
 
 ### A3. Pre-check · same page
 
@@ -130,7 +144,7 @@ warning should stay — confirming a plan does not publish the policy behind it.
 For a clean script, expect **no findings** and the amber *"…only the
 deterministic rules ran. This is not a clean script."*
 
-Now upload a script with a flagged scene:
+Now upload `docs/sample-uploads/script-flagged.txt`, which contains:
 
 ```
 第一集 场景一：码头。卧底警察与线人接头。
@@ -159,9 +173,9 @@ $P = "proj_..."   # your project id
 Invoke-RestMethod "http://localhost:8080/v1/projects/$P/gate" -Headers $H | ConvertTo-Json -Depth 5
 ```
 
-Expect `passed: false` with `facts_missing` naming `title`,
-`applicant_entity`, `investment_structure` — and `findings_needs_human` too if
-you ran the flagged script.
+Expect `passed: false`. Under v2 the gaps are `facts_missing` naming `title`,
+`investment_amount_rmb`, `applicant_entity` — plus `materials_unvalidated` if you
+skipped A2b, and `findings_needs_human` if you ran the flagged script.
 
 Look at the form:
 
@@ -179,8 +193,8 @@ foreach ($f in @(
   @{k="title"; v="Sweet Office"},
   @{k="episode_count"; v=30},
   @{k="episode_minutes"; v=2},
-  @{k="applicant_entity"; v="示例申报主体"},
-  @{k="investment_structure"; v="示例出资结构"}
+  @{k="investment_amount_rmb"; v=500000},
+  @{k="applicant_entity"; v="示例申报主体"}
 )) {
   Invoke-RestMethod "http://localhost:8080/v1/projects/$P/form/fields/$($f.k)/confirm" `
     -Method Post -Headers $H -ContentType "application/json" `

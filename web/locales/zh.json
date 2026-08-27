@@ -86,6 +86,7 @@
   "material.supporting_document": "佐证材料",
   "material.prompts": "生成提示词",
   "material.subtitle_sheet": "字幕表",
+  "material.final_film": "完成片",
   "roadmap.step.materials": "收集材料",
   "roadmap.step.self_check": "自查",
   "roadmap.step.confirm_classification": "确认分类结果",
@@ -95,6 +96,15 @@
   "roadmap.step.authority_review": "主管部门审核",
   "roadmap.step.record_filing": "记录备案结果",
   "roadmap.step.institution_review": "机构审核",
+  "roadmap.step.prepare_planning_filing": "准备规划备案材料",
+  "roadmap.step.planning_review": "规划备案审核",
+  "roadmap.step.produce_final_film": "完成拍摄制作",
+  "roadmap.step.submit_content_review": "提交内容审核",
+  "roadmap.step.record_license": "记录发行许可证",
+  "roadmap.step.record_approval": "记录批准文件",
+  "roadmap.step.prepare_broadcast_materials": "准备播前审核材料",
+  "roadmap.step.broadcaster_review": "播出单位播前审核",
+  "roadmap.step.record_program_number": "记录节目编号",
   "nav.institution": "机构端",
   "institution.title": "机构审核与备案",
   "institution.intro": "已冻结的表单提交给持证机构，由其受理或退回，并记录备案号。此处的资质核验为演示，不构成真实核验。",
@@ -128,5 +138,8 @@
   "license.reason.foreign": "该条目记录为含外资。",
   "institution.load_demo_admin_only": "仅管理员可载入示例名录。请在上方将角色切换为「管理员」。",
   "finding.line": "第 行",
-  "finding.matching_lines": "命中行"
+  "finding.matching_lines": "命中行",
+  "wizard.platform_promoted": "平台招商主推或首页首屏推荐播出",
+  "wizard.voluntary_key": "自愿按重点微短剧申报",
+  "wizard.key_conditions_note": "以上任一条件成立，即按重点微短剧处理，与投资额无关——广电办发〔2024〕35号。"
 }

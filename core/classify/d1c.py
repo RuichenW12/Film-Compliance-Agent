@@ -46,18 +46,28 @@ def _thresholds_published(pack3: dict, snapshot_thresholds_published: bool | Non
 
 
 def on_threshold_boundary(amount_rmb: float, thresholds: dict) -> bool:
-    """True when the amount sits exactly on a threshold.
+    """True when the amount sits exactly on a threshold the pack calls disputed.
 
-    The published source states the live-action boundary two ways in one page —
-    「300万元及以上」(>=) and 「300万元以上」(>) — so the tier of an amount
-    exactly equal to a threshold depends on which sentence is authoritative.
-    The code has to pick one to compute anything; `>=` is the inclusive reading.
-    But an answer that depends on an unresolved contradiction is not a settled
-    answer, so it is returned provisional with a flag rather than as fact.
+    Originally every equality was flagged, because one republished page wrote
+    the live-action boundary two ways: 「300万元及以上」(inclusive) and
+    「300万元以上」. 广电办发〔2024〕35号 then turned up in the archive and
+    settles the drafting convention: it writes 「达到100万元及以上」 and
+    「30万元（含）—100万元之间」, the same inclusive pattern the 2026 adjustment
+    uses, and the AI standard writes 「达到80万元及以上」 with no variant at all.
+
+    So the inclusive reading has evidence and flagging all four boundaries was
+    over-flagging. Which boundary is genuinely unsettled is now the pack's call:
+    a threshold set may carry `disputed_boundaries: [T1_min_rmb]`. Nothing is
+    flagged unless the policy data says so, and the seed says so for nothing.
+
+    See D-026 and docs/policy-library/MISSING.md M-001.
     """
 
+    disputed = thresholds.get("disputed_boundaries") or []
     return any(
-        thresholds.get(key) is not None and amount_rmb == float(thresholds[key])
+        key in disputed
+        and thresholds.get(key) is not None
+        and amount_rmb == float(thresholds[key])
         for key in ("T1_min_rmb", "T2_min_rmb")
     )
 
@@ -108,13 +118,46 @@ def _thresholds_for_mode(pack3: dict, is_ai_generated: bool | None) -> dict:
     return pack3.get("thresholds") or {}
 
 
+def key_drama_by_promotion(
+    platform_promoted: bool | None, voluntary_key_declaration: bool | None
+) -> str | None:
+    """A 重点微短剧 trigger that has nothing to do with money.
+
+    广电办发〔2024〕35号 defines 重点微短剧 as meeting **any one** of four
+    conditions: special subject, the investment threshold, platform promotion or
+    front-page placement, and declaring it voluntarily. The first two were
+    modelled; these are the other two, and they can make a 300,000 RMB ordinary
+    drama a 重点微短剧 that the amount alone would place in T3.
+
+    Returns the reason, or None when neither applies.
+    """
+
+    if voluntary_key_declaration:
+        return "tier.voluntary_key_declaration"
+    if platform_promoted:
+        return "tier.platform_promoted"
+    return None
+
+
 def judge_tier(
     budget_band: BudgetBand,
     pack3: dict,
     snapshot_thresholds_published: bool | None = None,
     investment_amount_rmb: float | None = None,
     is_ai_generated: bool | None = None,
+    platform_promoted: bool | None = None,
+    voluntary_key_declaration: bool | None = None,
 ) -> TierDecision:
+    promotion = key_drama_by_promotion(platform_promoted, voluntary_key_declaration)
+    if promotion is not None:
+        # Any one condition is enough, so the amount is not consulted at all.
+        return TierDecision(
+            tier=Tier.T1,
+            tier_provisional=False,
+            reasons=["tier.key_drama_by_condition", promotion],
+            clause_ref=(pack3.get("threshold_sets") or {}).get("live_action", {}).get("clause_ref"),
+        )
+
     published = _thresholds_published(pack3, snapshot_thresholds_published)
     threshold_sets = pack3.get("threshold_sets") or {}
 

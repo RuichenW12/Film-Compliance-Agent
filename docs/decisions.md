@@ -40,7 +40,8 @@ status becomes `Superseded by D-0xx`. That way the reasoning trail survives.
 | [D-024](#d-024) | A | One C1-a finding per scene, with every matching line kept | Accepted |
 | [D-025](#d-025) | A | Every long job is a task first; the runner decides where it executes | Accepted |
 | [D-026](#d-026) | Shared | Final amount tiers require amount, mode, and usable thresholds | Accepted |
-| [D-026](#d-026) | Shared | A disputed policy reading is reported provisional, never settled | Accepted, revisit when the primary sources arrive |
+| [D-026](#d-026) | Shared | A disputed policy reading is reported provisional, never settled | Narrowed 2026-08-26 by [D-027](#d-027) |
+| [D-027](#d-027) | Shared | 广电办发〔2024〕35号 settles two readings and adds two tier triggers | Accepted |
 
 ---
 
@@ -854,3 +855,64 @@ Revisit when the primary sources arrive: the original NRTA notice behind
 `SRC-002` settles the boundary, and a filing partner settles whether a subject
 hit fixes the tier. Both should then flip to settled by publishing confirmed
 rules rather than by editing this logic.
+
+## D-027
+
+**广电办发〔2024〕35号 settles two readings and adds two tier triggers** · Area: Shared · Status: Accepted · 2026-08-26
+
+The original of 广电办发〔2024〕35号 arrived in the policy library. It is the
+document the 2026 threshold adjustment amends, and reading it changes three
+things — two of them corrections to [D-026](#d-026), written a day earlier on
+weaker evidence.
+
+### The boundary is not disputed, and D-026 over-flagged it
+
+35号 writes 「总投资额度达到**100万元及以上**」 and 「总投资额度在
+**30万元（含）**—100万元之间」. The 2026 adjustment uses the same pattern, and
+the AI standard writes 「达到80万元及以上」 with no variant at all. Three
+documents, one drafting convention, all inclusive.
+
+D-026 flagged **every** equality as disputed on the strength of a single
+republished page that wrote the live-action boundary two ways. That was
+over-flagging: it marked the AI thresholds uncertain when their source is
+unambiguous.
+
+Which boundary is genuinely unsettled is now the **pack's** call. A threshold
+set may carry `disputed_boundaries: [T1_min_rmb]`, and nothing is flagged unless
+the policy data says so. The seed says so for nothing. If the primary notice
+([`MISSING.md`](policy-library/MISSING.md) M-001) turns out to contradict this,
+the flag comes back as a data change rather than a code change.
+
+### The special-subject disposal is well founded
+
+D-026 flagged the T1-plus-co-review outcome because Order 16 article 14 has the
+authority consult only when it considers it necessary. 35号 is explicit:
+特殊题材的微短剧「**按有关协审工作机制落实审核要求**」. The disposal is not an
+over-reach and is no longer flagged.
+
+What remains provisional is narrower and still true: the trigger vocabulary that
+decided a scene *is* special subject was written by this codebase, not by a
+regulator ([D-002](#d-002)). The flag is renamed `subject_match_unconfirmed` to
+say that, because the previous name blamed the wrong step.
+
+### 重点微短剧 has four triggers, and two were missing
+
+35号 defines it as meeting **any one** of:
+
+1. 符合特殊题材 — modelled
+2. 总投资额度达到门槛 — modelled
+3. **长短视频平台招商主推，或在各终端首页首屏推荐播出** — was missing
+4. **自愿按重点微短剧申报** — was missing
+
+A 300,000 RMB ordinary drama that a platform puts on its front page is a
+重点微短剧. The product classified it T3 on amount alone, which is not a
+cautious error in the safe direction: it under-classifies, and the creator
+prepares for the wrong regime.
+
+`IntentProfile` gains `platform_promoted` and `voluntary_key_declaration`, the
+wizard asks both, and either alone returns T1 without consulting the amount.
+Unanswered is not treated as true — an unasked question must not promote a
+project.
+
+Revisit when M-001 arrives: it may restate these conditions, and if the 2026
+adjustment changed them, this is where it shows.

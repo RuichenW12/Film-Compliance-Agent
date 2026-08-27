@@ -1,0 +1,169 @@
+{
+  "library_version": 1,
+  "purpose": "Deduplicated library of the policy documents this product is built on.",
+  "primary": [
+    {
+      "id": "P-001",
+      "title": "国家广播电视总局令第16号《微短剧发展管理办法》",
+      "path": "primary/P-001-nrta-order-16.pdf",
+      "status": "official_primary",
+      "sha256": "85e17e4cc533f49c0e334393450c6ba7a1afda34baefbcdd6ced8178a89cf665",
+      "original_filename": "国家广播电视总局令 16号 国家广播电视总局 公告公示 国家广播电视总局令第16号：《微短剧发展管理办法》.pdf",
+      "text": "text/P-001-nrta-order-16.txt"
+    },
+    {
+      "id": "P-002",
+      "title": "广电办发〔2024〕35号 关于进一步统筹发展和安全促进网络微短剧行业健康繁荣发展的通知",
+      "path": "primary/P-002-nrta-2024-35.pdf",
+      "status": "official_primary",
+      "sha256": "7d99ae1e8ed4da23cdf341061ed3b558d44f580ff4acce971708a90adec67def",
+      "original_filename": "广电办发〔2024〕35号 国家广播电视总局 公告公示 国家广播电视总局办公厅关于进一步统筹发展和安全促进网络微短剧行业健康繁荣发展的通知.pdf",
+      "text": "text/P-002-nrta-2024-35.txt"
+    },
+    {
+      "id": "P-003",
+      "title": "广电办发〔2022〕128号 关于国产网络剧片发行许可服务管理有关事项的通知",
+      "path": "primary/P-003-nrta-2022-128.pdf",
+      "status": "official_primary",
+      "sha256": "4c983eb601ec489613fedbec39239da9ccf5d56e10b532d8d501a32be2f44fd4",
+      "original_filename": "广电办发〔2022〕128号 国家广播电视总局 网络视听 国家广播电视总局办公厅关于国产网络剧片发行许可服务管理有关事项的通知.pdf",
+      "text": "text/P-003-nrta-2022-128.txt"
+    },
+    {
+      "id": "P-004",
+      "title": "国家广播电影电视总局令第63号《电视剧内容管理规定》",
+      "path": "primary/P-004-tv-content-rules.docx",
+      "status": "official_primary",
+      "sha256": "55324a2b0801698a18b007cc7cb2c624ea98b6557ea2770497c543a6c253c501",
+      "original_filename": "国家广播电影电视总局令 （第63号） 电视剧内容管理规定.docx"
+    },
+    {
+      "id": "P-005",
+      "title": "网络短视频内容审核标准细则（2021）",
+      "path": "primary/P-005-short-video-review-rules-2021.pdf",
+      "status": "official_primary",
+      "sha256": "13943e9948e2c671aa9165e0604284a97d6861024d88ca9b8919a7f46054422e",
+      "original_filename": "国家广播电视总局 公告公示 网络短视频内容审核标准细则（2021）.pdf",
+      "text": "text/P-005-short-video-review-rules-2021.txt"
+    }
+  ],
+  "republication": [
+    {
+      "id": "R-001",
+      "title": "宝鸡市文旅局转述《关于调整微短剧分类分层标准的通知》",
+      "status": "republication_pending_primary",
+      "note": "转述页，非原始通知。300万/100万门槛的唯一来源。原文见 MISSING.md M-001",
+      "path": "docs/partner-review/sources-v2/raw/SRC-002-baoji-live-thresholds.html",
+      "sha256": "c267b239f96ba8fa9f91882f8effc4d8931fe8bf9995f6c4d5b072c86e9d30c2",
+      "text": "docs/partner-review/sources-v2/text/SRC-002-baoji-live-thresholds.txt",
+      "stored_in": "docs/partner-review/sources-v2"
+    },
+    {
+      "id": "R-002",
+      "title": "西藏网信办转述《管理提示（AI微短剧分类分层标准）》",
+      "status": "republication_pending_primary",
+      "note": "转述页，非原始管理提示。80万/30万门槛的唯一来源。原文见 MISSING.md M-002",
+      "path": "docs/partner-review/sources-v2/raw/SRC-003-tibet-ai-thresholds.html",
+      "sha256": "0c52c1944346047fd8b77fcf7000ca5bb814549b830d8920f2ce8f69b8813315",
+      "text": "docs/partner-review/sources-v2/text/SRC-003-tibet-ai-thresholds.txt",
+      "stored_in": "docs/partner-review/sources-v2"
+    }
+  ],
+  "operational": [
+    {
+      "id": "O-001",
+      "title": "上海市松江区微短剧依法经营指引（57页）",
+      "jurisdiction": "上海·松江",
+      "status": "official_operational_guide",
+      "path": "docs/partner-review/sources-v2/authoritative/SRC-005-songjiang-microdrama-guide.pdf",
+      "sha256": "f715a0851d822a47b5d158948bb9e7487ce2fee05725653a8842a258c9135ec0",
+      "stored_in": "docs/partner-review/sources-v2"
+    },
+    {
+      "id": "O-002",
+      "title": "上海 国产网络剧片拍摄制作规划备案 办事指南",
+      "jurisdiction": "上海",
+      "status": "official_operational_guide",
+      "path": "docs/partner-review/sources-v2/authoritative/SRC-006-shanghai-planning-service.html",
+      "sha256": "a11c63395cdb37358713fb8c113f2e55f6e76fa320ba2ebb3def1167d2e62242",
+      "stored_in": "docs/partner-review/sources-v2"
+    },
+    {
+      "id": "O-003",
+      "title": "上海 国产网络剧片成片审查 办事指南",
+      "jurisdiction": "上海",
+      "status": "official_operational_guide",
+      "path": "docs/partner-review/sources-v2/authoritative/SRC-007-shanghai-content-review-service.html",
+      "sha256": "1d5c5499bd54a83a65d15b7caad7bd9ac7478d3b98c31ac9859731a3712fb53f",
+      "stored_in": "docs/partner-review/sources-v2"
+    },
+    {
+      "id": "O-004",
+      "title": "北京 国产网络剧片备案 办事指南",
+      "jurisdiction": "北京",
+      "status": "official_operational_guide",
+      "path": "docs/partner-review/sources-v2/authoritative/SRC-008-beijing-filing-service.html",
+      "sha256": "472f7e85d26bafc6c57f79c04a79b18261bbfa2c2b269da8be97a1ba133ddb2f",
+      "stored_in": "docs/partner-review/sources-v2"
+    },
+    {
+      "id": "O-005",
+      "title": "北京 国产网络剧片备案流程图",
+      "jurisdiction": "北京",
+      "status": "official_operational_guide",
+      "path": "docs/partner-review/sources-v2/authoritative/SRC-009-beijing-workflow.pdf",
+      "sha256": "9e1aee7e5136b6f0cfae504b039bc1672d473690ab09e2bc441c939780ec8a82",
+      "stored_in": "docs/partner-review/sources-v2"
+    },
+    {
+      "id": "O-006",
+      "title": "广东 重点网络影视剧规划备案问答",
+      "jurisdiction": "广东",
+      "status": "official_operational_guide",
+      "path": "docs/partner-review/sources-v2/authoritative/SRC-010-guangdong-planning-faq.html",
+      "sha256": "b6c0d20d775281976f513a128427fd51f38aeb43ca538f73b31637718bdc114c",
+      "stored_in": "docs/partner-review/sources-v2"
+    }
+  ],
+  "forms": [
+    {
+      "id": "F-001",
+      "title": "规划备案承诺书 填写示例",
+      "status": "official_public_form",
+      "path": "docs/partner-review/sources-v2/forms/FORM-001-planning-commitment-example.docx",
+      "sha256": "a7c3927137154ea95ccfd608895dd310567c1537d6ab4fdd4a50a4b9cde02fcf",
+      "stored_in": "docs/partner-review/sources-v2"
+    },
+    {
+      "id": "F-002",
+      "title": "规划备案承诺书 空白表",
+      "status": "official_public_form",
+      "path": "docs/partner-review/sources-v2/forms/FORM-002-planning-commitment-blank.docx",
+      "sha256": "064d30a2eb806319ddbd89a27030865e74a2e2dbf82986d8eda441069f832fb0",
+      "stored_in": "docs/partner-review/sources-v2"
+    },
+    {
+      "id": "F-003",
+      "title": "成本配置比例情况报告 空白表",
+      "status": "official_public_form",
+      "path": "docs/partner-review/sources-v2/forms/FORM-003-cost-ratio-report-blank.docx",
+      "sha256": "2f9690e4300b5b96a03d390686923e0fed55151427f402615183f87de90a9f1a",
+      "stored_in": "docs/partner-review/sources-v2"
+    }
+  ],
+  "not_copied": [
+    {
+      "what": "sources-v2/authoritative/SRC-004-nrta-2022-128.pdf",
+      "why": "同一份 128 号文的扫描件。policy_raw 的版本有文字层，已作为 P-003 收录。扫描件带北京广电局收文章，作为流转证据保留在 sources-v2，不再复制一份。"
+    },
+    {
+      "what": "sources-v2/raw/SRC-001-nrta-order-16.html",
+      "why": "总局令第16号的网页抓取版。官方 PDF 已作为 P-001 收录，证据力更强。"
+    },
+    {
+      "what": "sources-v2/reference-only/*.pdf",
+      "why": "行业协会标准，非官方，不能用于覆盖法规。留在 sources-v2。"
+    }
+  ],
+  "deduplication_note": "文档只存一份。已经在 docs/partner-review/sources-v2/ 里、且内容完全相同的文件，这里只登记路径，不再复制一份。那个目录有自己的校验测试，不能改动；本清单是统一入口，不是第二份拷贝。"
+}

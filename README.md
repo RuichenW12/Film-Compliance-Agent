@@ -74,6 +74,7 @@ judgement.
 | [`prompts/`](prompts/README.md) | Versioned model prompt contracts |
 | [`tests/`](tests/README.md) | Contract fixtures, policy scenarios, and golden samples |
 | [`infra/`](infra/README.md) | Deployment and cloud-resource definitions |
+| [`tools/`](tools/partner-review/README.md) | One-shot generators run by hand. Not imported by the product |
 | [`docs/`](docs/README.md) | Architecture decisions, runbooks, and delivery notes |
 
 ## Tracking changes

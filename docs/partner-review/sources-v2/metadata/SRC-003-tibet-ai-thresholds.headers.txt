@@ -1,0 +1,12 @@
+HTTP/2 200 
+date: Wed, 26 Aug 2026 14:33:51 GMT
+content-type: text/html
+vary: Accept-Encoding
+x-frame-options: ALLOWALL
+x-xss-protection: 1; mode=block
+x-content-type-options: nosniff
+x-permitted-cross-domain-policies: master-only
+x-download-options: noopen
+strict-transport-security: max-age=31536000
+content-encoding: gzip
+

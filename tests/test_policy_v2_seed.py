@@ -38,8 +38,32 @@ def test_v2_contains_all_runtime_templates_and_cards() -> None:
         "script",
         "supporting_document",
         "prompts",
+        "final_film",
         "subtitle_sheet",
     }
+
+
+def test_v2_p4_p5_are_source_bound_but_remain_mock_verified() -> None:
+    snapshot = _snapshot()
+    p4 = snapshot.packs.p4_process_templates
+    p5 = snapshot.packs.p5_form_templates
+
+    assert snapshot.verification_status is VerificationStatus.MOCK_VERIFIED
+    assert p4["mapping_status"] == "mock_pending_human_review"
+    assert {"SRC-001", "SRC-006", "SRC-007"} <= set(p4["source_refs"])
+    assert p5["mapping_status"] == "mock_pending_human_review"
+    reference_fields = {field["field_id"] for field in p5["reference_fields"]}
+    assert "production_license_number" in reference_fields
+    assert "contact_phone" in reference_fields
+    assert "production_license_number" not in p5["required_facts"]
+    assert {template["source_id"] for template in p5["public_form_templates"]} == {
+        "FORM-001",
+        "FORM-002",
+        "FORM-003",
+    }
+    assert p5["system_generated_forms"][0]["availability"] == (
+        "external_system_generated"
+    )
 
 
 def test_file_service_rejects_semantically_invalid_v2(tmp_path: Path) -> None:
