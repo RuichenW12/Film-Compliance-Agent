@@ -526,3 +526,80 @@ def test_the_condition_beats_the_amount_not_the_other_way_round():
     )
     assert decision.tier is Tier.T1
     assert "tier.key_drama_by_condition" in decision.reasons
+
+
+# ---------------- a clause carries its own document's effective date (D-028)
+
+
+def test_a_clause_knows_whether_it_is_in_force():
+    from datetime import datetime, timezone
+
+    from schemas.policy_snapshot import Clause
+
+    order16 = Clause(
+        clause_id="nrta-order-16-article-5",
+        title="第五条",
+        text="微短剧特殊题材。",
+        source_url="https://www.nrta.gov.cn/art/2026/7/31/art_113_73785.html",
+        effective_from=datetime(2026, 9, 1, tzinfo=timezone.utc),
+    )
+    assert order16.in_force(datetime(2026, 8, 27, tzinfo=timezone.utc)) is False
+    assert order16.in_force(datetime(2026, 9, 2, tzinfo=timezone.utc)) is True
+
+
+def test_an_undated_clause_is_unknown_not_in_force():
+    """Unknown must never read as "already applies"."""
+
+    from datetime import datetime, timezone
+
+    from schemas.policy_snapshot import Clause
+
+    undated = Clause(
+        clause_id="x",
+        title="t",
+        text="body",
+        source_url="https://example.gov.cn/x",
+    )
+    assert undated.in_force(datetime(2026, 8, 27, tzinfo=timezone.utc)) is None
+
+
+def _v2_snapshots():
+    """The v2 seed, which is what the API loads by default."""
+
+    from pathlib import Path as _Path
+
+    from schemas.snapshot import FileSnapshotService
+
+    root = _Path(__file__).resolve().parents[1]
+    return FileSnapshotService(root / "policy" / "seed-snapshot-v2.yaml")
+
+
+def test_the_seed_records_the_dates_its_sources_state():
+    """Order 16 applies from 2026-09-01; the tier notices already applied."""
+
+    snapshots = _v2_snapshots()
+    version = snapshots.latest_version()
+    order16 = snapshots.clause("nrta-order-16-article-5", version)
+    live = snapshots.clause("tier-live-action-2026", version)
+
+    assert order16.effective_from is not None
+    assert order16.effective_from.date().isoformat() == "2026-09-01"
+    assert live.effective_from.date().isoformat() == "2026-01-01"
+
+
+def test_a_snapshot_can_be_usable_while_a_clause_it_cites_is_not_in_force():
+    """The two dates answer different questions and must not be conflated.
+
+    The snapshot is usable today — that is what its own effective_from means —
+    while 微短剧发展管理办法 applies from 2026-09-01.
+    """
+
+    from datetime import datetime, timezone
+
+    snapshots = _v2_snapshots()
+    version = snapshots.latest_version()
+    assert version == "v2"
+
+    today = datetime(2026, 8, 27, tzinfo=timezone.utc)
+    order16 = snapshots.clause("nrta-order-16-article-2", version)
+    assert order16.in_force(today) is False

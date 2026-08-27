@@ -261,6 +261,13 @@ export default function WizardPage() {
                   ))}
                 </p>
               ) : null}
+              {result.classification?.pending_flags.includes(
+                "clause_not_yet_in_force"
+              ) ? (
+                <p className="alert warning-alert">
+                  {t("flag.clause_not_yet_in_force")}
+                </p>
+              ) : null}
               <p>Roadmap template: {result.roadmap_preview?.template ?? "—"}</p>
             </>
           )}

@@ -46,7 +46,8 @@ const FLAG_KEYS: Record<string, string> = {
   roadmap_template_pending: "flag.roadmap_template_pending",
   classification_pending: "flag.classification_pending",
   fact_extraction_pending: "flag.fact_extraction_pending",
-  script_semantic_check_pending: "flag.script_semantic_check_pending"
+  script_semantic_check_pending: "flag.script_semantic_check_pending",
+  clause_not_yet_in_force: "flag.clause_not_yet_in_force"
 };
 
 function Flags({ flags }: { flags: string[] }) {
