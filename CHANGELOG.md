@@ -22,6 +22,25 @@ Conventions:
 
 ## 2026-08-28
 
+### A — the intake turn endpoint, which cannot write
+
+- `POST /v1/intake/turn` takes one sentence and returns proposals: the value,
+  the words it was read from, and whether it was quoted or inferred. Creator or
+  admin only.
+- **Stateless and project-free on purpose.** It does not take a project id, does
+  not store, and does not classify. Storing stays
+  `POST /v1/projects/{id}/intent`, after a person has looked. As long as this
+  endpoint cannot write, no prompt that reaches it can make the product believe
+  anything — and there is a test asserting exactly that, because the tempting
+  next commit is always "and then apply the patch".
+- An empty turn and an oversized one are both refused **before** the model is
+  called, and the tests assert the backend recorded no call rather than just
+  checking the status code.
+- Verified: `python -m pytest` (469 passed, 3 skipped — 6 new), including that a
+  scripted backend offering a `tier` has it dropped before the response, and
+  that with no backend the endpoint still answers with `intake_chat_pending`
+  rather than an empty proposal list that reads as "nothing found".
+
 ### A — conversational intake, step 1: reading a turn without believing it
 
 - New `core/intake_chat.py`. One turn in, proposed intake answers out, nothing

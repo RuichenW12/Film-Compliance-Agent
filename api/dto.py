@@ -43,6 +43,33 @@ class IntentRequest(ApiModel):
     voluntary_key_declaration: bool | None = None
 
 
+class IntakeTurnRequest(ApiModel):
+    """One thing the creator said. Not a project, not a patch, not a decision."""
+
+    turn: str
+
+
+class ProposedAnswerResponse(ApiModel):
+    """A value the turn supports, and the words it was read from.
+
+    `inferred` is the whole contract with the interface: false means the person
+    typed this value, true means it was read out of what they typed. The quote
+    travels with it so the form can show both without a second round trip.
+    """
+
+    key: str
+    value: object
+    quote: str
+    inferred: bool
+
+
+class IntakeTurnResponse(ApiModel):
+    proposals: list[ProposedAnswerResponse] = Field(default_factory=list)
+    reply: str = ""
+    pending_flags: list[str] = Field(default_factory=list)
+    backend: str = ""
+
+
 class IntentResponse(ApiModel):
     state: ProjectState
     missing: list[str]
