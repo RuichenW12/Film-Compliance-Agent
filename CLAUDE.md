@@ -39,7 +39,7 @@ reading each other's diffs. So:
 
 ## Stack
 
-FastAPI + Firestore + Pub/Sub + Next.js (App Router). All inference is Gemini on Vertex AI. UI is English with Chinese legal terms glossed.
+FastAPI + Firestore + Pub/Sub + Next.js (App Router). All inference is Gemini on Vertex AI. UI is English only — no Chinese, not even as a gloss (D-039, reversing D-032's gloss half).
 
 ## Verify
 

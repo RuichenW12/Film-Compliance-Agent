@@ -139,3 +139,47 @@ def test_no_classification_flag_is_unaccounted_for() -> None:
         "these classification flags are neither rendered with copy nor listed "
         f"as deliberately silent: {sorted(unaccounted)}"
     )
+
+
+def test_every_clause_the_card_can_cite_has_an_english_name() -> None:
+    """`evidence_refs` carry a clause id; the card renders its name.
+
+    The ids are stable and the snapshot's own `title` is Chinese, so the English
+    reading lives in the bundle. A clause added to a snapshot with no entry here
+    would render as an empty bullet under "Decided under" -- worse than the raw
+    id it replaced, because it says nothing at all.
+    """
+    import re
+    import yaml
+
+    bundle = _en()
+    missing: list[str] = []
+    seen = 0
+
+    for path in sorted((Path(__file__).resolve().parent.parent / "policy").glob("*.yaml")):
+        text = path.read_text(encoding="utf-8")
+        for clause_id in set(re.findall(r"clause_(?:id|ref):\s*([A-Za-z0-9_-]+)", text)):
+            seen += 1
+            if f"clause.{clause_id}" not in bundle:
+                missing.append(f"{path.name}: clause.{clause_id}")
+
+    assert seen, "no clause ids found in policy/*.yaml -- has the shape moved?"
+    assert not missing, f"clauses with no English name: {sorted(set(missing))}"
+
+
+def test_the_english_bundle_has_no_chinese() -> None:
+    """The UI is English-only in this build.
+
+    Removing the glosses was a deliberate call (D-039) that gives something up:
+    a creator who reads "Class 3" here will meet the Chinese term on the actual
+    filing form. Keeping that removal consistent is the least we can do, and a
+    stray Chinese string in one label is exactly the kind of thing that creeps
+    back in one copy edit at a time.
+    """
+    import json
+    import re
+
+    bundle = json.loads((LOCALES / "en.json").read_text(encoding="utf-8"))
+    cjk = re.compile(r"[\u4e00-\u9fff]")
+    offenders = sorted(k for k, v in bundle.items() if isinstance(v, str) and cjk.search(v))
+    assert not offenders, f"English bundle carries Chinese text: {offenders}"

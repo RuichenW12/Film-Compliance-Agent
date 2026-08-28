@@ -179,7 +179,8 @@ export function ClassificationCard({
 
       {/* Checkable, but not in the way. The ground rule says a conclusion
           carries its evidence; it does not say the evidence has to be the
-          first thing a creator reads. */}
+          first thing a creator reads — nor that it has to be shown as the
+          identifiers we happen to store it under. */}
       <details className="result-why">
         <summary>{t("result.why")}</summary>
         {c.matched_rules.length ? (
@@ -187,9 +188,7 @@ export function ClassificationCard({
             <p className="muted">{t("result.why.quote")}</p>
             <ul>
               {c.matched_rules.map((rule) => (
-                <li key={rule.rule_id}>
-                  “{rule.quote}” <code>{rule.rule_id}</code>
-                </li>
+                <li key={rule.rule_id}>“{rule.quote}”</li>
               ))}
             </ul>
           </>
@@ -199,11 +198,10 @@ export function ClassificationCard({
             <p className="muted">{t("result.why.clauses")}</p>
             <ul>
               {c.evidence_refs.map((ref) => (
-                <li key={ref.clause_id}>
-                  <code>{ref.clause_id}</code>
-                </li>
+                <li key={ref.clause_id}>{t(`clause.${ref.clause_id}`)}</li>
               ))}
             </ul>
+            <p className="muted">{t("result.why.document")}</p>
           </>
         ) : null}
         <p className="muted">
@@ -216,22 +214,15 @@ export function ClassificationCard({
       <h3>{t("result.next.title")}</h3>
       <p>{t("result.next.body")}</p>
 
-      <details className="result-debug">
-        <summary>{t("result.debug")}</summary>
-        <p className="muted">
-          <code>{projectId}</code> <code>{result.state}</code>{" "}
-          <code>{result.roadmap_preview?.template ?? "—"}</code>
-        </p>
-        {c.pending_flags.length ? (
-          <p className="muted">
-            {c.pending_flags.map((flag) => (
-              <code key={flag}>{flag}</code>
-            ))}
-          </p>
+      <p className="muted result-disclaimer">
+        {t("result.disclaimer")}
+        {projectId ? (
+          <>
+            {" "}
+            {format("result.reference", { id: projectId })}
+          </>
         ) : null}
-      </details>
-
-      <p className="muted result-disclaimer">{t("result.disclaimer")}</p>
+      </p>
     </section>
   );
 }

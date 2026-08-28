@@ -22,6 +22,37 @@ Conventions:
 
 ## 2026-08-28
 
+### A — English only, and the result cites policies by name
+
+- **Every Chinese gloss is gone from the UI.** "Class 3 (三类)" is now "Class 3",
+  "micro-drama (微短剧)" is "micro-drama". `CLAUDE.md`'s stack line said the UI
+  was "English with Chinese legal terms glossed" and has been corrected —
+  **both workstreams read that line**, so check it before adding UI copy. See
+  [D-039](docs/decisions.md#d-039), which supersedes the gloss half of D-032.
+- **What that gives up:** a creator told "Class 3" will meet 三类 on the real
+  filing form and nothing in the product now bridges the two. Accepted
+  deliberately, and recorded as the thing to revisit when the materials and
+  filing-form stages ship.
+- **Clause ids render as names.** "How we reached this" showed
+  `tier-ai-generated-2026`; it now shows "Investment thresholds for AI-generated
+  micro-dramas", followed by the instrument and its effective date, and a
+  sentence explaining what a pinned policy version means. See
+  [D-040](docs/decisions.md#d-040).
+- **The technical disclosure is deleted.** `proj_… CLASSIFIED T3_4steps` plus a
+  raw flag list told a creator nothing and repeated, as keys, warnings already
+  given as sentences. The project id survives as a support reference on the
+  disclaimer line.
+- **Two new guards.** `tests/test_result_copy.py` now fails if any value in
+  `web/locales/en.json` contains a CJK character, and if any `clause_id` or
+  `clause_ref` in `policy/*.yaml` has no English name. The second caught
+  `nrta-order-16-article-54` in the v1 snapshot, which would have rendered as an
+  empty bullet. **Workstream B: adding a clause to a snapshot now requires an
+  English name in the bundle.**
+- Verified: `python -m pytest` (485 passed, 3 skipped), `npx tsc --noEmit`
+  clean, `python scripts/e2e_check.py --base http://localhost:8000` on a fresh
+  process **ALL CHECKS PASSED**, and a Chrome run showing the card end to end
+  with no Chinese and the provenance reading as prose.
+
 ### A — the exact investment amount comes off the intake form
 
 - **Intake no longer asks for the figure.** Since [D-036](docs/decisions.md#d-036)

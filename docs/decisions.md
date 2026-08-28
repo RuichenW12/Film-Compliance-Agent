@@ -1357,3 +1357,75 @@ guess is worse than a warning that arrives one stage later.
 budgeting exactly to a threshold — the cheap fix is a follow-up question shown
 only when `at_or_above_upper` is chosen, which asks for the figure at the one
 moment it can change the answer.
+
+---
+
+## D-039
+
+**English only, glosses included** · Area: A · Status: Accepted · 2026-08-28 · Supersedes the gloss half of [D-032](#d-032)
+
+D-032 settled that the UI is English with Chinese legal terms glossed, and
+[D-037](#d-037) followed it: `T3` rendered as "Class 3 (三类)", `micro_drama` as
+"micro-drama (微短剧)". The owner has now asked twice for no Chinese in this
+build, so the glosses come out and `CLAUDE.md`'s stack line is corrected to
+match.
+
+**What this gives up, stated plainly.** The gloss was a bridge, not decoration.
+A creator told "Class 3" here will meet 三类 on the actual filing form and on
+every provincial page they read next, and nothing in the product now connects
+the two for them. That cost is real and it is accepted, not overlooked.
+
+**Why it is still defensible.** The classification result is a pre-check
+reference, not the filing form. Its job is to say what the creator has to do,
+and mixed-script parentheses in the first sentence of an answer were noise
+against that job. If the bridge is wanted back it belongs where the terms are
+actually met — the materials list and the filing form itself — rather than in
+the headline of every result.
+
+**Enforced, not just done.** `tests/test_result_copy.py` fails if any value in
+`web/locales/en.json` contains a CJK character. A removal like this otherwise
+erodes one copy edit at a time.
+
+**The zh bundle is untouched.** It still mirrors every key, so the locale switch
+D-032 preserved remains possible; this decision is about what the English build
+shows, not about dropping the translation path.
+
+**Revisit when** the materials or filing-form stages ship, since those are the
+screens where a creator has to recognise the Chinese term on a real document.
+
+---
+
+## D-040
+
+**The result cites policies by name, not by clause id** · Area: A · Status: Accepted · 2026-08-28 · Extends [D-037](#d-037)
+
+D-037 folded the identifiers into disclosures but left them as identifiers:
+opening "How we reached this" showed `tier-ai-generated-2026`, and "Technical
+detail" showed `proj_01m14… CLASSIFIED T3_4steps script_verifyamount_required`.
+Folding the raw keys away made the card readable; it did not make the evidence
+readable, which is what the evidence is for.
+
+**What changed.** Each `evidence_refs` clause id now renders through a
+`clause.<id>` copy key — "Investment thresholds for AI-generated micro-dramas",
+"Order 16, Article 17 — review and the document you receive" — followed by one
+line naming the instrument and its effective date. The snapshot version is a
+sentence explaining what pinning means rather than a bare `v2`. The technical
+disclosure is deleted outright: the roadmap template and state name told a
+creator nothing, and the raw flag list repeated, as keys, warnings already given
+as sentences above it. The project id survives as a support reference on the
+disclaimer line, which is the one identifier a creator has any use for.
+
+**Why the names live in the bundle.** The snapshot's own clause `title` is
+Chinese (`第十七条`), which [D-039](#d-039) rules out of this build. The English
+reading is UI copy — a rendering of an identifier the snapshot already fixes —
+not a second source of policy. No amount, threshold or duty is restated here;
+those still come from the snapshot through `filing_route`.
+
+**The guard.** `tests/test_result_copy.py` walks every `clause_id`/`clause_ref`
+in `policy/*.yaml` and fails when one has no English name. Without it a clause
+added to a future snapshot renders as an empty bullet — worse than the id it
+replaced, because an empty bullet says nothing at all.
+
+**Revisit when** a snapshot carries an English title of its own, at which point
+the bundle copy should defer to the data rather than duplicate it.
+
