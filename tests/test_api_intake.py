@@ -106,6 +106,41 @@ def test_intent_accepts_and_persists_exact_investment_amount(client):
     assert project["intent_profile"]["investment_amount_rmb"] == 1_500_000
 
 
+def test_intent_accepts_the_two_non_money_key_drama_conditions(client):
+    """The wizard sends these on every submission. ApiModel forbids extras, so a
+    field missing from IntentRequest rejects the whole intake with a 422 — which
+    is what happened: 广电办发〔2024〕35号's platform-promotion and voluntary
+    declaration reached IntentProfile and the web form but never the DTO."""
+
+    project_id = create_project(client)
+    response = client.post(
+        f"/v1/projects/{project_id}/intent",
+        json={
+            **ROMANCE_INTENT,
+            "platform_promoted": True,
+            "voluntary_key_declaration": False,
+        },
+    )
+
+    assert response.status_code == 200
+    intent = client.get(f"/v1/projects/{project_id}").json()["project"]["intent_profile"]
+    assert intent["platform_promoted"] is True
+    assert intent["voluntary_key_declaration"] is False
+
+
+def test_the_intake_dto_accepts_every_field_the_domain_intent_carries(client):
+    """A field the domain models but the DTO omits is unreachable through HTTP,
+    and silently so until someone posts it. Compare the two rather than trust it."""
+
+    from api.dto import IntentRequest
+    from schemas.project import IntentProfile
+
+    domain = set(IntentProfile.model_fields) - {"source"}
+    exposed = set(IntentRequest.model_fields)
+
+    assert domain <= exposed, f"not reachable over HTTP: {sorted(domain - exposed)}"
+
+
 def test_intent_rejects_a_negative_exact_investment_amount(client):
     project_id = create_project(client)
     response = client.post(
@@ -201,7 +236,7 @@ def test_recalc_tier_requires_the_internal_token(client):
 
 def test_recalc_tier_only_touches_provisional_projects(client, monkeypatch):
     """A settled tier is left alone. Since the seed's subject rules are still
-    unconfirmed, a special-subject project is provisional (D-026), so this uses
+    unconfirmed, a special-subject project is provisional (D-033), so this uses
     a project whose tier really is final."""
 
     project_id = create_project(client)

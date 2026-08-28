@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { PolicyVerificationBanner } from "../../components/policy-verification-banner";
 import {
@@ -23,6 +23,15 @@ interface ClassifyResponse {
     policy_verification_status: PolicyVerificationStatus;
     pending_flags: string[];
     evidence_refs: { snapshot_version: string; clause_id: string }[];
+    filing_route: {
+      authority: string;
+      pre_shoot_filing: string;
+      content_review: string;
+      result_document: string;
+      platform_self_review: boolean;
+      blocks_release_until_granted: boolean;
+      clause_refs: string[];
+    } | null;
   } | null;
   exit: { kind: string; obligations: string[]; card_key: string } | null;
   roadmap_preview: { template?: string } | null;
@@ -36,19 +45,31 @@ export default function WizardPage() {
   const [genres, setGenres] = useState("");
   const [episodeCount, setEpisodeCount] = useState("24");
   const [episodeMinutes, setEpisodeMinutes] = useState("3");
-  const [budgetBand, setBudgetBand] = useState<BudgetBand>("band_b");
+  // Not "band_b". A creator who never opened this dropdown has not told us their
+// budget is medium, and defaulting to one invents the fact the tier rests on.
+// "unknown" is handled properly downstream: it assumes the stricter tier, flags
+// budget_unknown, and returns a three-tier comparison card.
+  const [budgetBand, setBudgetBand] = useState<BudgetBand>("unknown");
   const [investmentAmount, setInvestmentAmount] = useState("");
   const [isAiGenerated, setIsAiGenerated] = useState(true);
   // 广电办发〔2024〕35号: platform promotion and voluntary declaration each make
   // a project 重点微短剧 on their own, whatever the investment amount says.
   const [platformPromoted, setPlatformPromoted] = useState(false);
   const [voluntaryKey, setVoluntaryKey] = useState(false);
-  const [platforms, setPlatforms] = useState("hongguo,douyin");
+  // Empty, not "hongguo,douyin". Prefilling names a distribution plan the
+  // creator never stated, and a first-time creator often does not have one yet.
+  const [platforms, setPlatforms] = useState("");
 
   const [busy, setBusy] = useState(false);
+  const resultRef = useRef<HTMLElement | null>(null);
   const [projectId, setProjectId] = useState<string | null>(null);
   const [result, setResult] = useState<ClassifyResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!result) return;
+    resultRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [result]);
 
   async function onSubmit(event: React.FormEvent) {
     event.preventDefault();
@@ -151,19 +172,6 @@ export default function WizardPage() {
           />
         </label>
         <label>
-          <span>Budget band</span>
-          <select
-            value={budgetBand}
-            onChange={(event) => setBudgetBand(event.target.value as BudgetBand)}
-          >
-            {BANDS.map((band) => (
-              <option key={band} value={band}>
-                {band}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
           <span>{t("wizard.investment_amount_rmb")}</span>
           <input
             type="number"
@@ -173,6 +181,20 @@ export default function WizardPage() {
             onChange={(event) => setInvestmentAmount(event.target.value)}
           />
         </label>
+        <label>
+          <span>{t("wizard.budget_band")}</span>
+          <select
+            value={budgetBand}
+            onChange={(event) => setBudgetBand(event.target.value as BudgetBand)}
+          >
+            {BANDS.map((band) => (
+              <option key={band} value={band}>
+                {t(`budget_band.${band}`)}
+              </option>
+            ))}
+          </select>
+        </label>
+        <p className="muted">{t("wizard.budget_band.hint")}</p>
         <label>
           <span>AI generated content</span>
           <input
@@ -198,15 +220,17 @@ export default function WizardPage() {
           />
         </label>
         <p className="muted">{t("wizard.key_conditions_note")}</p>
+        <p className="muted">{t("wizard.key_conditions_guidance")}</p>
         <h2>{t("wizard.channels.title")}</h2>
         <label>
-          <span>Domestic platforms</span>
+          <span>{t("wizard.domestic_platforms")}</span>
           <input
             value={platforms}
             onChange={(event) => setPlatforms(event.target.value)}
             size={40}
           />
         </label>
+        <p className="muted">{t("wizard.domestic_platforms.hint")}</p>
         <button type="submit" disabled={busy}>
           {busy ? "Running…" : t("wizard.classify")}
         </button>
@@ -214,8 +238,18 @@ export default function WizardPage() {
 
       {error ? <p role="alert">{error}</p> : null}
 
+      {/* A real Gemini call takes 8-12s. Without something in the place the
+          answer will appear, the page looks frozen: the only feedback was the
+          button's label, and the result card renders below the fold. */}
+      {busy ? (
+        <section className="card" aria-live="polite">
+          <h2>{t("wizard.classifying")}</h2>
+          <p className="muted">{t("wizard.classifying.hint")}</p>
+        </section>
+      ) : null}
+
       {result ? (
-        <section className="card">
+        <section className="card" ref={resultRef}>
           <h2>Classification</h2>
           <PolicyVerificationBanner
             status={result.classification?.policy_verification_status}
@@ -267,6 +301,47 @@ export default function WizardPage() {
                 <p className="alert warning-alert">
                   {t("flag.clause_not_yet_in_force")}
                 </p>
+              ) : null}
+              {result.classification?.filing_route ? (
+                <>
+                  <h3>{t("filing.heading")}</h3>
+                  <ul>
+                    <li>
+                      {t("filing.authority")}:{" "}
+                      <strong>
+                        {t(
+                          `filing.authority.${result.classification.filing_route.authority}`
+                        )}
+                      </strong>
+                    </li>
+                    <li>
+                      {t("filing.pre_shoot")}:{" "}
+                      {t(
+                        `filing.pre_shoot.${result.classification.filing_route.pre_shoot_filing}`
+                      )}
+                    </li>
+                    <li>
+                      {t("filing.result_document")}:{" "}
+                      {t(
+                        `filing.document.${result.classification.filing_route.result_document}`
+                      )}
+                    </li>
+                  </ul>
+                  {/* The one line that changes what a creator does next. */}
+                  <p
+                    className={
+                      result.classification.filing_route
+                        .blocks_release_until_granted
+                        ? "alert warning-alert"
+                        : "alert"
+                    }
+                  >
+                    {result.classification.filing_route
+                      .blocks_release_until_granted
+                      ? t("filing.blocks_release")
+                      : t("filing.no_block")}
+                  </p>
+                </>
               ) : null}
               <p>Roadmap template: {result.roadmap_preview?.template ?? "—"}</p>
             </>

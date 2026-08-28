@@ -39,6 +39,48 @@ ROMANCE_INTENT = {
     "is_ai_generated": False,
 }
 
+# The three fixtures above leave investment_amount_rmb unset, so each falls through
+# to D1c's band placeholder. These three supply a real amount, which is the path
+# that actually decides a tier once thresholds are published: live action
+# T1 >= 3,000,000 / T2 >= 1,000,000; AI T1 >= 800,000 / T2 >= 300,000.
+
+# 一类 by amount alone - ordinary subject, over the live-action T1 line.
+KEY_BY_AMOUNT_INTENT = {
+    "form_type_claimed": "micro_drama",
+    "genre_keywords": ["都市", "创业"],
+    "logline": "一支年轻团队在城市里从零做起一家小店的创业故事。",
+    "episode_count": 30,
+    "episode_minutes": 3,
+    "budget_band": "band_a",
+    "investment_amount_rmb": 3200000,
+    "is_ai_generated": False,
+}
+
+# 二类 - ordinary subject, between the two live-action lines.
+ORDINARY_BY_AMOUNT_INTENT = {
+    "form_type_claimed": "micro_drama",
+    "genre_keywords": ["家庭"],
+    "logline": "三代人围绕一间老房子的搬迁做出各自的选择。",
+    "episode_count": 24,
+    "episode_minutes": 3,
+    "budget_band": "band_b",
+    "investment_amount_rmb": 1500000,
+    "is_ai_generated": False,
+}
+
+# AI micro-drama - the same money buys a different tier, because the AI set sits
+# lower. 900,000 is under the live-action T1 line but over the AI one.
+AI_KEY_INTENT = {
+    "form_type_claimed": "micro_drama",
+    "genre_keywords": ["科幻"],
+    "logline": "一名工程师在虚拟城市里寻找失踪同事的下落。",
+    "episode_count": 20,
+    "episode_minutes": 2,
+    "budget_band": "band_b",
+    "investment_amount_rmb": 900000,
+    "is_ai_generated": True,
+}
+
 VLOG_INTENT = {
     "form_type_claimed": "single_video",
     "genre_keywords": ["生活"],
@@ -72,9 +114,13 @@ def header(headers: dict, name: str) -> str | None:
 
 
 class Checker:
-    def __init__(self, base: str, internal_token: str) -> None:
+    def __init__(self, base: str, internal_token: str, timeout: float) -> None:
         self.base = base.rstrip("/")
         self.internal_token = internal_token
+        # A live Vertex classify measured 8.5-11.5s, so a 10s ceiling failed
+        # intermittently -- and as a raised TimeoutError, which aborted the run
+        # and hid every later check rather than recording one FAIL.
+        self.timeout = timeout
         self.failures = 0
 
     def call(
@@ -92,7 +138,7 @@ class Checker:
         for key, value in (headers or CREATOR).items():
             request.add_header(key, value)
         try:
-            with urllib.request.urlopen(request, timeout=10) as response:
+            with urllib.request.urlopen(request, timeout=self.timeout) as response:
                 return (
                     response.status,
                     json.loads(response.read() or b"{}"),
@@ -125,13 +171,19 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--base", default="http://localhost:8080")
     parser.add_argument("--internal-token", default="t_local_internal")
+    parser.add_argument(
+        "--timeout",
+        type=float,
+        default=60.0,
+        help="per-request timeout in seconds; classify calls a real model",
+    )
     args = parser.parse_args()
 
     # Sample text is Chinese; a Windows console defaults to a codepage that cannot show it.
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
-    checker = Checker(args.base, args.internal_token)
+    checker = Checker(args.base, args.internal_token, args.timeout)
 
     print("\n== 0. service is up ==")
     try:
@@ -144,6 +196,9 @@ def main() -> int:
     checker.check(
         "snapshot is pinned", bool(health.get("snapshot_version")), health.get("snapshot_version", "")
     )
+    # The service loads one seed snapshot. Asking it about any other version is
+    # a SNAPSHOT_NOT_FOUND, so every version we send below follows this one.
+    pinned = health.get("snapshot_version") or ""
     print(
         f"  note: llm_backend={health.get('llm_backend')} "
         f"available={health.get('llm_available')} "
@@ -188,6 +243,43 @@ def main() -> int:
         injected_class.get("tier") == "T1" and injected_class.get("co_review_required"),
     )
 
+    print()
+    print("== tier from a real amount, not the band placeholder ==")
+    for label, intent, want_tier, want_clause, want_authority in (
+        ("T1 3.2M live action", KEY_BY_AMOUNT_INTENT, "T1", "tier-live-action-2026", "nrta_national"),
+        ("T2 1.5M live action", ORDINARY_BY_AMOUNT_INTENT, "T2", "tier-live-action-2026", "provincial"),
+        ("T1 0.9M AI", AI_KEY_INTENT, "T1", "tier-ai-generated-2026", "nrta_national"),
+    ):
+        pid = checker.new_project(intent)
+        checker.call(
+            "POST",
+            f"/v1/projects/{pid}/channels",
+            {"domestic_platforms": ["hongguo"], "overseas": []},
+        )
+        _, res, _ = checker.call("POST", f"/v1/projects/{pid}/classify")
+        cls = res.get("classification") or {}
+        checker.check(f"{label} -> {want_tier}", cls.get("tier") == want_tier, cls.get("tier", ""))
+        # A real amount settles the tier, so the band placeholder must not have
+        # been consulted and the answer is not provisional.
+        checker.check(
+            f"{label} is settled, not provisional",
+            cls.get("tier_provisional") is False,
+            f"provisional={cls.get('tier_provisional')} pending={cls.get('pending_flags')}",
+        )
+        checker.check(
+            f"{label} cites the threshold clause it used",
+            want_clause in [r["clause_id"] for r in cls.get("evidence_refs", [])],
+            ",".join(r["clause_id"] for r in cls.get("evidence_refs", [])),
+        )
+        # The tier is only half the answer. The other half is where it files,
+        # and whether a grant has to land before anything may be published.
+        route = cls.get("filing_route") or {}
+        checker.check(
+            f"{label} says where it files",
+            route.get("authority") == want_authority,
+            f"authority={route.get('authority')} blocks_release={route.get('blocks_release_until_granted')}",
+        )
+
     print("\n== ordinary series: provisional tier ==")
     romance_id = checker.new_project(ROMANCE_INTENT)
     _, romance, _ = checker.call("POST", f"/v1/projects/{romance_id}/classify")
@@ -229,14 +321,14 @@ def main() -> int:
     print("\n== policy loop integration surface (what T-B3 will call) ==")
     internal = {"X-Internal-Token": checker.internal_token}
     status, _, _ = checker.call(
-        "POST", f"/v1/internal/projects/{romance_id}/recalc-tier", {"snapshot_version": "v1"}
+        "POST", f"/v1/internal/projects/{romance_id}/recalc-tier", {"snapshot_version": pinned}
     )
     checker.check("recalc-tier refuses without the token", status == 403)
 
     status, body, headers = checker.call(
         "POST",
         f"/v1/internal/projects/{romance_id}/recalc-tier",
-        {"snapshot_version": "v1"},
+        {"snapshot_version": pinned},
         headers=internal,
     )
     checker.check("recalc-tier answers a provisional project", status == 200, json.dumps(body))
@@ -248,7 +340,7 @@ def main() -> int:
     status, body, headers = checker.call(
         "POST",
         f"/v1/internal/projects/{project_id}/recalc-tier",
-        {"snapshot_version": "v1"},
+        {"snapshot_version": pinned},
         headers=internal,
     )
     checker.check(
@@ -259,7 +351,7 @@ def main() -> int:
     status, body, _ = checker.call(
         "POST",
         f"/v1/internal/projects/{project_id}/policy-stale",
-        {"snapshot_version": "v2"},
+        {"snapshot_version": pinned},
         headers=internal,
     )
     checker.check("stale flag is set", body.get("policy_stale") is True)
@@ -295,13 +387,13 @@ def main() -> int:
         "the notice carries keys and params, not prose",
         bool(stale_notice)
         and stale_notice[0]["title_key"] == "notification.policy_stale.title"
-        and stale_notice[0]["params"].get("snapshot_version") == "v2",
+        and stale_notice[0]["params"].get("snapshot_version") == pinned,
     )
 
     checker.call(
         "POST",
         f"/v1/internal/projects/{project_id}/policy-stale",
-        {"snapshot_version": "v2"},
+        {"snapshot_version": pinned},
         headers=internal,
     )
     _, redelivered, _ = checker.call("GET", "/v1/notifications")

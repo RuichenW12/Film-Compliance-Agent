@@ -123,6 +123,16 @@
       "path": "docs/partner-review/sources-v2/authoritative/SRC-010-guangdong-planning-faq.html",
       "sha256": "b6c0d20d775281976f513a128427fd51f38aeb43ca538f73b31637718bdc114c",
       "stored_in": "docs/partner-review/sources-v2"
+    },
+    {
+      "id": "O-007",
+      "title": "上海 国产网络剧片拍摄制作规划备案 审批结果样本",
+      "jurisdiction": "上海",
+      "status": "official_operational_guide",
+      "path": "operational/O-007-shanghai-planning-approval-sample.pdf",
+      "sha256": "00dedfbb8f993e41e4ca0a3007536543578f439c48e08c1554bc9d152fa6c9c3",
+      "note": "SRC-006 办事指南页的公开附件「审批结果样本.pdf」，无需账号即可下载。展示规划备案通过后收到的批复长什么样。含文字层但为 CID 编码，尚未抽取文本。",
+      "retrieved": "2026-08-27"
     }
   ],
   "forms": [

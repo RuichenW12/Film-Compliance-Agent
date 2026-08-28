@@ -7,6 +7,7 @@ import time
 import pytest
 
 from core.classify import classify
+from core.classify.chain import filing_route
 from core.classify.d1c import judge_tier
 from core.llm import ScriptedLLM
 from schemas.common import EvidenceRef
@@ -28,9 +29,15 @@ def test_special_subject_profile_is_t1_with_co_review(
     assert outcome.roadmap_preview["template"] == "T1_7steps"
 
     # 广电办发〔2024〕35号 backs the disposal itself — 特殊题材 follows the
-    # 协审工作机制 — so that is no longer flagged. What stays provisional is the
-    # match: the trigger vocabulary was written by this codebase. See D-026.
-    assert classification.tier_provisional is True
+    # 协审工作机制 — so that is not flagged either.
+    #
+    # The tier is settled. Whether an expert has signed off on the trigger
+    # vocabulary is a fact about the policy data, decided in the outer loop
+    # before publication, and it is still reported — as a flag. It does not make
+    # *this project's* tier look unsettled, which is a different claim and an
+    # unrepayable one: nothing clears expert_pending, so the tier would have read
+    # provisional forever. See D-031, superseding that half of D-033.
+    assert classification.tier_provisional is False
     assert "subject_match_unconfirmed" in classification.pending_flags
 
     # The hit quotes the triggering text verbatim, and the quote really occurs.
@@ -271,7 +278,7 @@ def test_published_threshold_sets_use_mode_and_exact_amount(
 
     广电办发〔2024〕35号 writes 「达到100万元及以上」 and 「30万元（含）—100万元
     之间」, the same inclusive pattern the 2026 adjustment uses, so equality is
-    not by itself uncertain. See D-026.
+    not by itself uncertain. See D-033.
     """
 
     decision = judge_tier(
@@ -603,3 +610,84 @@ def test_a_snapshot_can_be_usable_while_a_clause_it_cites_is_not_in_force():
     today = datetime(2026, 8, 27, tzinfo=timezone.utc)
     order16 = snapshots.clause("nrta-order-16-article-2", version)
     assert order16.in_force(today) is False
+
+
+def test_filing_route_names_the_authority_for_each_tier():
+    """总局令第16号 sends each tier somewhere different. The pack says where."""
+
+    snapshots = _v2_snapshots()
+    version = snapshots.latest_version()
+
+    t1 = filing_route(Tier.T1, snapshots, version)
+    t2 = filing_route(Tier.T2, snapshots, version)
+    t3 = filing_route(Tier.T3, snapshots, version)
+
+    assert t1["authority"] == "nrta_national"
+    assert t2["authority"] == "provincial"
+    assert t3["authority"] == "platform"
+
+    # Article 17 makes a grant a precondition of release for the first two and
+    # leaves the third to the platform. That difference is the whole point of
+    # the route: it answers "can I publish yet", not just "who reviews me".
+    assert t1["blocks_release_until_granted"] is True
+    assert t2["blocks_release_until_granted"] is True
+    assert t3["blocks_release_until_granted"] is False
+    assert t3["platform_self_review"] is True
+
+    # Article 12 puts the one-class filing before shooting; two-class is left to
+    # provincial rules, and none exist yet, so it must not read as settled.
+    assert t1["pre_shoot_filing"] == "required"
+    assert t2["pre_shoot_filing"] == "varies_by_province"
+    assert t3["pre_shoot_filing"] == "not_required"
+
+
+def test_filing_route_only_cites_clauses_the_snapshot_actually_carries():
+    snapshots = _v2_snapshots()
+    version = snapshots.latest_version()
+
+    for tier in (Tier.T1, Tier.T2, Tier.T3):
+        route = filing_route(tier, snapshots, version)
+        assert route["clause_refs"], f"{tier} route cites nothing"
+        for clause_id in route["clause_refs"]:
+            assert snapshots.clause(clause_id, version) is not None
+
+
+def test_a_tier_with_no_route_returns_nothing_rather_than_a_guess():
+    snapshots = _v2_snapshots()
+    version = snapshots.latest_version()
+
+    assert filing_route(Tier.UNDETERMINED, snapshots, version) is None
+
+
+def test_classification_carries_the_route_for_its_own_tier(channels):
+    """A 3.2M live-action project is T1, so it reports to the national body."""
+
+    from schemas.enums import ClaimedFormType
+    from schemas.project import IntentProfile
+
+    snapshots = _v2_snapshots()
+    intent = IntentProfile(
+        form_type_claimed=ClaimedFormType.MICRO_DRAMA,
+        genre_keywords=["都市"],
+        logline="一支年轻团队在城市里从零做起一家小店的创业故事。",
+        episode_count=30,
+        episode_minutes=3.0,
+        budget_band=BudgetBand.BAND_A,
+        investment_amount_rmb=3_200_000,
+        is_ai_generated=False,
+    )
+
+    classification = classify(intent, channels, snapshots).classification
+
+    assert classification.tier is Tier.T1
+    assert classification.filing_route is not None
+    assert classification.filing_route["authority"] == "nrta_national"
+    assert classification.filing_route["blocks_release_until_granted"] is True
+
+
+def test_a_snapshot_without_routes_simply_has_none(intent_crime, channels, snapshots):
+    """v1 predates filing_routes. Absent data reads as absent, not as a guess."""
+
+    classification = classify(intent_crime, channels, snapshots).classification
+
+    assert classification.filing_route is None
