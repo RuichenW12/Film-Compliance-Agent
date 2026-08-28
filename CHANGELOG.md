@@ -22,6 +22,42 @@ Conventions:
 
 ## 2026-08-28
 
+### A — the frontier was three stages further along than we thought
+
+- **Correction, and the reason it matters.** Planning the work after
+  classification, both the 2026-08-24 status doc and `e2e_check.py`'s
+  `PENDING_STEPS` said T-A3 to T-A6 were unbuilt. Both were stale. Every route
+  exists, and a live walk took a project through roadmap confirm, material
+  cards, an upload ticket, fact extraction and the C1-a pre-check into a
+  correctly blocked gate. See [D-042](docs/decisions.md#d-042).
+- **The e2e now walks steps 5 to 11** in a new section 19, sixteen assertions,
+  instead of printing them as pending. `PENDING_STEPS` keeps only the
+  policy-loop items that really have no route. **Workstream B: your line is the
+  only one left in that list.**
+- **The status doc opens with a stale banner** naming `openapi.json` and the
+  e2e output as the sources to trust instead.
+- **The wizard hands off.** The result card ends with *Continue to your filing
+  checklist*, opening `/collection?project=<id>`, which now auto-loads. Before
+  this the two screens were joined by copying an opaque id between them. See
+  [D-041](docs/decisions.md#d-041).
+- **The result card's "what happens next" was wrong** and is corrected: it said
+  the next stage was unbuilt when roadmap, materials, facts and the pre-check
+  all run. It now names what actually comes next, and keeps the honest caveat
+  that freeze and institution submission are unfinished.
+- **Fixed a latent bug that no test could see.** `core/extract.py` used a union
+  `"type": ["string","number","null"]`, which Vertex rejects — every live
+  extraction would have failed while the suite passed. Same defect as the one
+  already fixed in `core/intake_help.py`. New `tests/test_response_schemas.py`
+  discovers every `*SCHEMA` under `core/` and bans list-valued `type`; five
+  schemas covered. See [D-043](docs/decisions.md#d-043).
+- **Material cards cite clauses by name**, matching D-040, instead of printing
+  `nrta-order-16-article-14`.
+- Verified: `python -m pytest` (491 passed, 3 skipped), `npx tsc --noEmit`
+  clean, `python scripts/e2e_check.py --base http://localhost:8000` on a fresh
+  process **ALL CHECKS PASSED** including the sixteen new checks against real
+  Vertex, and a Chrome run following the handoff from a classification into a
+  loaded collection page.
+
 ### A — English only, and the result cites policies by name
 
 - **Every Chinese gloss is gone from the UI.** "Class 3 (三类)" is now "Class 3",

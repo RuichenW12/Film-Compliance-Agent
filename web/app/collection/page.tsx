@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import {
   ApiError,
@@ -143,6 +143,23 @@ export default function CollectionPage() {
       await refresh(projectId);
     });
   }
+
+  /* The wizard sends a creator here with ?project=<id> once it has classified
+     their work. Asking them to copy an opaque id out of one screen and paste it
+     into the next was the seam between two stages that are meant to be one
+     journey. Typing an id by hand still works -- this only removes the need. */
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const handed = new URLSearchParams(window.location.search).get("project");
+    if (!handed || loaded || busy !== null) return;
+    setProjectId(handed);
+    void guard("load", async () => {
+      await refresh(handed);
+    });
+    // `guard` and `refresh` are stable for the life of the page; re-running on
+    // every render would refetch in a loop.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const latestScript = assets.filter((asset) => asset.kind === "script").pop();
 
@@ -306,7 +323,13 @@ export default function CollectionPage() {
                         <span className="chip">{t("collection.optional")}</span>
                       )}
                       {card.why_clause ? (
-                        <span className="muted"> · {card.why_clause.clause_id}</span>
+                        <span className="muted">
+                          {" · "}
+                          {/* The clause by name, as D-040 settled for the
+                              result card. A raw id here would be the same
+                              defect in a second place. */}
+                          {t(`clause.${card.why_clause.clause_id}`)}
+                        </span>
                       ) : (
                         <span className="muted"> · {t("collection.no_clause")}</span>
                       )}

@@ -213,6 +213,14 @@ export function ClassificationCard({
 
       <h3>{t("result.next.title")}</h3>
       <p>{t("result.next.body")}</p>
+      {projectId ? (
+        <p>
+          <a className="primary-button" href={`/collection?project=${projectId}`}>
+            {t("result.next.cta")}
+          </a>
+        </p>
+      ) : null}
+      <p className="muted">{t("result.next.caveat")}</p>
 
       <p className="muted result-disclaimer">
         {t("result.disclaimer")}

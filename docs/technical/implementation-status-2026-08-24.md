@@ -1,5 +1,23 @@
 # Implementation status by owner — 2026-08-24
 
+> **Stale as of 2026-08-28. Do not plan from the T-A3 to T-A6 rows below.**
+>
+> Every route those rows call missing has since been written. `openapi.json`
+> now serves roadmap confirm, material cards, upload tickets, `extract-facts`,
+> the C1-a review, finding actions, form freeze and field confirm, the gate,
+> and the institution submit / decide / resume / filing routes. Section 19 of
+> `scripts/e2e_check.py` walks steps 5 to 11 end to end against a live server
+> and passes.
+>
+> This file was believed current on 2026-08-28 and cost a full planning pass:
+> it says T-A3 has "no route" while `api/routers/materials.py`,
+> `api/routers/assets.py` and `core/extract.py` were all in the tree. Trust
+> `python -c "import json,urllib.request; print(sorted(json.load(urllib.request.urlopen('http://localhost:8000/openapi.json'))['paths']))"`
+> and the e2e output over this table.
+>
+> What is genuinely unbuilt: the Firestore adapter (`store/` is memory-only),
+> the Veo teaser behind its flag, and workstream B's crawl and publish loop.
+
 Scope source of truth: API & interface contract v1, TDD v1, and the
 [Richard policy loop v1 scope](../superpowers/specs/2026-08-22-richard-policy-loop-v1-design.md).
 Ownership source of truth: the workstream table in [`README.md`](../../README.md)

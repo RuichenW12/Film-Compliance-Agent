@@ -1429,3 +1429,72 @@ replaced, because an empty bullet says nothing at all.
 **Revisit when** a snapshot carries an English title of its own, at which point
 the bundle copy should defer to the data rather than duplicate it.
 
+---
+
+## D-041
+
+**The wizard hands the project to collection; no id is copied by hand** · Area: A · Status: Accepted · 2026-08-28
+
+`/collection` asked the creator to paste a project id into a text box. The
+wizard, one screen earlier, had just created that project and knew the id. The
+two stages were one journey joined by a clipboard.
+
+The result card now ends with a link to `/collection?project=<id>`, and the
+collection page reads the query parameter once on mount and loads. Typing an id
+by hand still works: this removes the need, not the option.
+
+**Why a link and not a redirect.** Classification is an answer a creator may
+want to sit with, screenshot or show someone before doing anything. Bouncing
+them onward would treat the answer as a step rather than a result.
+
+## D-042
+
+**The status doc and the e2e both claimed a frontier three stages behind the code** · Area: Shared · Status: Accepted · 2026-08-28
+
+Planning the work after classification, two sources agreed that T-A3 through
+T-A6 were unbuilt: `docs/technical/implementation-status-2026-08-24.md` marked
+roadmap confirm as "no route", and `scripts/e2e_check.py` printed steps 5 to 14
+as `PENDING` from a hard-coded list. Both were stale. `openapi.json` already
+served every one of those routes, and driving them against a live server took a
+project from intent through roadmap confirm, material cards, an upload ticket,
+fact extraction, the C1-a pre-check, and into a correctly blocked gate.
+
+The cost was a full planning pass spent designing work that existed, and an
+answer to the owner that understated the product by six stages.
+
+**What changed.** `PENDING_STEPS` now holds only the policy-loop items that
+genuinely have no route, and a new section 19 walks steps 5 to 11 with sixteen
+assertions -- including that a kept fact quotes the uploaded file, and that a
+form freeze is refused while the gate is blocked. The status doc keeps its
+table for history but opens with a banner naming itself stale and pointing at
+`openapi.json` and the e2e output instead.
+
+**The rule this suggests.** A hard-coded list of what is unbuilt rots silently,
+because nothing fails when the code catches up. A check that walks the route and
+passes cannot rot the same way: it either exercises the feature or breaks. When
+those disagree, believe the one that made a request.
+
+## D-043
+
+**A union type in a response schema is invisible to every fake-LLM test** · Area: A · Status: Accepted · 2026-08-28
+
+`core/extract.py` declared `"value": {"type": ["string", "number", "null"]}`.
+Vertex's `responseSchema` is an OpenAPI 3.0 subset where `type` is a single
+string, so every live extraction call would have failed while the suite stayed
+green -- the same defect already fixed once in `core/intake_help.py`.
+
+The union also bought nothing. `_survives` requires `str(value)` to appear
+verbatim inside the quote, which must appear verbatim in the document, so a
+value that is not literal document text is discarded regardless, and a null
+value is rejected outright. The schema is now `{"type": "string"}`.
+
+**The guard.** `tests/test_response_schemas.py` walks every module-level
+`*SCHEMA` dict under `core/` and fails on any list-valued `type`. It discovers
+the schemas rather than listing them, so a new one is covered when it is
+written, and it asserts that it found some -- otherwise a rename would leave it
+passing by checking nothing. Five schemas are currently covered.
+
+**Revisit if** a backend is added whose schema dialect does accept unions, at
+which point the check should key off the configured backend rather than ban the
+construct outright.
+

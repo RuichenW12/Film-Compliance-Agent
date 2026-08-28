@@ -98,16 +98,21 @@ VLOG_INTENT = {
     "is_ai_generated": True,
 }
 
-# Contract section 7 steps that no code implements yet.
+# Contract section 7 steps with no route yet.
+#
+# This list used to name steps 5 through 14, which was wrong: every one of
+# them has been implemented and is now walked by section 19 below. Printing
+# them as PENDING made the script report a frontier three stages behind the
+# code, and anyone reading the output would have concluded the product stops
+# at classification. A step belongs here only when openapi.json has no route
+# for it -- section 19 is what proves the rest.
 PENDING_STEPS = [
-    ("5. roadmap confirm", "T-A3"),
-    ("6. materials, upload URL, fact extraction", "T-A3"),
-    ("8. script pre-check findings (C1-a)", "T-A4"),
-    ("9. finding actions and incremental review", "T-A5"),
-    ("11. form freeze, field confirm, hash", "T-A5"),
-    ("12-14. institution console and filing", "T-A6"),
     ("15-16. policy crawl, publish, stale + recalc fan-out", "T-B1..T-B3"),
 ]
+
+# A short script for the pre-check. Deliberately ordinary: this walks the
+# plumbing, and a subject that trips a rule is covered in tests/.
+SAMPLE_SCRIPT = '第一场 便利店 夜 内\n林小满站在收银台后。\n陈默推门进来。\n'
 
 
 def header(headers: dict, name: str) -> str | None:
@@ -158,6 +163,26 @@ class Checker:
             except json.JSONDecodeError:
                 parsed = {"raw": payload.decode(errors="replace")}
             return error.code, parsed, dict(error.headers)
+
+    def put_bytes(self, path: str, payload: bytes) -> tuple[int, dict]:
+        """Upload route takes the file itself, so this bypasses the JSON body."""
+
+        request = urllib.request.Request(
+            f"{self.base}{path}", data=payload, method="PUT"
+        )
+        request.add_header("Content-Type", "application/octet-stream")
+        for key, value in CREATOR.items():
+            request.add_header(key, value)
+        try:
+            with urllib.request.urlopen(request) as response:
+                raw = response.read().decode()
+                return response.status, (json.loads(raw) if raw else {})
+        except urllib.error.HTTPError as error:
+            raw = error.read().decode()
+            try:
+                return error.code, json.loads(raw)
+            except json.JSONDecodeError:
+                return error.code, {"raw": raw[:200]}
 
     def check(self, label: str, condition: bool, detail: str = "") -> None:
         mark = "PASS" if condition else "FAIL"
@@ -455,6 +480,8 @@ def main() -> int:
     )
     checker.check("another creator sees an empty inbox", other_inbox == [])
 
+    walk_post_classification(checker, pinned)
+
     print("\n== not built yet (each line is the next task, not a bug) ==")
     for label, task in PENDING_STEPS:
         print(f"  [PENDING {task}] {label}")
@@ -464,6 +491,137 @@ def main() -> int:
     )
     return 1 if checker.failures else 0
 
+
+
+def walk_post_classification(checker: "Checker", pinned: str) -> None:
+    """Steps 5 to 11 on a fresh project, because they are built and were not walked.
+
+    The script used to print these as PENDING from a hard-coded list. They are
+    implemented, so the honest thing is to exercise them and let a real failure
+    speak. Everything here is one project taken from intent to a blocked gate.
+    """
+
+    print()
+    print()
+    print("== 19. past classification: roadmap, materials, facts, pre-check ==")
+
+    project_id = checker.new_project(dict(ROMANCE_INTENT))
+    status, body, _ = checker.call("POST", f"/v1/projects/{project_id}/classify")
+    checker.check(
+        "a project to walk with",
+        status == 200 and body.get("classification", {}).get("tier") == "T3",
+        json.dumps(body.get("classification", {}).get("tier")),
+    )
+
+    # 5. roadmap confirm
+    status, body, _ = checker.call("GET", f"/v1/projects/{project_id}/roadmap")
+    steps = (body.get("roadmap") or {}).get("steps") or []
+    checker.check(
+        "the roadmap arrives with steps before it is confirmed",
+        status == 200 and bool(steps) and not (body.get("roadmap") or {}).get("confirmed"),
+        json.dumps({"steps": len(steps)}),
+    )
+    checker.check(
+        "every step names an owner",
+        all(step.get("owner") for step in steps),
+    )
+
+    status, body, _ = checker.call("POST", f"/v1/projects/{project_id}/roadmap/confirm")
+    checker.check(
+        "confirming the roadmap starts collection",
+        status == 200 and body.get("state") == "COLLECTING_MATERIALS",
+        json.dumps(body.get("state")),
+    )
+    status, again, _ = checker.call("POST", f"/v1/projects/{project_id}/roadmap/confirm")
+    checker.check(
+        "confirming twice is idempotent",
+        status == 200 and again.get("state") == body.get("state"),
+    )
+
+    # 6. materials and the upload ticket
+    status, cards, _ = checker.call("GET", f"/v1/projects/{project_id}/materials")
+    required = [card for card in cards if card.get("required")]
+    checker.check(
+        "collection cards arrive, some required",
+        status == 200 and bool(required),
+        json.dumps([card.get("material_id") for card in required]),
+    )
+    checker.check(
+        "every card names its material through a key, not prose",
+        all(str(card.get("name_key", "")).startswith("material.") for card in cards),
+    )
+
+    status, ticket, _ = checker.call(
+        "POST",
+        f"/v1/projects/{project_id}/assets/upload-url",
+        {"kind": "script", "filename": "script.txt"},
+    )
+    checker.check(
+        "an upload ticket is issued",
+        status == 200 and bool(ticket.get("ticket_id")) and bool(ticket.get("upload_url")),
+        json.dumps(ticket.get("backend")),
+    )
+
+    version = ""
+    if ticket.get("ticket_id"):
+        status, asset = checker.put_bytes(
+            ticket["upload_url"], SAMPLE_SCRIPT.encode("utf-8")
+        )
+        version = asset.get("version_id", "")
+        checker.check(
+            "the upload records an asset version with a hash",
+            status == 201 and bool(version) and bool(asset.get("sha256")),
+            json.dumps({"version": bool(version)}),
+        )
+
+    if version:
+        # 6. fact extraction
+        status, body, _ = checker.call(
+            "POST", f"/v1/projects/{project_id}/assets/{version}/extract-facts"
+        )
+        checker.check(
+            "fact extraction answers, and names its backend",
+            status == 200 and "backend" in body,
+            json.dumps({"backend": body.get("backend"), "kept": len(body.get("facts") or [])}),
+        )
+        checker.check(
+            "no fact is invented: every one kept carries a quote from the file",
+            all(
+                (fact.get("quote") or "") in SAMPLE_SCRIPT
+                for fact in (body.get("facts") or [])
+            ),
+        )
+
+        # 8. the C1-a pre-check
+        status, body, _ = checker.call(
+            "POST", f"/v1/projects/{project_id}/review", {"asset_version": version}
+        )
+        checker.check(
+            "the script pre-check runs and reports its backend",
+            status == 200 and "backend" in body,
+            json.dumps({"backend": body.get("backend"), "findings": len(body.get("findings") or [])}),
+        )
+        checker.check(
+            "a finding without evidence never reaches the creator",
+            all(
+                finding.get("evidence_refs")
+                for finding in (body.get("findings") or [])
+            ),
+        )
+
+    # 11. the gate holds the form shut until it is satisfied
+    status, gate, _ = checker.call("GET", f"/v1/projects/{project_id}/gate")
+    checker.check(
+        "the gate reports machine-readable gaps",
+        status == 200 and gate.get("passed") is False and bool(gate.get("gaps")),
+        json.dumps([gap.get("check") for gap in gate.get("gaps") or []]),
+    )
+    status, body, _ = checker.call("POST", f"/v1/projects/{project_id}/form/freeze")
+    checker.check(
+        "a form cannot be frozen while the gate is blocked",
+        status == 409,
+        json.dumps(body.get("error", {}).get("code")),
+    )
 
 if __name__ == "__main__":
     sys.exit(main())
