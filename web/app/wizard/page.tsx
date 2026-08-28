@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 
 import { FieldHelp } from "../../components/field-help";
+import { ClassificationCard } from "../../components/classification-card";
 import { GenrePicker } from "../../components/genre-picker";
 import { PolicyVerificationBanner } from "../../components/policy-verification-banner";
 import {
@@ -290,115 +291,11 @@ export default function WizardPage() {
       ) : null}
 
       {result ? (
-        <section className="card" ref={resultRef}>
-          <h2>Classification</h2>
-          <PolicyVerificationBanner
-            status={result.classification?.policy_verification_status}
-          />
-          {result.exit ? (
-            <p>{t(result.exit.card_key)}</p>
-          ) : (
-            <>
-              <p>
-                <span className="badge">{result.classification?.form_type}</span>
-                <span className="badge">
-                  {t("classification.tier")} {result.classification?.tier}
-                </span>
-                {result.classification?.tier_provisional ? (
-                  <span className="badge">
-                    {t("classification.provisional")}
-                  </span>
-                ) : null}
-                {result.classification?.co_review_required ? (
-                  <span className="badge">{t("classification.co_review")}</span>
-                ) : null}
-              </p>
-              <h3>Why</h3>
-              <ul>
-                {result.classification?.matched_rules.map((rule) => (
-                  <li key={rule.rule_id}>
-                    <code>{rule.rule_id}</code>: “{rule.quote}”
-                  </li>
-                ))}
-                {result.classification?.evidence_refs.map((ref) => (
-                  <li key={ref.clause_id}>
-                    Clause <code>{ref.clause_id}</code> (snapshot{" "}
-                    {ref.snapshot_version})
-                  </li>
-                ))}
-              </ul>
-              {result.classification?.pending_flags.length ? (
-                <p>
-                  {result.classification.pending_flags.map((flag) => (
-                    <span className="badge" key={flag}>
-                      {flag}
-                    </span>
-                  ))}
-                </p>
-              ) : null}
-              {result.classification?.pending_flags.includes(
-                "filing_due_before_shooting"
-              ) ? (
-                <p className="alert warning-alert">
-                  {t("flag.filing_due_before_shooting")}
-                </p>
-              ) : null}
-              {result.classification?.pending_flags.includes(
-                "clause_not_yet_in_force"
-              ) ? (
-                <p className="alert warning-alert">
-                  {t("flag.clause_not_yet_in_force")}
-                </p>
-              ) : null}
-              {result.classification?.filing_route ? (
-                <>
-                  <h3>{t("filing.heading")}</h3>
-                  <ul>
-                    <li>
-                      {t("filing.authority")}:{" "}
-                      <strong>
-                        {t(
-                          `filing.authority.${result.classification.filing_route.authority}`
-                        )}
-                      </strong>
-                    </li>
-                    <li>
-                      {t("filing.pre_shoot")}:{" "}
-                      {t(
-                        `filing.pre_shoot.${result.classification.filing_route.pre_shoot_filing}`
-                      )}
-                    </li>
-                    <li>
-                      {t("filing.result_document")}:{" "}
-                      {t(
-                        `filing.document.${result.classification.filing_route.result_document}`
-                      )}
-                    </li>
-                  </ul>
-                  {/* The one line that changes what a creator does next. */}
-                  <p
-                    className={
-                      result.classification.filing_route
-                        .blocks_release_until_granted
-                        ? "alert warning-alert"
-                        : "alert"
-                    }
-                  >
-                    {result.classification.filing_route
-                      .blocks_release_until_granted
-                      ? t("filing.blocks_release")
-                      : t("filing.no_block")}
-                  </p>
-                </>
-              ) : null}
-              <p>Roadmap template: {result.roadmap_preview?.template ?? "—"}</p>
-            </>
-          )}
-          <p>
-            Project <code>{projectId}</code> is now in state{" "}
-            <code>{result.state}</code>.
-          </p>
-        </section>
+        <ClassificationCard
+          result={result}
+          projectId={projectId}
+          sectionRef={resultRef}
+        />
       ) : null}
     </section>
   );

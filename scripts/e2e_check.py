@@ -6,6 +6,13 @@
 Steps map to the golden e2e sequence in the API contract (section 7). Steps that
 are not built yet are reported as PENDING with the task that will deliver them,
 so the output doubles as a progress board.
+
+Run it against a **freshly started** API. Section 17 asserts the demo creator has
+exactly one `policy_stale` notice, and every run adds one more to the same inbox
+— so against a server left running from an earlier run it reports two failures
+that say nothing about the code. The store is in memory, so restarting the API
+is the whole fix. `--base` picks a different port when you want to leave a
+long-lived server alone.
 """
 
 from __future__ import annotations

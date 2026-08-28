@@ -688,3 +688,48 @@ main label span {
   border-color: #6f8fc9;
   color: #23406e;
 }
+
+/* The classification result. A creator reads this once, under pressure, to
+   find out what they have to do — so the verdict is set larger than body
+   text, the obligations are a numbered list, and the identifiers that used to
+   headline this card are folded into disclosures that open on demand. */
+.result-card .result-headline {
+  font-size: 1.125rem;
+  line-height: 1.5;
+  margin: 0.25rem 0 0.5rem;
+}
+
+.result-card .result-steps {
+  margin: 0.5rem 0 0;
+  padding-left: 1.25rem;
+  line-height: 1.7;
+}
+
+.result-card .result-steps li {
+  margin-bottom: 0.25rem;
+}
+
+.result-why,
+.result-debug {
+  margin-top: 1rem;
+  border-top: 1px solid var(--border);
+  padding-top: 0.75rem;
+}
+
+.result-why > summary,
+.result-debug > summary {
+  cursor: pointer;
+  font-size: 0.875rem;
+  color: var(--muted);
+}
+
+.result-why code,
+.result-debug code {
+  font-size: 0.75rem;
+  margin-right: 0.375rem;
+}
+
+.result-disclaimer {
+  margin-top: 1rem;
+  font-size: 0.8125rem;
+}

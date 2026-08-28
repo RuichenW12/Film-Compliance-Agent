@@ -22,6 +22,44 @@ Conventions:
 
 ## 2026-08-28
 
+### A — the classification result says what to do, in words
+
+- **The result card was a debug view and now reads as an answer.** A creator ran
+  a classification and got back `micro_drama`, `Tier T3`, a clause id, a
+  `script_verify` chip, `T3_4steps`, and their project's internal state — with
+  the filing route, the only actionable part, at the bottom. The verdict is now
+  a sentence, the filing route is a numbered "What this means you have to do" at
+  the top, and flags read as sentences. See [D-037](docs/decisions.md#d-037).
+- **Nothing was deleted.** The matched quotes, clause ids and snapshot version
+  moved into a "How we reached this" disclosure; the project id, state and
+  roadmap template into "Technical detail". `evidence_refs` still reach the page
+  — one click away rather than as the headline.
+- **The card now says the trail ends here**, naming the script pre-check as the
+  next stage and stating plainly that it is not built.
+- **New guard, and it found things.** `t()` falls back to the key when copy is
+  missing, which is how raw identifiers reached a creator. `tests/test_result_copy.py`
+  walks `FormType`, `Tier`, every `filing_route` value in `policy/*.yaml` and
+  every flag literal in `core/classify/`, failing when one has no copy. It
+  caught seven flags that would have rendered as keys — `amount_required`,
+  `amount_official`, `budget_unknown`, `generation_mode_required`,
+  `thresholds_unavailable`, `threshold_boundary_disputed`, `human_review`.
+- Verified: `python -m pytest` (483 passed, 3 skipped), `npx tsc --noEmit`
+  clean, `python scripts/e2e_check.py --base http://localhost:8000` **ALL CHECKS
+  PASSED**, and a T3 run in Chrome reading end to end as English with the
+  evidence intact behind the disclosure.
+- **`e2e_check.py` needs a freshly started API, and now says so.** Section 17
+  asserts the demo creator has exactly one `policy_stale` notice; each run adds
+  one more to the same inbox, so a server left running from an earlier run
+  reports two failures that say nothing about the code. Confirmed by running the
+  same script on stock `HEAD` (identical failures) and on a fresh process (all
+  green). The product logic is right — `mark_policy_stale` already guards
+  redelivery with `already_stale`. Only the script's docstring changed.
+- **Unrelated environment note for anyone verifying in a browser:** Chrome
+  serves every Next.js chunk as 403 on `http://127.0.0.1:3000`, so the page
+  renders but never hydrates and the form falls back to a native GET submit.
+  The same server on `http://localhost:3000` is fine, and `curl` gets 200 on
+  both. Use `localhost`.
+
 ### A — one story field, suggested genres, and an order that follows the logic
 
 - **`logline` is gone; `synopsis` is the one story field.** Two free-text boxes

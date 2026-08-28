@@ -1265,3 +1265,58 @@ can show them, which is a second copy of policy data. The tier is still computed
 server-side from the pinned snapshot and stays correct if the two drift; the
 labels would not. Accepted because a range with no numbers is a question nobody
 can answer, and recorded here so the staleness is findable.
+
+---
+
+## D-037
+
+**The result card speaks; the identifiers stay, folded away** · Area: A · Status: Accepted · 2026-08-28
+
+A creator ran a classification and read this back: `micro_drama`, `Tier T3`,
+"Clause `tier-ai-generated-2026` (snapshot v2)", a bare `script_verify` chip,
+"Roadmap template: `T3_4steps`", and "Project `proj_01m14mer...` is now in state
+`CLASSIFIED`". Their verdict was that it was unreadable, and they were right.
+Every line was true, and not one of them answered "so what do I do?" — while
+the filing route, the one part that did, sat at the bottom of the card.
+
+The card had grown as an integration view. It showed what the chain produced, in
+the order the chain produced it, which is the right display for the person
+debugging the chain and the wrong one for the person the chain is for.
+
+**What changed.** The verdict is a sentence built from copy, not a pair of enum
+chips. The filing route moves to the top under "What this means you have to do",
+as a numbered list. Pending flags render as sentences or not at all. The clause
+ids, the matched quotes and the snapshot version move into a "How we reached
+this" disclosure, and the project id, state and roadmap template into a
+"Technical detail" one.
+
+**Why fold rather than delete.** Ground rule 2 says a conclusion asserting
+compliance carries its `evidence_refs`, and that stays literally true — the
+evidence is on the page, one click away, with the quote it matched. What the
+rule does not say is that the evidence must be the first thing a creator reads.
+The identifiers are equally kept: they are how we reproduce a complaint, and
+deleting them to tidy the card would cost more than it saved.
+
+**The class names.** `T1`/`T2`/`T3` render as "Class 1 (一类)" and so on, following
+the stack rule that the UI is English with Chinese legal terms glossed. The
+per-class explanation describes the classification scheme, which 总局令第16号
+defines; it does not describe consequences, which come from `filing_route` in
+the snapshot and are rendered from that data.
+
+**Saying that the trail ends here.** "What happens next" states that the script
+pre-check is the next stage and that it is not built. Silence would have implied
+classification was the whole product; a step listed with no way to reach it
+would have been worse.
+
+**The guard.** `t()` falls back to the key when a bundle has no entry, which is
+how a raw identifier reached a creator in the first place. The fallback is
+right — a missing string should not blank a page — so `tests/test_result_copy.py`
+now walks `FormType`, `Tier`, every `filing_route` value in `policy/*.yaml`, and
+every flag literal in `core/classify/`, and fails when one has no copy. A new
+flag must be given words or listed as deliberately silent. Writing it caught
+seven flags the card would have shown as keys: `amount_required`,
+`amount_official`, `budget_unknown`, `generation_mode_required`,
+`thresholds_unavailable`, `threshold_boundary_disputed`, `human_review`.
+
+**Revisit when** the script pre-check ships, because "What happens next" then
+describes a step the creator can actually take and should link to it.
