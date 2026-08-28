@@ -41,8 +41,20 @@ interface ClassifyResponse {
 
 const BANDS: BudgetBand[] = ["band_a", "band_b", "band_c", "unknown"];
 
+type ProductionStage = "idea" | "script_ready" | "shooting" | "finished" | "unknown";
+const STAGES: ProductionStage[] = [
+  "unknown",
+  "idea",
+  "script_ready",
+  "shooting",
+  "finished"
+];
+
 export default function WizardPage() {
+  const [title, setTitle] = useState("");
   const [logline, setLogline] = useState("");
+  const [synopsis, setSynopsis] = useState("");
+  const [stage, setStage] = useState<ProductionStage>("unknown");
   const [genres, setGenres] = useState("");
   const [episodeCount, setEpisodeCount] = useState("24");
   const [episodeMinutes, setEpisodeMinutes] = useState("3");
@@ -57,9 +69,6 @@ export default function WizardPage() {
   // a project 重点微短剧 on their own, whatever the investment amount says.
   const [platformPromoted, setPlatformPromoted] = useState(false);
   const [voluntaryKey, setVoluntaryKey] = useState(false);
-  // Empty, not "hongguo,douyin". Prefilling names a distribution plan the
-  // creator never stated, and a first-time creator often does not have one yet.
-  const [platforms, setPlatforms] = useState("");
 
   const [busy, setBusy] = useState(false);
   const resultRef = useRef<HTMLElement | null>(null);
@@ -80,7 +89,7 @@ export default function WizardPage() {
     try {
       const created = await apiFetch<{ project_id: string }>("/v1/projects", {
         method: "POST",
-        body: JSON.stringify({ title_working: null })
+        body: JSON.stringify({ title_working: title.trim() || null })
       });
       setProjectId(created.project_id);
 
@@ -93,6 +102,8 @@ export default function WizardPage() {
             .map((value) => value.trim())
             .filter(Boolean),
           logline,
+          synopsis: synopsis.trim() || null,
+          production_stage: stage,
           episode_count: Number(episodeCount),
           episode_minutes: Number(episodeMinutes),
           budget_band: budgetBand,
@@ -105,16 +116,6 @@ export default function WizardPage() {
         })
       });
 
-      await apiFetch(`/v1/projects/${created.project_id}/channels`, {
-        method: "POST",
-        body: JSON.stringify({
-          domestic_platforms: platforms
-            .split(",")
-            .map((value) => value.trim())
-            .filter(Boolean),
-          overseas: []
-        })
-      });
 
       const classified = await apiFetch<ClassifyResponse>(
         `/v1/projects/${created.project_id}/classify`,
@@ -137,6 +138,15 @@ export default function WizardPage() {
       <h1>{t("wizard.intent.title")}</h1>
       <form onSubmit={onSubmit} className="card">
         <label>
+          <span>{t("wizard.title")}</span>
+          <FieldHelp field="title" label="Title" />
+          <input
+            value={title}
+            onChange={(event) => setTitle(event.target.value)}
+            size={40}
+          />
+        </label>
+        <label>
           <span>Logline</span>
           <FieldHelp field="logline" label="Logline" />
           <input
@@ -145,6 +155,29 @@ export default function WizardPage() {
             size={60}
             required
           />
+        </label>
+        <label>
+          <span>{t("wizard.synopsis")}</span>
+          <FieldHelp field="synopsis" label="Synopsis" />
+          <textarea
+            value={synopsis}
+            onChange={(event) => setSynopsis(event.target.value)}
+            rows={4}
+          />
+        </label>
+        <label>
+          <span>{t("wizard.production_stage")}</span>
+          <FieldHelp field="production_stage" label="How far along it is" />
+          <select
+            value={stage}
+            onChange={(event) => setStage(event.target.value as ProductionStage)}
+          >
+            {STAGES.map((value) => (
+              <option key={value} value={value}>
+                {t(`production_stage.${value}`)}
+              </option>
+            ))}
+          </select>
         </label>
         <label>
           <span>Genre keywords (comma separated)</span>
@@ -211,6 +244,13 @@ export default function WizardPage() {
             onChange={(event) => setIsAiGenerated(event.target.checked)}
           />
         </label>
+        {/* Neither is answerable at intake: platform promotion is settled
+            after the film exists, and declaring voluntarily is a strategic
+            choice. Kept, because deleting them would let a platform-featured
+            500,000 project read as three-class when Circular 35 makes it one
+            — but out of the first screen, where they were noise. */}
+        <details className="more-conditions">
+          <summary>{t("wizard.more_conditions")}</summary>
         <label>
           <span>{t("wizard.platform_promoted")}</span>
           <FieldHelp field="platform_promoted" label="Platform will feature it" />
@@ -231,16 +271,7 @@ export default function WizardPage() {
         </label>
         <p className="muted">{t("wizard.key_conditions_note")}</p>
         <p className="muted">{t("wizard.key_conditions_guidance")}</p>
-        <h2>{t("wizard.channels.title")}</h2>
-        <label>
-          <span>{t("wizard.domestic_platforms")}</span>
-          <input
-            value={platforms}
-            onChange={(event) => setPlatforms(event.target.value)}
-            size={40}
-          />
-        </label>
-        <p className="muted">{t("wizard.domestic_platforms.hint")}</p>
+        </details>
         <button type="submit" disabled={busy}>
           {busy ? "Running…" : t("wizard.classify")}
         </button>
@@ -303,6 +334,13 @@ export default function WizardPage() {
                       {flag}
                     </span>
                   ))}
+                </p>
+              ) : null}
+              {result.classification?.pending_flags.includes(
+                "filing_due_before_shooting"
+              ) ? (
+                <p className="alert warning-alert">
+                  {t("flag.filing_due_before_shooting")}
                 </p>
               ) : null}
               {result.classification?.pending_flags.includes(

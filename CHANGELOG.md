@@ -22,6 +22,37 @@ Conventions:
 
 ## 2026-08-28
 
+### A — ask what a creator can answer, and what actually decides something
+
+Five changes to what intake asks, from reviewing the form question by question.
+
+- **A working title.** `required_facts` has always included `title`, and the
+  wizard sent `title_working: null` — so every project reached the freeze gate
+  with a fact it could never have supplied. Asked now.
+- **A synopsis, read by the subject stage alongside the logline.** One sentence
+  is thin evidence for a special-subject match. Verified end to end: a logline
+  of 「两个老朋友在小城重逢」 with the operation described only in the synopsis
+  now returns `T1`, quoting the synopsis — and would have read as three-class
+  before. The verbatim rule is unchanged; there is simply more of the creator's
+  own text for a quote to be found in.
+- **`has_finished_film` becomes `production_stage`** (idea / script written /
+  shooting / finished). The bool could not say whether shooting had *started*,
+  which is the line article 12 draws, and nothing read it. **A one-class project
+  already shooting now carries `filing_due_before_shooting`** — the tier does not
+  move and no state changes, but a roadmap opening with a step they have passed
+  would read as advice when it is a problem.
+- **The distribution question is gone.** Nothing in `core/` read
+  `domestic_platforms`; asking a first-time creator where they will publish, and
+  then ignoring the answer, was the worst of both.
+- **The two Circular 35 conditions fold into a disclosure.** Neither is
+  answerable at intake — platform promotion is settled after the film exists —
+  but deleting them would let a platform-featured 500,000 project read as
+  three-class when Circular 35 makes it a key micro-drama. Out of the first
+  screen, not out of the model.
+- Verified: `python -m pytest` (459 passed, 3 skipped — 3 new), `npx tsc
+  --noEmit` clean, and the whole path driven in Chrome with a synopsis-only
+  subject hit while already shooting.
+
 ### A — the help panel closes when you click away
 
 - Clicking anywhere outside an open `?` panel closes it, and so does Escape.

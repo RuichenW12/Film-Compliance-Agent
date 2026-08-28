@@ -10,6 +10,7 @@ from .enums import (
     ClaimedFormType,
     FormType,
     Phase,
+    ProductionStage,
     ProjectState,
     Tier,
 )
@@ -22,12 +23,18 @@ class IntentProfile(DomainModel):
     form_type_claimed: ClaimedFormType = ClaimedFormType.UNKNOWN
     genre_keywords: list[str] = Field(default_factory=list)
     logline: str | None = None
+    # Longer than the logline and read by the same subject stage. One sentence
+    # is thin evidence for a special-subject match; a paragraph gives the
+    # check something to quote.
+    synopsis: str | None = None
     episode_count: int | None = Field(default=None, ge=1)
     episode_minutes: float | None = Field(default=None, gt=0)
     budget_band: BudgetBand = BudgetBand.UNKNOWN
     investment_amount_rmb: int | None = Field(default=None, ge=0)
     is_ai_generated: bool | None = None
-    has_finished_film: bool | None = None
+    # Replaces `has_finished_film`, which nothing read. A bool could not say
+    # whether shooting had *started*, which is the line article 12 draws.
+    production_stage: ProductionStage = ProductionStage.UNKNOWN
     # 广电办发〔2024〕35号 makes 重点微短剧 any one of four conditions. Amount and
     # special subject were already modelled; these are the other two.
     platform_promoted: bool | None = None

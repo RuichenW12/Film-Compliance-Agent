@@ -4,7 +4,14 @@ from __future__ import annotations
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from schemas.enums import AssetKind, BudgetBand, ClaimedFormType, ExitKind, ProjectState
+from schemas.enums import (
+    AssetKind,
+    BudgetBand,
+    ClaimedFormType,
+    ExitKind,
+    ProductionStage,
+    ProjectState,
+)
 from schemas.common import Fact
 from schemas.findings import Finding
 from schemas.workflow import InstitutionReview, WorkflowTask
@@ -30,12 +37,13 @@ class IntentRequest(ApiModel):
     form_type_claimed: ClaimedFormType | None = None
     genre_keywords: list[str] | None = None
     logline: str | None = None
+    synopsis: str | None = None
     episode_count: int | None = Field(default=None, ge=1)
     episode_minutes: float | None = Field(default=None, gt=0)
     budget_band: BudgetBand | None = None
     investment_amount_rmb: int | None = Field(default=None, ge=0)
     is_ai_generated: bool | None = None
-    has_finished_film: bool | None = None
+    production_stage: ProductionStage | None = None
     # 广电办发〔2024〕35号 makes 重点微短剧 any one of four conditions. These are
     # the two that have nothing to do with money, and they must be accepted here
     # or the wizard's whole submission is rejected: ApiModel forbids extras.

@@ -10,7 +10,7 @@ import pytest
 from core.clock import FixedClock
 from core.llm import ScriptedLLM, UnavailableLLM
 from core.workflow_service import WorkflowService
-from schemas.enums import BudgetBand, ClaimedFormType
+from schemas.enums import BudgetBand, ClaimedFormType, ProductionStage
 from schemas.project import ChannelProfile, IntentProfile
 from schemas.snapshot import FileSnapshotService
 from store.memory import InMemoryStores
@@ -67,7 +67,7 @@ def intent_crime() -> IntentProfile:
         episode_minutes=3.0,
         budget_band=BudgetBand.BAND_B,
         is_ai_generated=True,
-        has_finished_film=False,
+        production_stage=ProductionStage.SCRIPT_READY,
     )
 
 
@@ -83,7 +83,7 @@ def intent_romance() -> IntentProfile:
         episode_minutes=2.0,
         budget_band=BudgetBand.BAND_C,
         is_ai_generated=False,
-        has_finished_film=False,
+        production_stage=ProductionStage.SCRIPT_READY,
     )
 
 
@@ -99,5 +99,5 @@ def intent_single_video() -> IntentProfile:
         episode_minutes=8.0,
         budget_band=BudgetBand.BAND_C,
         is_ai_generated=True,
-        has_finished_film=True,
+        production_stage=ProductionStage.FINISHED,
     )

@@ -106,6 +106,17 @@ def _pattern_stage(
     return hits
 
 
+def _document(logline: str, keywords: str, synopsis: str) -> str:
+    """What the semantic stage reads, and what a quote must be found in.
+
+    Joined rather than concatenated blindly so an absent part does not leave a
+    stray newline the model might quote across -- the verbatim check compares
+    against exactly this string.
+    """
+
+    return chr(10).join(part for part in (logline, keywords, synopsis) if part)
+
+
 def judge_subject(
     intent: IntentProfile,
     pack2: dict,
@@ -115,7 +126,16 @@ def judge_subject(
     by_id = {rule.rule_id: rule for rule in rules}
     logline = intent.logline or ""
     keywords = " ".join(intent.genre_keywords)
-    haystacks = {"logline": logline, "genre_keywords": keywords}
+    # The synopsis is read alongside the logline, not instead of it: a match has
+    # to quote something the creator wrote, and a paragraph gives that check more
+    # to find than one sentence does. Kept as its own haystack so a hit says
+    # which text it came from.
+    synopsis = intent.synopsis or ""
+    haystacks = {
+        "logline": logline,
+        "genre_keywords": keywords,
+        "synopsis": synopsis,
+    }
 
     decision = SubjectDecision()
     matched: dict[str, tuple[SubjectRule, MatchedRule]] = {}
@@ -123,14 +143,14 @@ def judge_subject(
     for rule, hit in _pattern_stage(rules, haystacks):
         matched.setdefault(rule.rule_id, (rule, hit))
 
-    if llm is not None and llm.available() and (logline or keywords):
+    if llm is not None and llm.available() and (logline or keywords or synopsis):
         try:
             reply = llm.structured(
                 LLMRequest(
                     prompt_id=PROMPT_ID,
                     prompt_version=PROMPT_VERSION,
                     instruction=INSTRUCTION,
-                    document=f"{logline}\n{keywords}".strip(),
+                    document=_document(logline, keywords, synopsis),
                     response_schema=SUBJECT_SCHEMA,
                     temperature=0.2,
                     context={
@@ -148,7 +168,7 @@ def judge_subject(
         except UpstreamLLMError:
             decision.pending_flags.append("subject_semantic_check_pending")
         else:
-            document = f"{logline}\n{keywords}"
+            document = _document(logline, keywords, synopsis)
             for raw in reply.get("hits", []) + reply.get("edge_hits", []):
                 rule = by_id.get(str(raw.get("rule_id", "")))
                 quote = str(raw.get("quote", ""))
@@ -167,7 +187,7 @@ def judge_subject(
                         ),
                     ),
                 )
-    elif logline or keywords:
+    elif logline or keywords or synopsis:
         decision.pending_flags.append("subject_semantic_check_pending")
 
     for rule, hit in matched.values():

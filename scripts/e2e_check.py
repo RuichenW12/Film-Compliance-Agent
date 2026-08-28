@@ -26,7 +26,7 @@ CRIME_INTENT = {
     "episode_minutes": 3,
     "budget_band": "band_b",
     "is_ai_generated": True,
-    "has_finished_film": False,
+    "production_stage": "script_ready",
 }
 
 ROMANCE_INTENT = {

@@ -70,6 +70,22 @@ class Tier(StrEnum):
     UNDETERMINED = "undetermined"
 
 
+class ProductionStage(StrEnum):
+    """How far along the work is.
+
+    Not idle curiosity: 总局令第16号 article 12 requires a one-class filing
+    *before* shooting starts. Someone who has already shot a one-class project
+    is not early — they are late, and the product should say so rather than
+    hand them a roadmap that begins with a step they have passed.
+    """
+
+    IDEA = "idea"
+    SCRIPT_READY = "script_ready"
+    SHOOTING = "shooting"
+    FINISHED = "finished"
+    UNKNOWN = "unknown"
+
+
 class BudgetBand(StrEnum):
     BAND_A = "band_a"
     BAND_B = "band_b"

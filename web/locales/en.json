@@ -195,5 +195,21 @@
   "help.platform_promoted.example": "unticked, unless you already have the agreement",
   "help.voluntary_key_declaration": "Tick to declare the work as a key micro-drama by choice. It means the strictest route, in exchange for a distribution licence — worth it for awards, priority scheduling and negotiating with platforms.",
   "help.voluntary_key_declaration.example": "unticked, for a first project",
-  "help.no_clauses": "The hint above is all the policy library has for this field. It comes from NRTA Circular 35 (2024), which isn't in the snapshot as a citable clause yet."
+  "help.no_clauses": "The hint above is all the policy library has for this field. It comes from NRTA Circular 35 (2024), which isn't in the snapshot as a citable clause yet.",
+  "wizard.title": "Working title",
+  "wizard.synopsis": "Synopsis",
+  "wizard.production_stage": "How far along it is",
+  "wizard.more_conditions": "Two more things that can make it a key micro-drama",
+  "production_stage.unknown": "Not sure yet",
+  "production_stage.idea": "Just an idea",
+  "production_stage.script_ready": "Script is written",
+  "production_stage.shooting": "Already shooting",
+  "production_stage.finished": "Finished",
+  "help.title": "What you're calling it for now. It doesn't have to be final, but the filing form needs a title, so an empty one comes back as a gap later.",
+  "help.title.example": "Fog Operation",
+  "help.synopsis": "A paragraph on the story. Read alongside the logline when checking for sensitive subject matter — more text gives that check more to find, and any match has to quote your own words back.",
+  "help.synopsis.example": "After reuniting, one of them is drawn into an anti-narcotics operation and his cover starts to slip.",
+  "help.production_stage": "How far the work has got. It matters because a key micro-drama must be filed before shooting starts — if you're already shooting one, you've passed a step rather than not reached it yet.",
+  "help.production_stage.example": "Just an idea",
+  "flag.filing_due_before_shooting": "This is a key micro-drama, and those must be filed before shooting begins. You've already started, so this step is behind you rather than ahead — talk to your provincial authority about how to put it right."
 }

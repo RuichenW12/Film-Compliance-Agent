@@ -612,3 +612,31 @@ main label span {
   font-size: 0.8rem;
   color: var(--muted);
 }
+
+/* The two Circular 35 conditions: kept, because deleting them would let a
+   platform-featured small project read as three-class, but folded away because
+   neither is answerable when the form is first filled in. */
+.more-conditions {
+  margin: 0.5rem 0 0.75rem;
+  border-top: 1px solid #eceff3;
+  padding-top: 0.6rem;
+}
+
+.more-conditions summary {
+  cursor: pointer;
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+
+.more-conditions[open] summary {
+  margin-bottom: 0.5rem;
+  color: #333;
+}
+
+.card textarea {
+  width: min(40rem, 100%);
+  font: inherit;
+  padding: 0.35rem 0.5rem;
+  border: 1px solid #b6bec9;
+  border-radius: 4px;
+}

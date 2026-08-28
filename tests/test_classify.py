@@ -691,3 +691,73 @@ def test_a_snapshot_without_routes_simply_has_none(intent_crime, channels, snaps
     classification = classify(intent_crime, channels, snapshots).classification
 
     assert classification.filing_route is None
+
+
+def test_a_synopsis_is_read_alongside_the_logline(channels, snapshots):
+    """One sentence is thin evidence for a subject match; a paragraph is not.
+
+    The trigger word appears only in the synopsis here, and the hit must still
+    quote text the creator actually wrote.
+    """
+
+    from schemas.enums import ClaimedFormType
+    from schemas.project import IntentProfile
+
+    intent = IntentProfile(
+        form_type_claimed=ClaimedFormType.MICRO_DRAMA,
+        logline="两个老朋友在小城重逢。",
+        synopsis="重逢之后，其中一人卷入一场缉毒行动，身份逐渐暴露。",
+        episode_count=24,
+        episode_minutes=3.0,
+    )
+
+    classification = classify(intent, channels, snapshots).classification
+
+    assert classification.tier is Tier.T1
+    assert classification.matched_rules
+    quote = classification.matched_rules[0].quote
+    assert quote in intent.synopsis
+
+
+def test_shooting_a_one_class_project_is_flagged_not_silently_allowed(
+    intent_crime, channels, snapshots
+):
+    """Article 12 puts the one-class filing before shooting.
+
+    Someone already shooting has passed that step. The tier does not change and
+    no state moves — but handing them a roadmap that opens with a step they
+    cannot take any more would read as advice when it is a problem.
+    """
+
+    from schemas.enums import ProductionStage
+
+    early = classify(intent_crime, channels, snapshots).classification
+    assert "filing_due_before_shooting" not in early.pending_flags
+
+    late = classify(
+        intent_crime.model_copy(update={"production_stage": ProductionStage.SHOOTING}),
+        channels,
+        snapshots,
+    ).classification
+
+    assert late.tier is Tier.T1
+    assert "filing_due_before_shooting" in late.pending_flags
+
+
+def test_the_warning_is_only_for_the_tier_that_files_before_shooting(
+    intent_romance, channels, snapshots
+):
+    """Three-class has no pre-shoot filing, so finishing one is not a problem."""
+
+    from schemas.enums import ProductionStage
+
+    classification = classify(
+        intent_romance.model_copy(update={"production_stage": ProductionStage.FINISHED}),
+        channels,
+        snapshots,
+        thresholds_published=False,
+    ).classification
+
+    assert classification.tier is not Tier.T1
+    assert "filing_due_before_shooting" not in classification.pending_flags
+
