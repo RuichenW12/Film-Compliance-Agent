@@ -139,6 +139,49 @@ def clauses_not_yet_in_force(
     return sorted(set(future))
 
 
+def filing_route(
+    tier: Tier, snapshots: SnapshotService, version: str
+) -> dict | None:
+    """Which authority this tier reports to, per the snapshot's p4 pack.
+
+    The three routes are not a product opinion: 总局令第16号 states them.
+    Article 12 puts a one-class filing before shooting; article 13 sends the
+    national publication to the State Council department while provinces审核
+    their own; article 17 makes one- and two-class review a precondition of
+    release and leaves three-class to the platform; article 34 makes the
+    platform verify the first two and number the third.
+
+    Returned as data from the pack rather than computed here, so a policy
+    change is a snapshot change. A route whose clauses are not in this snapshot
+    is not returned at all -- an unsourced route is exactly the kind of
+    confident-looking answer this product must not give.
+    """
+
+    try:
+        pack4 = snapshots.get_pack(PackName.P4_PROCESS_TEMPLATES, version)
+    except (SnapshotNotFoundError, KeyError):
+        return None
+    raw = (pack4 or {}).get("filing_routes") or {}
+    route = raw.get(tier.value)
+    if not isinstance(route, dict):
+        return None
+
+    cited = [str(c) for c in route.get("clause_refs") or []]
+    known = []
+    for clause_id in cited:
+        try:
+            snapshots.clause(clause_id, version)
+        except (SnapshotNotFoundError, KeyError):
+            continue
+        known.append(clause_id)
+    if cited and not known:
+        return None
+
+    resolved = dict(route)
+    resolved["clause_refs"] = known
+    return resolved
+
+
 def _edge_alert(dept: dict | None) -> Alert:
     mapping = dept or {}
     return Alert(
@@ -196,24 +239,33 @@ def classify(
     if classification is None:
         return outcome
 
+    updates: dict = {}
+
+    # Where this tier files. Same reason as the check below: every branch
+    # decides a tier, so attaching the route once here beats repeating it in
+    # each of them.
+    route = filing_route(
+        classification.tier, snapshots, classification.policy_snapshot_version
+    )
+    if route is not None:
+        updates["filing_route"] = route
+
     future = clauses_not_yet_in_force(
         snapshots,
         classification.policy_snapshot_version,
         [ref.clause_id for ref in classification.evidence_refs],
         datetime.now(timezone.utc),
     )
-    if not future:
+    if future:
+        updates["pending_flags"] = sorted(
+            {*classification.pending_flags, "clause_not_yet_in_force"}
+        )
+
+    if not updates:
         return outcome
 
     return replace(
-        outcome,
-        classification=classification.model_copy(
-            update={
-                "pending_flags": sorted(
-                    {*classification.pending_flags, "clause_not_yet_in_force"}
-                )
-            }
-        ),
+        outcome, classification=classification.model_copy(update=updates)
     )
 
 
@@ -295,10 +347,17 @@ def _classify(
         # 特殊题材的微短剧「按有关协审工作机制落实审核要求」 — so the disposal
         # itself is well founded and no longer flagged.
         #
-        # What stays provisional is narrower and still true: the trigger
-        # vocabulary that decided this scene *is* special subject was written by
-        # this codebase, not by a regulator. The tier rests on that match.
-        # See D-026 and D-002.
+        # Whether the trigger vocabulary has been confirmed by an expert is a
+        # property of the policy data, not of this project's tier. It is settled
+        # in the outer loop, before a rule is ever published, and the snapshot
+        # already reports its own maturity through policy_verification_status.
+        # Letting it also decide tier_provisional said something different and
+        # false -- that this project's tier might still move -- and it was a debt
+        # nothing could repay: no code path clears expert_pending, so every
+        # subject hit read as unsettled forever, and recalc_tier (which only
+        # touches provisional tiers) would then overwrite a T1 with the
+        # amount-derived tier. The flag stays, as a flag. See D-031, which
+        # supersedes this half of D-026.
         rules_unconfirmed = subject.expert_pending
         subject_flags = [
             *pending_flags,
@@ -307,7 +366,7 @@ def _classify(
         classification = Classification(
             form_type=FormType.MICRO_DRAMA,
             tier=Tier.T1,
-            tier_provisional=rules_unconfirmed,
+            tier_provisional=False,
             special_subject_hit=True,
             co_review_required=True,
             matched_rules=subject.matched_rules,

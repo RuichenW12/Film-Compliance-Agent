@@ -20,6 +20,250 @@ Conventions:
 
 ---
 
+## 2026-08-27
+
+### A — the wizard stops asking a first-time creator unanswerable questions
+
+- **The domestic platforms field was prefilled with `hongguo,douyin`.** Nobody
+  said that. It is the same defect as the `band_b` default: naming a distribution
+  plan the creator never stated, and a first-time creator often has no plan yet.
+  Now empty, labelled optional, and carrying the fact that it **does not affect
+  the tier or the filing route today** — verified: nothing in `core/` reads
+  `domestic_platforms` at all. It is stored for the distribution check that is
+  not built.
+- The two 广电办发〔2024〕35号 checkboxes said what they were but not what to do
+  about them. Added: leave both unticked unless you already know otherwise —
+  platform promotion is a commercial arrangement usually settled after the film
+  exists, and declaring voluntarily trades the strictest route for a distribution
+  licence, which is worth it for awards, priority scheduling and negotiating with
+  platforms.
+- Verified empty platforms end to end: channels returns 200 with
+  `tracks_enabled {china: true, us: false}`, and classification is unaffected.
+  `npx tsc --noEmit` clean, `python -m pytest` (443 passed, 3 skipped).
+
+### A — the English UI is now actually English
+
+- All 23 mixed-language strings in `locales/en.json` are English. Most were pure
+  noise: `"Special subject 特殊题材 (special subject)"` said the same thing three
+  times, and eight material labels followed that shape. A few were Chinese only
+  and unreadable to an English speaker: `待补充`, `国家广电总局`.
+- Two demo institution names in `app/institution/page.tsx` were hard-coded past
+  the locale bundle entirely, so no amount of locale work would have caught them.
+- Terms of art are translated rather than kept: 重点微短剧 as "key micro-drama",
+  招商主推 / 首页首屏推荐 as "sponsor-promoted, or shown on a home or landing
+  screen", 广电办发〔2024〕35号 as "NRTA Circular 35 (2024)".
+- The two Chinese strings left in the codebase are **comments** in
+  `app/wizard/page.tsx` citing 广电办发〔2024〕35号. They are not user-visible, and
+  a citation is exactly where the original document number belongs.
+- **This narrows the locked decision in `lib/i18n.ts`** ("the UI is English;
+  Chinese legal terms are kept with an English gloss"). The glossing is dropped;
+  the plan is a full Chinese bundle later, where those terms belong, rather than
+  a mixed one now. See [D-032](docs/decisions.md#d-032).
+- Verified: `npx tsc --noEmit` clean, `python -m pytest` (443 passed, 3 skipped),
+  and a scan of every `.ts`/`.tsx` under `app/`, `lib/` and `locales/` for CJK
+  outside comments returns nothing.
+
+### A — the budget field stopped inventing a number, and says what it is
+
+- The wizard's budget dropdown rendered raw enum values — `band_a`, `band_b`,
+  `band_c` — which tell an individual creator nothing. They now read as what they
+  mean ("Large — at or above the 重点微短剧 threshold", and so on), from the
+  locale bundles rather than hard-coded, and without restating figures the
+  snapshot owns.
+- **It defaulted to `band_b`.** A creator who never opened that dropdown and left
+  the amount blank got a `T2` derived from a medium budget they had not claimed —
+  ground rule 3, invented as a default. It now defaults to `unknown`, which the
+  chain already handles honestly: it assumes the stricter tier, flags
+  `budget_unknown`, and returns the three-tier comparison card.
+- Reordered so the exact investment amount comes first and the band reads as the
+  fallback it is, with a note saying an exact figure always wins and that a band
+  only ever yields a 暂定 tier. The note previously said "the amount above" while
+  sitting above the amount field.
+- Verified: `npx tsc --noEmit` clean, `python -m pytest` (443 passed, 3 skipped),
+  and the form checked in Chrome.
+
+### A — local settings come from .env, via uvicorn rather than the app
+
+- Added a git-ignored `.env` and start the API with
+  `python -m uvicorn api.main:app --port 8080 --env-file .env`. No code change
+  and no new dependency: `--env-file` is uvicorn's own flag and `python-dotenv`
+  ships inside the `uvicorn[standard]` we already declare.
+- The application still does **not** read `.env` itself. Settings arrive from the
+  environment and the file is one way to fill it, not a second source of truth —
+  so `Settings.from_env()` keeps its single path and the test suite keeps running
+  with nothing set at all.
+- The emulator hosts in `.env.example` are deliberately left out of the working
+  `.env`: pointing at an emulator that is not running is worse than leaving
+  storage in memory.
+- Verified from a shell with all four variables explicitly unset: `healthz`
+  reports `llm_backend: vertex`, and `/v1/internal/*` answers 404 for an unknown
+  project rather than 403, so the token loaded too.
+
+### A — intake was broken in the browser, and the filing route is now on screen
+
+- **`IntentRequest` was missing `platform_promoted` and `voluntary_key_declaration`.**
+  Both reached `IntentProfile` and the wizard form when 广电办发〔2024〕35号's two
+  non-money conditions were modelled, but never the API DTO. `ApiModel` sets
+  `extra="forbid"`, so the wizard's every submission came back **422** and the
+  main flow did not work at all from a browser. Found by driving the UI in
+  Chrome; `scripts/e2e_check.py` never caught it because its fixtures do not send
+  those two fields.
+- Added both to the DTO, plus two tests: one posting them through HTTP, and one
+  asserting **every field the domain `IntentProfile` carries is reachable over
+  HTTP** — a field the domain models but the DTO omits is invisible until
+  someone posts it.
+- The wizard now renders `filing_route` under **"Where this files"**: the
+  authority, whether a filing is due before shooting, the document produced, and
+  a highlighted line saying whether release is blocked until it is granted. New
+  keys in `locales/en.json` and `locales/zh.json`.
+- Verified in Chrome against a live Vertex-backed API, both halves of the
+  contrast: 900,000 RMB **with** AI → `T1` · `tier-ai-generated-2026` ·
+  国家广电总局 · pre-shoot filing required · "You cannot publish until this is
+  granted"; the **same amount without** AI → `T3` · `tier-live-action-2026` ·
+  platform · not required · "The platform reviews this before broadcast". That
+  contrast is the demo.
+- Verified: `python -m pytest` (443 passed, 3 skipped) and `npx tsc --noEmit`
+  clean.
+
+### Shared — a special-subject tier is settled, and the silent T1→T2 relax is gone
+
+- A special-subject hit no longer reports `tier_provisional: true` just because
+  its rules carry `expert_pending`. Whether an expert has vetted the trigger
+  vocabulary is a fact about the **snapshot**, already reported by
+  `policy_verification_status`, and it is settled in the outer loop before
+  publication. It is not a statement about whether this project's tier may move.
+- This closes **D-029** without touching `recalc_tier`. Recalc only processes
+  provisional tiers; subject hits are now outside its reach, so the path that
+  relaxed a 缉毒 project from **T1 to T2** on a policy refresh no longer exists.
+- `expert_pending` keeps its honest jobs: the `rules_expert_pending` and
+  `subject_match_unconfirmed` flags still appear, and `core/review.py` still
+  downgrades such findings to `needs_human`. It reports; it no longer decides.
+- Verified: `python -m pytest` (441 passed, 3 skipped) and
+  `python scripts/e2e_check.py` against a live Vertex-backed API — **ALL CHECKS
+  PASSED**, the first fully green run. The two assertions that had been left
+  failing on purpose went green **unmodified**, which is the point: they always
+  described the correct behaviour. The owner's inbox now carries only
+  `policy_stale` and no `tier_recalculated`, because recalc correctly leaves the
+  project alone.
+- See [D-031](docs/decisions.md#d-031), superseding the subject half of D-026.
+
+- **Found while doing this, not fixed:** `ImpactNode` has only `D1C` and `C1A`,
+  so a change to `p2_subject_rules` has no node to declare and `_is_affected`
+  returns false — projects classified on an old trigger vocabulary are **not
+  even marked stale**. Since that vocabulary is the part most likely to change,
+  this is the live gap. Left for T-B3, when `impact_nodes` is first computed for
+  real projects rather than living only in the policy loop's memory adapter.
+  **B depends on this.**
+
+### Shared — a classification now says where it files, not just what tier it is
+
+- `Classification` gains `filing_route`: the authority a tier reports to, whether
+  a filing is due before shooting, what document the process yields, and whether
+  release is blocked until that document lands. T1 to 国家广电总局, T2 to 省级以上,
+  T3 to the platform's own pre-broadcast review.
+- The route is **data in the snapshot** (`p4_process_templates.filing_routes`),
+  not logic in the chain, so a policy change is a snapshot change. It is attached
+  once in `classify()` alongside the not-yet-in-force check, for the same stated
+  reason: every branch decides a tier, so a rule only some branches honour is not
+  a rule.
+- Cited from **总局令第16号 only** — articles 12, 13, 17 and 34, three of which
+  are new clause entries in `p6_legal_clauses`. 广电办发〔2024〕35号 states the
+  same three levels, but it is a 规范性文件 and the Order is a 部门规章; citing
+  the higher instrument is more defensible, and 35号 has no `SRC-` id in the
+  sources-v2 archive anyway. See [D-030](docs/decisions.md#d-030).
+- A route whose clauses are absent from the snapshot is **not returned at all**,
+  and a tier with no route entry yields `None` rather than a guess. Verified
+  against `seed-snapshot-v1.yaml`, which predates the field: routes read as
+  absent, not as invented.
+- **Product effect:** this closes the half of the question the product could not
+  answer. An individual creator's 250,000 RMB AI micro-drama now comes back
+  `T3 / platform / pre_shoot_filing: not_required / blocks_release: false` —
+  which is the one path open to someone with no 《广播电视节目制作经营许可证》.
+- Verified: `python -m pytest` (441 passed, 3 skipped — 5 new) and
+  `python scripts/e2e_check.py` against a live Vertex-backed API, where all three
+  amount fixtures now also assert their authority. `python
+  scripts/materialize_policy_snapshot_v2.py` regenerated the frozen archive copy.
+
+### A — the golden path now exercises amount-based tiering
+
+- `scripts/e2e_check.py` gained three fixtures that supply
+  `investment_amount_rmb`: a 3.2M live-action (T1), a 1.5M live-action (T2), and
+  a 0.9M **AI** micro-drama (T1). Every previous fixture left the amount unset,
+  so the walkthrough only ever exercised D1c's band placeholder and never the
+  branch that actually decides a tier once thresholds are published.
+- Each asserts three things: the tier, that it is **settled rather than
+  provisional** (proving the placeholder was not consulted), and that the
+  evidence cites the threshold clause it used.
+- The AI fixture is the useful one to demo: **the same 900,000 RMB is T3 as
+  live action and T1 as AI**, because 广电总局网络视听司《管理提示（AI微短剧
+  分类分层标准）》sets a lower set (T1 ≥ 800,000) than the live-action one
+  (T1 ≥ 3,000,000). It cites `tier-ai-generated-2026` rather than
+  `tier-live-action-2026`, so the switch is visible in the evidence.
+- Correction to the previous entry's framing: the amount path was **not**
+  untested. `tests/test_classify.py` covers it well, including the disputed
+  boundary. What was missing was end-to-end coverage through the API, which is
+  what these fixtures add.
+- Verified: `python -m pytest` (436 passed, 3 skipped) and
+  `python scripts/e2e_check.py` against a live Vertex-backed API — all 12 new
+  checks pass. The run still reports the two D-029 recalc failures, unchanged.
+
+### Shared — policy evidence indexed by tier, and M-001 stops blocking
+
+- Added `docs/policy-library/BY-TIER.md`: the 一类 / 二类 / 三类 evidence index.
+  Each tier gets its filing trigger, pre-shoot duty, review step, authority
+  level, and whether we hold the original. Clause text is quoted from the
+  verified `official_primary` texts of 总局令第16号 (P-001) and 广电办发〔2024〕
+  35号 (P-002) only.
+- Recorded in `MISSING.md` that **M-001 cannot be obtained from public
+  channels**. A site-restricted search of `nrta.gov.cn` returns 35号, Order 16
+  and the consultation draft but not the 调整通知; everything findable is a
+  republication without a 文号. Cause is instrument rank — 部门规范性文件 have
+  no mandatory central publication, and `flk.npc.gov.cn` does not carry
+  「广电办发」at all. M-001 is therefore **no longer a blocker**: the goal
+  changes from "obtain the original" to "obtain the 文号 plus a source more
+  authoritative than a municipal page", and the open questions move to a human
+  contact in the industry.
+- **Decision: proceed on R-001's numbers** — T1 ¥3,000,000 / T2 ¥1,000,000,
+  `thresholds_published: true` unchanged. Order 16 article 5 carries no figures
+  of its own, so the amounts must come from a subordinate document, and R-001
+  is the best-evidenced one available.
+- Verified: `python -m pytest` (436 passed, 3 skipped). Documentation only, no
+  code or snapshot change.
+
+### A — the e2e check survives a live model and follows the pinned snapshot
+
+- `scripts/e2e_check.py` timed out against a real Vertex backend. A classify
+  call with the model available measured **8.5–11.5s** over ten runs, against a
+  hard-coded 10s per-request ceiling. Worse than a flaky FAIL: the ceiling
+  raised `TimeoutError`, which aborted the whole script, so every check after
+  the first classify never ran and looked like it did not exist. The timeout is
+  now `--timeout`, default 60s.
+- The three `recalc-tier` calls still sent `snapshot_version: "v1"` while the
+  service loads `seed-snapshot-v2.yaml`, so they got `SNAPSHOT_NOT_FOUND` and
+  three checks failed for a reason that had nothing to do with recalc. The
+  `policy-stale` call beside them already said `"v2"` — the script was half
+  migrated when v2 landed (`942ec24`). Every version sent now follows the
+  `snapshot_version` that `/healthz` reports, so a v3 needs no edit here.
+- Verified: `python -m pytest` (436 passed, 3 skipped) and a full
+  `python scripts/e2e_check.py` against a live Vertex-backed API on a fresh
+  server — 12 failures before, 2 after, both remaining failures being the
+  recalc defect described below rather than script problems.
+
+- **Unfixed and left failing on purpose, for both workstreams to see:**
+  `recalc_tier` (`core/workflow_service.py:262`) recomputes a tier from
+  `judge_tier` alone and never re-runs the D1b subject stage. A special-subject
+  project therefore **relaxes from T1 to T2** on a policy refresh while keeping
+  `co_review_required: true`, its subject match, and evidence citing
+  `nrta-order-16-article-5` — a tier that no longer follows from its own
+  evidence. `e2e_check` reports this as "a non-provisional project is left
+  alone" and "stale flag did not touch the classification". Both were being
+  masked before: the first by a stale expectation that this project is
+  non-provisional (it is provisional now, because the seed's subject rules carry
+  `expert_pending`), the second by the abort described above. Making the script
+  green would have hidden a real defect, so it stays red pending
+  [D-029](docs/decisions.md#d-029). **B depends on this: `/v1/internal/*`
+  recalc is the surface T-B3 calls.**
+
 ## 2026-08-26
 
 ### Shared — a clause carries its own document's effective date

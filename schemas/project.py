@@ -87,6 +87,11 @@ class Classification(DomainModel):
     # must point at the clauses it read, in the snapshot it was pinned to.
     evidence_refs: list[EvidenceRef] = Field(default_factory=list)
     dept: dict | None = None
+    # Which authority this tier reports to, and whether a grant blocks release.
+    # Derived from the snapshot's p4 filing_routes, never hard-coded here, and
+    # carrying its own clause_refs so the route is auditable like any other
+    # conclusion. None when the pack does not describe a route for this tier.
+    filing_route: dict | None = None
     decided_at: AwareDatetime | None = None
 
 

@@ -121,6 +121,45 @@ packs:
             owner: institution
           - name: roadmap.step.record_program_number
             owner: institution
+    filing_routes:
+      source_refs: [SRC-001]
+      mapping_status: mock_pending_human_review
+      note: 层级与路径出自总局令第16号本身（第十二、十三、十七、三十四条）。广电办发〔2024〕35号的三级表述一致，但它是规范性文件，位阶低于本规章，故此处只引规章。
+      T1:
+        authority: nrta_national
+        authority_key: filing.authority.nrta_national
+        pre_shoot_filing: required
+        content_review: required
+        result_document: distribution_licence
+        platform_self_review: false
+        blocks_release_until_granted: true
+        clause_refs:
+          - nrta-order-16-article-12
+          - nrta-order-16-article-13
+          - nrta-order-16-article-17
+      T2:
+        authority: provincial
+        authority_key: filing.authority.provincial
+        pre_shoot_filing: varies_by_province
+        content_review: required
+        result_document: approval_document
+        platform_self_review: false
+        blocks_release_until_granted: true
+        clause_refs:
+          - nrta-order-16-article-12
+          - nrta-order-16-article-13
+          - nrta-order-16-article-17
+      T3:
+        authority: platform
+        authority_key: filing.authority.platform
+        pre_shoot_filing: not_required
+        content_review: platform_pre_broadcast
+        result_document: programme_number
+        platform_self_review: true
+        blocks_release_until_granted: false
+        clause_refs:
+          - nrta-order-16-article-17
+          - nrta-order-16-article-34
   p5_form_templates:
     mapping_status: mock_pending_human_review
     source_refs: [SRC-001, SRC-005, SRC-006, SRC-007, FORM-001, FORM-002, FORM-003]
@@ -245,6 +284,21 @@ packs:
       - clause_id: nrta-order-16-article-20
         title: 第二十条
         text: 主管部门应自受理一类微短剧申请之日起二十日内作出决定，其中组织专家评审的时间为十日。
+        source_url: https://www.nrta.gov.cn/art/2026/7/31/art_113_73785.html
+        effective_from: "2026-09-01T00:00:00+08:00"
+      - clause_id: nrta-order-16-article-12
+        title: 第十二条
+        text: 对一类微短剧的拍摄、制作实行备案公示制度，对二类微短剧可以参照适用；制作机构拍摄、制作一类微短剧之前应当向省、自治区、直辖市以上人民政府广播电视主管部门申请备案公示。
+        source_url: https://www.nrta.gov.cn/art/2026/7/31/art_113_73785.html
+        effective_from: "2026-09-01T00:00:00+08:00"
+      - clause_id: nrta-order-16-article-13
+        title: 第十三条
+        text: 国务院广播电视主管部门负责直接申报机构一类、二类微短剧的备案公示，以及全国一类微短剧的公示；省级主管部门负责审核本行政区域内的一类、二类微短剧备案，二类可参照本办法制定本行政区域内的实施细则。
+        source_url: https://www.nrta.gov.cn/art/2026/7/31/art_113_73785.html
+        effective_from: "2026-09-01T00:00:00+08:00"
+      - clause_id: nrta-order-16-article-34
+        title: 第三十四条
+        text: 播出单位对一类、二类微短剧播出前应当核验其《微短剧发行许可证》或者批准文件；对三类微短剧应当播前审核，并同步将剧目信息和节目编号在线上系统报广播电视主管部门。
         source_url: https://www.nrta.gov.cn/art/2026/7/31/art_113_73785.html
         effective_from: "2026-09-01T00:00:00+08:00"
       - clause_id: tier-live-action-2026

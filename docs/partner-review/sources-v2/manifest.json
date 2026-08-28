@@ -290,6 +290,6 @@
   "snapshot_materialized_at": "2026-08-26T23:15:00+08:00",
   "snapshot_file": {
     "path": "snapshot/seed-snapshot-v2.yaml",
-    "sha256": "1c09a72d7fcf708033d51266d5b89a5d9b01437f35aa54a485f9c05994775b88"
+    "sha256": "3f3bd4e6725cca6740df2a00125f4c768b4d6e4f1c300ac039386b63996fe5f3"
   }
 }

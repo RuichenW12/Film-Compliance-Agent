@@ -10,3 +10,4 @@ node_modules/
 .next/
 web/coverage/
 .playwright-mcp/
+web/tsconfig.tsbuildinfo

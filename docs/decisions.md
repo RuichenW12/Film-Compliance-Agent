@@ -969,3 +969,194 @@ would be harder to defend.
 There was already a `Regime` enum with `CURRENT` and `FROM_2026_09_01`, unused
 and unwired. It is left alone: a date on the clause is the fact that is actually
 true, while an enum member naming one specific date will age badly.
+
+## D-029
+
+**A recalculated tier must not relax a subject-derived one** · Area: Shared · Status: Open, blocking nothing yet · 2026-08-27
+
+`recalc_tier` recomputes a provisional tier by calling `judge_tier` — the
+amount/band stage, D1c — and nothing else. That is correct for a project whose
+tier came from an amount. It is wrong for one whose tier came from a subject
+hit: D1b is never re-run, so the band-derived answer simply overwrites the
+subject-derived one. Measured against the live seed: a 缉毒/卧底 logline
+classifies `T1`, and one recalc drops it to `T2` while `co_review_required`
+stays `true`, the subject match stays in `matched_rules`, and the evidence still
+cites `nrta-order-16-article-5`. The record ends up asserting a tier that its
+own evidence does not support, and it errs toward *less* scrutiny.
+
+This became reachable rather than theoretical when subject hits started being
+reported provisional ([D-028](#d-028) and the special-subject disposal above):
+`recalc_tier` only touches provisional tiers, so while a subject hit was final
+this path was never entered. Nothing about recalc changed — what changed is who
+is now eligible for it.
+
+Three readings, none of them free:
+
+1. **Skip re-tiering when a subject hit is present.** Cheapest, and preserves
+   the stricter answer. But a genuinely new threshold then never reaches these
+   projects at all.
+2. **Re-run D1b during recalc.** Most correct, and most expensive — it puts a
+   model call inside a fan-out that today is deterministic and synchronous, and
+   the semantic stage is occasionally a miss (see below), so a refresh could
+   relax a tier through model variance rather than through policy.
+3. **Take the stricter of the two** and record both. Preserves scrutiny without
+   a model call, at the cost of a tier that is a max() of two stages rather than
+   the output of one.
+
+Left open deliberately: it changes the meaning of the `/v1/internal/*` recalc
+contract that T-B3 calls, so it needs both workstream owners rather than
+whoever noticed it. `scripts/e2e_check.py` is left reporting two failures here
+instead of being adjusted to match current behavior — a green check that
+encodes a relaxed tier is worse than a red one.
+
+Revisit when: T-B3 wires the real recalc fan-out, or sooner if a snapshot
+publishes real amount thresholds, since that is when recalc starts changing
+tiers for reasons other than a placeholder band mapping.
+
+**Related, not the same defect:** when the D1b model call succeeds but returns
+quotes that are not verbatim in the document, every hit is discarded
+(`core/classify/d1b.py:154`) and the tier degrades T1 → T2 with **no pending
+flag** — indistinguishable from "no special subject found". Observed on roughly
+2 of 14 live classifies of the same fixture. An `UpstreamLLMError` sets
+`subject_semantic_check_pending`; a silent miss sets nothing. Given that a
+missing backend is reported and never faked, a discarded-quote miss arguably
+deserves the same signal. Not changed here, for the same reason as above.
+
+## D-030
+
+**The filing route is snapshot data, and cites the 规章 rather than the 通知** · Area: Shared · Status: Accepted · 2026-08-27
+
+A tier on its own does not tell a creator anything they can act on. 「T2」 is a
+label; 「报省级以上，拿到批准文件之前不得播出」 is an answer. So a classification
+now carries `filing_route`.
+
+Two choices in it are worth recording.
+
+**Why the route is data, not code.** The mapping tier → authority is short enough
+to hard-code in `chain.py`, and that was the tempting version. It is also exactly
+the kind of thing that changes without the code changing: a province issuing its
+二类 implementing rules, or a future notice moving a threshold between levels.
+Putting it in `p4_process_templates.filing_routes` means such a change is a
+snapshot publish, which is already the audited path, rather than a deploy. The
+cost is a route that can go missing — handled by returning `None`, never a
+default.
+
+**Why it cites 总局令第16号 and not 广电办发〔2024〕35号.** Both state the same
+three levels, and 35号 states them more plainly. But the Order is a 部门规章 and
+35号 is a 规范性文件: the higher instrument wins where both speak. Article 12
+carries the pre-shoot filing, article 13 the split between national publication
+and provincial审核, article 17 makes a grant a precondition of release for the
+first two tiers, and article 34 makes the platform verify the first two and
+number the third. That is the whole route without leaving the regulation.
+
+There is also a practical reason. 35号 has no `SRC-` id in the sources-v2
+archive — it lives in `docs/policy-library/` as `P-002` — and citing it would
+have meant either adding it to a directory with its own checksum tests, or
+citing a clause the snapshot cannot resolve. The rule that an unsourced route is
+withheld would then have deleted the route entirely.
+
+**What this does not do:** it does not model 属地. The route says *which level*,
+not *which province*, and `IntentProfile` still has no jurisdiction field. For T2
+that gap is load-bearing — article 12 makes the pre-shoot filing 「可以」参照适用
+and article 13 leaves the detail to provincial rules, so the pack reports
+`varies_by_province` rather than a settled answer. Revisit when a province
+publishes its 二类 implementing rules, which cannot happen before the Order takes
+effect on 2026-09-01.
+
+## D-031
+
+**Whether a rule is expert-confirmed is settled before publication, not at classify time** · Area: Shared · Status: Accepted · 2026-08-27 · Supersedes the subject half of [D-026](#d-026), and closes [D-029](#d-029)
+
+D-026 made a special-subject hit report `tier_provisional: true` whenever the
+rules behind it carried `expert_pending`. The reasoning was honest: the trigger
+vocabulary was written by this codebase, not by a regulator, so the tier rested
+on an unvetted match.
+
+It was the wrong field to say it in, for three reasons.
+
+**It said something false.** `tier_provisional` means *this project's tier may
+still move*. What was actually true is *this policy data has not been vetted* —
+a fact about the snapshot, shared by every project classified against it. The
+snapshot already reports that, in `policy_verification_status`
+(`mock_verified`) and each pack's `mapping_status`. The claim was being made
+twice, once in the right place and once in the wrong one.
+
+**It was a debt nothing could repay.** `expert_pending` is read in five places
+and written in none: its value comes entirely from the pack YAML, and no code
+path can clear it. All nine seed subject rules carry `true`. So every special
+subject hit read as unsettled *permanently*, with no action available to anyone
+that would settle it.
+
+**It reached across a boundary it should not have.** Confirming a rule belongs
+to the outer loop — crawl, propose, human review, publish. The product loop
+should trust what the library contains and give the creator a definite answer.
+Letting an outer-loop debt decide an inner-loop conclusion made the creator
+carry the policy team's uncertainty.
+
+**What it broke.** `recalc_tier` only touches provisional tiers. While subject
+hits were final it never saw them; once D-026 made them provisional it did, and
+it recomputes from `judge_tier` alone. A 缉毒 project therefore relaxed **T1 to
+T2** on any policy refresh while keeping `co_review_required`, its subject
+match, and evidence citing `nrta-order-16-article-5` — a tier its own evidence
+did not support, moving toward less scrutiny, silently. That is D-029, and it
+needed no fix of its own: cutting the transduction puts subject hits back
+outside recalc's reach.
+
+**What stays.** `expert_pending` keeps both of its honest consumers: the
+`rules_expert_pending` and `subject_match_unconfirmed` flags still surface on
+the classification, and `core/review.py` still downgrades findings from such
+rules to `needs_human` rather than `block`. It reports; it no longer decides.
+
+**Still missing, deliberately not built here.** Two gaps this exposes.
+
+1. There is no per-rule confirmation step. The admin loop can publish or discard
+   a whole proposal, but an expert cannot mark one rule confirmed, so nothing
+   can set `expert_pending` to false except publishing a snapshot that already
+   says so. `publish` should also record when a snapshot still carries unvetted
+   rules rather than emitting it silently.
+2. `ImpactNode` has only `D1C` and `C1A`. A change to `p2_subject_rules` has no
+   node to declare, so `_is_affected` returns false and projects classified on
+   the old vocabulary are **not even marked stale**. The word list is the part
+   most likely to change — it comes from trend and sentiment research — so this
+   is the live gap. It is left for T-B3, when `impact_nodes` is first computed
+   for real projects; today it exists only in the policy loop's memory adapter.
+
+Revisit when either is built.
+
+## D-032
+
+**The English UI drops the Chinese gloss; a Chinese bundle comes later** · Area: A · Status: Accepted · 2026-08-27 · Narrows the i18n half of locked decision 1
+
+`lib/i18n.ts` records: *the UI is English; Chinese legal terms are kept with an
+English gloss.* In practice the bundle had drifted into three different habits,
+and only one of them was the decision.
+
+Most entries were not glosses at all but repetitions —
+`"Special subject 特殊题材 (special subject)"` names the same idea three times,
+and eight material labels shared that shape. A few were Chinese with no English
+at all (`待补充`, `国家广电总局`), which is the opposite of a glossed English UI.
+Only a handful were the real case the decision was written for: 重点微短剧,
+广电办发〔2024〕35号.
+
+The gloss had a genuine argument behind it. A creator filing for real meets
+重点微短剧 on the government's own pages and forms, and an English-only product
+leaves them unable to match what they see. That argument is not wrong — it is
+just answered better by a **Chinese bundle** than by a mixed English one. Mixing
+serves neither reader: the English speaker reads past characters they cannot
+parse, and the Chinese speaker gets English scaffolding around the terms they
+actually need.
+
+So: the English bundle is English, `zh.json` keeps the same keys and will carry
+the Chinese terms when it is filled in, and `t()` already falls back to English
+for keys the Chinese bundle has not reached yet.
+
+**What this does not touch.** Clause ids (`nrta-order-16-article-5`), snapshot
+versions and evidence refs are identifiers, not display text, and are unchanged.
+Neither are source comments: a comment citing 广电办发〔2024〕35号 points a
+developer at the actual document, and translating that would cost traceability
+for nothing.
+
+Revisit when the Chinese bundle is written, or if a user testing the English UI
+cannot find on a government site the thing the product told them about — that is
+the failure mode this trades away, and it is worth watching for.
+

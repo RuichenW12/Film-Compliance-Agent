@@ -22,7 +22,7 @@ import { t } from "../../lib/i18n";
 const DEMO_INSTITUTIONS: Institution[] = [
   {
     institution_id: "inst_demo_ok",
-    name: "示例持证机构甲 (demo licensed institution A)",
+    name: "Demo Licensed Institution A",
     license_no: "DEMO-LICENSE-0001",
     valid_until: "2030-12-31",
     registered_capital_rmb: 10_000_000,
@@ -30,7 +30,7 @@ const DEMO_INSTITUTIONS: Institution[] = [
   },
   {
     institution_id: "inst_demo_foreign",
-    name: "示例外资机构乙 (demo foreign-invested institution B)",
+    name: "Demo Foreign-Invested Institution B",
     license_no: "DEMO-LICENSE-0002",
     valid_until: "2030-12-31",
     registered_capital_rmb: 10_000_000,
