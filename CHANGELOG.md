@@ -44,6 +44,11 @@ Conventions:
   among its required facts, so `amount_required` still appears on a
   bracket-derived classification — it has stopped being a reason to hedge the
   tier, not stopped being wanted.
+- `e2e_check.py` had an assertion locking the old semantics — "tier marked
+  provisional" on a bracket-only romance fixture. It now asserts the opposite,
+  plus that `amount_required` still appears, plus a new case: an **unanswered**
+  budget is still provisional and says `budget_unknown`, so "settled from a
+  range" has not quietly become "settled from nothing".
 - Verified: `python -m pytest` (461 passed, 3 skipped), `npx tsc --noEmit`
   clean, and in Chrome with the amount left blank and only a range chosen:
   `Tier T3`, **no provisional marker**, citing `tier-live-action-2026`, with

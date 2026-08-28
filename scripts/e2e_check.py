@@ -280,12 +280,39 @@ def main() -> int:
             f"authority={route.get('authority')} blocks_release={route.get('blocks_release_until_granted')}",
         )
 
-    print("\n== ordinary series: provisional tier ==")
+    print("\n== ordinary series: a range is enough to settle it ==")
     romance_id = checker.new_project(ROMANCE_INTENT)
     _, romance, _ = checker.call("POST", f"/v1/projects/{romance_id}/classify")
     romance_class = romance.get("classification") or {}
     checker.check("tier is T3", romance_class.get("tier") == "T3")
-    checker.check("tier marked provisional", romance_class.get("tier_provisional") is True)
+    # It used to be provisional here, and that was right while the brackets were
+    # invented labels. They are the published thresholds now, so "under the lower
+    # line" settles the tier without a figure — see D-036.
+    checker.check(
+        "a bracket settles the tier without an exact amount",
+        romance_class.get("tier_provisional") is False,
+        f"provisional={romance_class.get('tier_provisional')}",
+    )
+    # The figure is still wanted for the filing form, just not for the tier.
+    checker.check(
+        "the exact amount is still reported as outstanding",
+        "amount_required" in romance_class.get("pending_flags", []),
+        ",".join(romance_class.get("pending_flags", [])),
+    )
+
+    print("\n== no budget answer at all: assume the stricter tier, and say so ==")
+    unknown_id = checker.new_project({**ROMANCE_INTENT, "amount_bracket": "unknown"})
+    _, unknown, _ = checker.call("POST", f"/v1/projects/{unknown_id}/classify")
+    unknown_class = unknown.get("classification") or {}
+    checker.check(
+        "an unanswered budget is provisional, not guessed",
+        unknown_class.get("tier_provisional") is True,
+    )
+    checker.check(
+        "and says the budget is what is missing",
+        "budget_unknown" in unknown_class.get("pending_flags", []),
+        ",".join(unknown_class.get("pending_flags", [])),
+    )
 
     print("\n== single video: exits the drama path ==")
     vlog_id = checker.new_project(VLOG_INTENT)
