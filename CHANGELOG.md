@@ -22,6 +22,28 @@ Conventions:
 
 ## 2026-08-28
 
+### A — the exact investment amount comes off the intake form
+
+- **Intake no longer asks for the figure.** Since [D-036](docs/decisions.md#d-036)
+  a threshold-aligned bracket settles the tier, which left the amount field on
+  the form contributing nothing to the answer while asking an idea-stage creator
+  for a number they would have to invent. See [D-038](docs/decisions.md#d-038).
+- **Nothing moves in the contract.** `IntentProfile.investment_amount_rmb`, the
+  DTO field, the POST body key and the per-field help entry all stay — the
+  form-freeze stage (T-A5) is where the figure is actually needed and where it
+  will be collected.
+- **What it gives up, stated plainly:** a budget sitting *exactly* on a
+  threshold is the one case the figure decides and the bracket cannot. With an
+  amount that project is reported provisional with `threshold_boundary_disputed`
+  ([D-033](docs/decisions.md#d-033)); with `at_or_above_upper` alone the
+  inclusive reading is taken and the tier reads settled. The detection code is
+  untouched and still fires whenever the API receives an amount.
+- Verified: `python -m pytest` (483 passed, 3 skipped), `npx tsc --noEmit`
+  clean, `python scripts/e2e_check.py --base http://localhost:8000` on a fresh
+  process **ALL CHECKS PASSED**, and a Chrome run confirming the form now has
+  two number inputs (episodes, minutes) and a bracket-only project still
+  settles at Class 3.
+
 ### A — the classification result says what to do, in words
 
 - **The result card was a debug view and now reads as an answer.** A creator ran

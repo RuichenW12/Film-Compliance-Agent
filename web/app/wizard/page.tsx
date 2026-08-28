@@ -69,7 +69,11 @@ export default function WizardPage() {
   // is assumed, `budget_unknown` is flagged, and a three-tier comparison card
   // comes back.
   const [amountBracket, setAmountBracket] = useState<AmountBracket>("unknown");
-  const [investmentAmount, setInvestmentAmount] = useState("");
+  // The exact figure is no longer asked for at intake: the bracket settles the
+  // tier on its own, and the filing form is where the number is actually
+  // needed. The state stays so the POST body keeps the field -- the API
+  // contract is unchanged, and the form-freeze stage will supply it. See D-038.
+  const [investmentAmount] = useState("");
   const [isAiGenerated, setIsAiGenerated] = useState(true);
   // 广电办发〔2024〕35号: platform promotion and voluntary declaration each make
   // a project 重点微短剧 on their own, whatever the investment amount says.
@@ -213,17 +217,6 @@ export default function WizardPage() {
           </select>
         </label>
         <p className="muted">{t("wizard.amount_bracket.hint")}</p>
-        <label>
-          <span>{t("wizard.investment_amount_rmb")}</span>
-          <FieldHelp field="investment_amount_rmb" label="Investment amount (RMB)" />
-          <input
-            type="number"
-            min={0}
-            step={1}
-            value={investmentAmount}
-            onChange={(event) => setInvestmentAmount(event.target.value)}
-          />
-        </label>
         <label>
           <span>Episodes</span>
           <FieldHelp field="episode_count" label="Episodes" />

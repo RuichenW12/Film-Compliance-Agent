@@ -1320,3 +1320,40 @@ seven flags the card would have shown as keys: `amount_required`,
 
 **Revisit when** the script pre-check ships, because "What happens next" then
 describes a step the creator can actually take and should link to it.
+
+---
+
+## D-038
+
+**The exact investment amount leaves intake; it belongs on the filing form** · Area: A · Status: Accepted · 2026-08-28 · Builds on [D-036](#d-036)
+
+D-036 made a threshold-aligned bracket settle a tier. That left the exact figure
+on the intake form doing nothing for the answer: given a bracket, `judge_tier`
+consults the amount for one purpose only, and the creator is asked for a number
+they frequently do not have at the idea stage.
+
+So the field comes off the intake form. `IntentProfile.investment_amount_rmb`
+and the DTO field both stay, the wizard keeps sending the key, and the per-field
+help entry survives — the form-freeze stage (T-A5) lists the figure among its
+required facts and is where it will actually be collected. Nothing in the API
+contract moves; only the question stops being asked at the wrong moment.
+
+**What this gives up, precisely.** The amount does one thing a bracket cannot:
+`on_threshold_boundary` detects a budget sitting *exactly* on a threshold, where
+[D-033](#d-033) records the source stating the boundary two ways. With a figure,
+such a project is reported provisional with `threshold_boundary_disputed`. With
+`at_or_above_upper` alone, the inclusive reading is taken and the tier is
+settled. That warning is therefore unreachable from intake until the freeze
+stage collects a figure.
+
+**Why that is the right trade for now.** The detection code is untouched and
+still fires whenever the API receives an amount, so this is a gap in one entry
+path, not a lost capability. Against it: every creator at the idea stage was
+being asked for a number they would have to invent, and inventing amounts is the
+one thing this repository's ground rules forbid outright. A field that invites a
+guess is worse than a warning that arrives one stage later.
+
+**Revisit when** the freeze stage ships, or sooner if a real project is observed
+budgeting exactly to a threshold — the cheap fix is a follow-up question shown
+only when `at_or_above_upper` is chosen, which asks for the figure at the one
+moment it can change the answer.
