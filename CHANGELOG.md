@@ -22,6 +22,47 @@ Conventions:
 
 ## 2026-08-28
 
+### A — conversational intake, step 1: reading a turn without believing it
+
+- New `core/intake_chat.py`. One turn in, proposed intake answers out, nothing
+  stored and nothing classified. No UI yet, which is the point: every safety
+  property lives here and can be attacked before anything is visible.
+- Three rules, in order. **Traceable or discarded** — a proposal must quote a
+  span of what the person actually typed, and a value with no sentence behind it
+  is dropped, because there is nothing to show them for checking. **Verbatim or
+  inferred, both kept** — "around a million" becomes 1,000,000 flagged as
+  inferred and carrying the words it came from, rather than being thrown away.
+  **Intake fields only** — `PROPOSABLE_KEYS` is derived from `IntentProfile`, so
+  a tier or a form type cannot be proposed however the model phrases it.
+- This deliberately differs from `core/extract.py`, which keeps discarding
+  anything not literal. That module reads a document nobody is watching; here the
+  person is on the other side of the screen with their own sentence beside the
+  field. Same requirement, different response to failing it.
+- **Four defects the 20 scripted tests could not have found, all from running it
+  against Vertex:**
+  - `RESPONSE_SCHEMA` used a union type (`["string","number","boolean","null"]`).
+    Vertex rejects a list there, so every scripted test passed while no real call
+    could have succeeded. Values now arrive as text and the schema does the
+    typing, which it was doing anyway. **`core/extract.py` has the same latent
+    bug**, unhit only because fact extraction is not wired up yet.
+  - `episode_minutes` is a float, so a creator typing `3` produced `3.0`, whose
+    string is absent from "3 minutes each" — flagged as inferred and sent back to
+    be checked. `_renderings` now knows an integral float was written without the
+    decimal, and that 900000 may have been written 900,000.
+  - A single genre offered for `genre_keywords` failed to coerce, because the
+    field is a list. A scalar for a list field is now wrapped: that changes the
+    shape, not the content.
+  - A live model emits **one proposal per keyword**, so two genres in one turn
+    produced two entries for the same key and `as_patch()` silently kept the
+    last. List fields now merge; a second value for a scalar is set aside as
+    `already_answered_in_this_turn` rather than overwriting an answer nobody saw.
+- Verified: `python -m pytest` (463 passed, 3 skipped — 20 new) and five turns
+  against a live Vertex-backed Gemini, including 「投资九十万，AI 生成的科幻短剧」
+  → amount, AI flag and genres all read and flagged, and two injection attempts
+  in both languages producing an empty patch.
+
+## 2026-08-28
+
 ### Shared — two decisions were sharing an id, and the wizard looked frozen
 
 - **`docs/decisions.md` had two D-026 entries and two D-027 entries**, written the
