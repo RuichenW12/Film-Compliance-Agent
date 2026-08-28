@@ -236,7 +236,7 @@ def test_recalc_tier_requires_the_internal_token(client):
 
 def test_recalc_tier_only_touches_provisional_projects(client, monkeypatch):
     """A settled tier is left alone. Since the seed's subject rules are still
-    unconfirmed, a special-subject project is provisional (D-026), so this uses
+    unconfirmed, a special-subject project is provisional (D-033), so this uses
     a project whose tier really is final."""
 
     project_id = create_project(client)

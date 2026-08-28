@@ -36,7 +36,7 @@ def test_special_subject_profile_is_t1_with_co_review(
     # before publication, and it is still reported — as a flag. It does not make
     # *this project's* tier look unsettled, which is a different claim and an
     # unrepayable one: nothing clears expert_pending, so the tier would have read
-    # provisional forever. See D-031, superseding that half of D-026.
+    # provisional forever. See D-031, superseding that half of D-033.
     assert classification.tier_provisional is False
     assert "subject_match_unconfirmed" in classification.pending_flags
 
@@ -278,7 +278,7 @@ def test_published_threshold_sets_use_mode_and_exact_amount(
 
     广电办发〔2024〕35号 writes 「达到100万元及以上」 and 「30万元（含）—100万元
     之间」, the same inclusive pattern the 2026 adjustment uses, so equality is
-    not by itself uncertain. See D-026.
+    not by itself uncertain. See D-033.
     """
 
     decision = judge_tier(

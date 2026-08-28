@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { PolicyVerificationBanner } from "../../components/policy-verification-banner";
 import {
@@ -61,9 +61,15 @@ export default function WizardPage() {
   const [platforms, setPlatforms] = useState("");
 
   const [busy, setBusy] = useState(false);
+  const resultRef = useRef<HTMLElement | null>(null);
   const [projectId, setProjectId] = useState<string | null>(null);
   const [result, setResult] = useState<ClassifyResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!result) return;
+    resultRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [result]);
 
   async function onSubmit(event: React.FormEvent) {
     event.preventDefault();
@@ -232,8 +238,18 @@ export default function WizardPage() {
 
       {error ? <p role="alert">{error}</p> : null}
 
+      {/* A real Gemini call takes 8-12s. Without something in the place the
+          answer will appear, the page looks frozen: the only feedback was the
+          button's label, and the result card renders below the fold. */}
+      {busy ? (
+        <section className="card" aria-live="polite">
+          <h2>{t("wizard.classifying")}</h2>
+          <p className="muted">{t("wizard.classifying.hint")}</p>
+        </section>
+      ) : null}
+
       {result ? (
-        <section className="card">
+        <section className="card" ref={resultRef}>
           <h2>Classification</h2>
           <PolicyVerificationBanner
             status={result.classification?.policy_verification_status}

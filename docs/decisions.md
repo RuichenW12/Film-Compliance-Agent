@@ -40,8 +40,9 @@ status becomes `Superseded by D-0xx`. That way the reasoning trail survives.
 | [D-024](#d-024) | A | One C1-a finding per scene, with every matching line kept | Accepted |
 | [D-025](#d-025) | A | Every long job is a task first; the runner decides where it executes | Accepted |
 | [D-026](#d-026) | Shared | Final amount tiers require amount, mode, and usable thresholds | Accepted |
-| [D-026](#d-026) | Shared | A disputed policy reading is reported provisional, never settled | Narrowed 2026-08-26 by [D-027](#d-027) |
-| [D-027](#d-027) | Shared | 广电办发〔2024〕35号 settles two readings and adds two tier triggers | Accepted |
+| [D-027](#d-027) | Shared | A computationally final result does not imply human-verified policy | Accepted |
+| [D-033](#d-033) | Shared | A disputed policy reading is reported provisional, never settled | Published as D-026; narrowed by [D-034](#d-034), subject half superseded by [D-031](#d-031) |
+| [D-034](#d-034) | Shared | 广电办发〔2024〕35号 settles two readings and adds two tier triggers | Published as D-027 |
 | [D-028](#d-028) | Shared | A clause carries its own document's effective date | Accepted |
 
 ---
@@ -801,9 +802,14 @@ reviewed, its evidence recorded, and a human reviewer to authorize the change.
 This decision does not claim cloud deployment, official endorsement, or legal
 advice. Cloud bootstrap and Gate 5-b remain separate work.
 
-## D-026
+## D-033
 
 **A disputed policy reading is reported provisional, never settled** · Area: Shared · Status: Accepted, revisit when the primary sources arrive · 2026-08-26
+
+> Published as **D-026** and renumbered to D-033 on 2026-08-28: two different
+> decisions had been written under that id on the same day, so `#d-026` resolved
+> to the other one and every reference to this entry pointed at the wrong text.
+> The id no longer tracks the date for this entry; the date above does.
 
 The v2 source archive records two places where the product was asserting more
 than its sources support. Both were documented in the archive and invisible in
@@ -857,23 +863,26 @@ Revisit when the primary sources arrive: the original NRTA notice behind
 hit fixes the tier. Both should then flip to settled by publishing confirmed
 rules rather than by editing this logic.
 
-## D-027
+## D-034
 
 **广电办发〔2024〕35号 settles two readings and adds two tier triggers** · Area: Shared · Status: Accepted · 2026-08-26
 
+> Published as **D-027** and renumbered to D-034 on 2026-08-28, for the same
+> collision described in [D-033](#d-033).
+
 The original of 广电办发〔2024〕35号 arrived in the policy library. It is the
 document the 2026 threshold adjustment amends, and reading it changes three
-things — two of them corrections to [D-026](#d-026), written a day earlier on
+things — two of them corrections to [D-033](#d-033), written a day earlier on
 weaker evidence.
 
-### The boundary is not disputed, and D-026 over-flagged it
+### The boundary is not disputed, and D-033 over-flagged it
 
 35号 writes 「总投资额度达到**100万元及以上**」 and 「总投资额度在
 **30万元（含）**—100万元之间」. The 2026 adjustment uses the same pattern, and
 the AI standard writes 「达到80万元及以上」 with no variant at all. Three
 documents, one drafting convention, all inclusive.
 
-D-026 flagged **every** equality as disputed on the strength of a single
+D-033 flagged **every** equality as disputed on the strength of a single
 republished page that wrote the live-action boundary two ways. That was
 over-flagging: it marked the AI thresholds uncertain when their source is
 unambiguous.
@@ -886,7 +895,7 @@ the flag comes back as a data change rather than a code change.
 
 ### The special-subject disposal is well founded
 
-D-026 flagged the T1-plus-co-review outcome because Order 16 article 14 has the
+D-033 flagged the T1-plus-co-review outcome because Order 16 article 14 has the
 authority consult only when it considers it necessary. 35号 is explicit:
 特殊题材的微短剧「**按有关协审工作机制落实审核要求**」. The disposal is not an
 over-reach and is no longer flagged.
@@ -1065,9 +1074,9 @@ effect on 2026-09-01.
 
 ## D-031
 
-**Whether a rule is expert-confirmed is settled before publication, not at classify time** · Area: Shared · Status: Accepted · 2026-08-27 · Supersedes the subject half of [D-026](#d-026), and closes [D-029](#d-029)
+**Whether a rule is expert-confirmed is settled before publication, not at classify time** · Area: Shared · Status: Accepted · 2026-08-27 · Supersedes the subject half of [D-033](#d-033), and closes [D-029](#d-029)
 
-D-026 made a special-subject hit report `tier_provisional: true` whenever the
+D-033 made a special-subject hit report `tier_provisional: true` whenever the
 rules behind it carried `expert_pending`. The reasoning was honest: the trigger
 vocabulary was written by this codebase, not by a regulator, so the tier rested
 on an unvetted match.
@@ -1094,7 +1103,7 @@ Letting an outer-loop debt decide an inner-loop conclusion made the creator
 carry the policy team's uncertainty.
 
 **What it broke.** `recalc_tier` only touches provisional tiers. While subject
-hits were final it never saw them; once D-026 made them provisional it did, and
+hits were final it never saw them; once D-033 made them provisional it did, and
 it recomputes from `judge_tier` alone. A 缉毒 project therefore relaxed **T1 to
 T2** on any policy refresh while keeping `co_review_required`, its subject
 match, and evidence citing `nrta-order-16-article-5` — a tier its own evidence

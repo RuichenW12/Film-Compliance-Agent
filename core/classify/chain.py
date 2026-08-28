@@ -357,7 +357,7 @@ def _classify(
         # subject hit read as unsettled forever, and recalc_tier (which only
         # touches provisional tiers) would then overwrite a T1 with the
         # amount-derived tier. The flag stays, as a flag. See D-031, which
-        # supersedes this half of D-026.
+        # supersedes this half of D-033.
         rules_unconfirmed = subject.expert_pending
         subject_flags = [
             *pending_flags,

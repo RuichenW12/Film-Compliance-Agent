@@ -166,5 +166,7 @@
   "budget_band.unknown": "I don't know yet",
   "wizard.key_conditions_guidance": "Leave both unticked unless you already know otherwise. Platform promotion is a commercial arrangement usually settled after the film is made, and declaring voluntarily is a choice to take the strictest route in exchange for a distribution licence — useful for awards, priority scheduling and negotiating with platforms.",
   "wizard.domestic_platforms": "Domestic platforms (optional)",
-  "wizard.domestic_platforms.hint": "Leave blank if you don't know yet. This does not affect your tier or filing route today; it is recorded for the distribution check that is not built yet."
+  "wizard.domestic_platforms.hint": "Leave blank if you don't know yet. This does not affect your tier or filing route today; it is recorded for the distribution check that is not built yet.",
+  "wizard.classifying": "Working on it…",
+  "wizard.classifying.hint": "Reading the logline against the subject rules. This calls a model and usually takes eight to twelve seconds."
 }

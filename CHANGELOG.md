@@ -20,6 +20,32 @@ Conventions:
 
 ---
 
+## 2026-08-28
+
+### Shared — two decisions were sharing an id, and the wizard looked frozen
+
+- **`docs/decisions.md` had two D-026 entries and two D-027 entries**, written the
+  same day about different things. Markdown resolves `#d-026` to the first, so
+  every link meant to reach "a disputed policy reading is reported provisional"
+  landed on "final amount tiers require amount, mode, and thresholds" instead —
+  including the reference in D-031, which claims to supersede half of it.
+- The second occurrences are renumbered to **D-033** and **D-034**, each carrying
+  a note saying what it was published as and why it moved. That bends the
+  never-renumber convention, deliberately: the convention exists so references
+  stay stable, and here it was the collision breaking them. The first entries
+  keep their ids, so nothing that already resolved correctly moved.
+- Every reference across `CHANGELOG.md`, `core/`, `tests/` and `docs/` was
+  reclassified one at a time — 10 pointed at the renumbered pair, 2 genuinely
+  pointed at the originals and were left alone. The index also gained the row
+  D-027 never had.
+- **The wizard looked frozen for eight to twelve seconds.** The only feedback was
+  the submit button's label, and the answer renders below the fold, so a real
+  Vertex call read as a hang. There is now a card where the answer will appear,
+  saying what is happening and how long it usually takes, and the result scrolls
+  itself into view when it lands.
+- Verified: `python -m pytest` (443 passed, 3 skipped), `npx tsc --noEmit` clean,
+  every decision id unique across 34 entries, and both states checked in Chrome.
+
 ## 2026-08-27
 
 ### A — the wizard stops asking a first-time creator unanswerable questions
@@ -145,7 +171,7 @@ Conventions:
   described the correct behaviour. The owner's inbox now carries only
   `policy_stale` and no `tier_recalculated`, because recalc correctly leaves the
   project alone.
-- See [D-031](docs/decisions.md#d-031), superseding the subject half of D-026.
+- See [D-031](docs/decisions.md#d-031), superseding the subject half of D-033.
 
 - **Found while doing this, not fixed:** `ImpactNode` has only `D1C` and `C1A`,
   so a change to `p2_subject_rules` has no node to declare and `_is_affected`
@@ -300,9 +326,9 @@ running API: a classification citing `nrta-order-16-article-5` comes back with
 ### Shared — 广电办发〔2024〕35号 corrects two readings and adds two tier triggers
 
 The original 35号 arrived in the policy library, and reading it changed three
-things. Two are corrections to [D-026](docs/decisions.md#d-026), written a day
+things. Two are corrections to [D-033](docs/decisions.md#d-033), written a day
 earlier on weaker evidence. Reasoning in
-[D-027](docs/decisions.md#d-027).
+[D-034](docs/decisions.md#d-034).
 
 - **重点微短剧 has four triggers and two were missing.** 35号 defines it as
   meeting *any one* of: special subject, the investment threshold, **platform
@@ -313,7 +339,7 @@ earlier on weaker evidence. Reasoning in
   without consulting the amount. Unanswered is never treated as true.
 - **The threshold boundary is not disputed after all.** 35号 writes
   「达到100万元及以上」 and 「30万元（含）—100万元之间」; the 2026 adjustment uses
-  the same pattern and the AI standard has no variant. D-026 flagged every
+  the same pattern and the AI standard has no variant. D-033 flagged every
   equality on the strength of one republished page, which marked the AI
   thresholds uncertain when their source is clear. A threshold set may now carry
   `disputed_boundaries`, and nothing is flagged unless the policy data says so.
@@ -346,7 +372,7 @@ Verified: `python -m pytest` — 432 passed, 3 skipped;
 Verifying the v2 source archive turned up two places where the product asserted
 more than its sources support. Both were written down in the archive and
 invisible in the running system. Reasoning in
-[D-026](docs/decisions.md#d-026).
+[D-033](docs/decisions.md#d-033).
 
 - **The threshold boundary.** `SRC-002` writes the live-action boundary two ways
   on the same page — 「300万元及以上」(`>=`) and 「300万元以上」(`>`). The code

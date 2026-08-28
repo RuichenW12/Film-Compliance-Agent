@@ -60,7 +60,7 @@ def on_threshold_boundary(amount_rmb: float, thresholds: dict) -> bool:
     a threshold set may carry `disputed_boundaries: [T1_min_rmb]`. Nothing is
     flagged unless the policy data says so, and the seed says so for nothing.
 
-    See D-026 and docs/policy-library/MISSING.md M-001.
+    See D-033 and docs/policy-library/MISSING.md M-001.
     """
 
     disputed = thresholds.get("disputed_boundaries") or []
