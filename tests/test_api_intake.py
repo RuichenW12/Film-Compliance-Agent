@@ -18,7 +18,7 @@ CRIME_INTENT = {
     "logline": "卧底警察深入毒枭内部，在缉毒行动中面临身份暴露的危机。",
     "episode_count": 24,
     "episode_minutes": 3,
-    "budget_band": "band_b",
+    "amount_bracket": "between",
     "is_ai_generated": True,
     "production_stage": "script_ready",
 }
@@ -29,7 +29,7 @@ ROMANCE_INTENT = {
     "logline": "总裁与实习生在职场相遇，逐渐走到一起的爱情故事。",
     "episode_count": 30,
     "episode_minutes": 2,
-    "budget_band": "band_c",
+    "amount_bracket": "below_lower",
     "is_ai_generated": False,
 }
 
@@ -208,7 +208,7 @@ def test_tier_choice_reruns_d1c(client):
     assert first["classification"]["tier"] == "T3"
 
     second = client.post(
-        f"/v1/projects/{project_id}/tier-choice", json={"budget_band": "band_a"}
+        f"/v1/projects/{project_id}/tier-choice", json={"amount_bracket": "at_or_above_upper"}
     ).json()
     assert second["classification"]["tier"] == "T1"
     assert second["classification"]["tier_provisional"] is True

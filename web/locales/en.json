@@ -211,5 +211,10 @@
   "help.synopsis.example": "After reuniting, one of them is drawn into an anti-narcotics operation and his cover starts to slip.",
   "help.production_stage": "How far the work has got. It matters because a key micro-drama must be filed before shooting starts — if you're already shooting one, you've passed a step rather than not reached it yet.",
   "help.production_stage.example": "Just an idea",
-  "flag.filing_due_before_shooting": "This is a key micro-drama, and those must be filed before shooting begins. You've already started, so this step is behind you rather than ahead — talk to your provincial authority about how to put it right."
+  "flag.filing_due_before_shooting": "This is a key micro-drama, and those must be filed before shooting begins. You've already started, so this step is behind you rather than ahead — talk to your provincial authority about how to put it right.",
+  "wizard.amount_bracket": "Budget range",
+  "wizard.amount_bracket.hint": "Enough to decide your tier on its own — the ranges are the official thresholds, and they shift when the work is AI generated. The exact figure above is still needed for the filing form, but you do not need it to get an answer here.",
+  "amount_bracket.unknown": "I don't know yet",
+  "help.amount_bracket": "Which side of the thresholds your budget falls on. Answering this settles your tier without naming a figure. The ranges change if you tick AI generated content: the AI thresholds are much lower.",
+  "help.amount_bracket.example": "Under ¥1,000,000 for live action; under ¥300,000 for AI"
 }

@@ -8,16 +8,15 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from schemas.enums import BudgetBand, Tier
+from schemas.enums import AmountBracket, Tier
 
 # Placeholder band-to-tier mapping used only while official amounts are unpublished.
-PROVISIONAL_BAND_TIER: dict[BudgetBand, Tier] = {
-    BudgetBand.BAND_A: Tier.T1,
-    BudgetBand.BAND_B: Tier.T2,
-    BudgetBand.BAND_C: Tier.T3,
+BRACKET_TIER: dict[AmountBracket, Tier] = {
+    AmountBracket.AT_OR_ABOVE_UPPER: Tier.T1,
+    AmountBracket.BETWEEN: Tier.T2,
+    AmountBracket.BELOW_LOWER: Tier.T3,
 }
 
-# With an unknown band we assume the stricter of the amount-based tiers and say so.
 STRICTER_ASSUMPTION = Tier.T2
 
 
@@ -84,27 +83,45 @@ def _tier_from_amount(amount_rmb: float, thresholds: dict) -> Tier | None:
     return None
 
 
-def _provisional_from_band(
-    budget_band: BudgetBand,
+def _from_bracket(
+    amount_bracket: AmountBracket,
+    thresholds: dict,
     *,
+    settled: bool,
     pending_flags: list[str],
 ) -> TierDecision:
-    if budget_band is BudgetBand.UNKNOWN:
+    """A tier from where the budget sits relative to the thresholds.
+
+    `settled` is the whole difference from what this used to be. The old bands
+    were invented before any threshold was published, so a tier from one could
+    only ever be a placeholder. A bracket is defined *by* the published
+    thresholds: "under the lower line" decides three-class as surely as a figure
+    would, and reporting that as provisional understates what we know.
+
+    It stays provisional when the thresholds themselves are not usable — none
+    published, or no production mode to choose a set with — because then there
+    is nothing for the bracket to be relative to.
+    """
+
+    if amount_bracket is AmountBracket.UNKNOWN:
         return TierDecision(
             tier=STRICTER_ASSUMPTION,
             tier_provisional=True,
             pending_flags=["budget_unknown", *pending_flags],
             reasons=["tier.assumed_stricter_pending_budget"],
             comparison_card=[
-                {"tier": tier.value, "band": band.value}
-                for band, tier in PROVISIONAL_BAND_TIER.items()
+                {"tier": tier.value, "bracket": bracket.value}
+                for bracket, tier in BRACKET_TIER.items()
             ],
         )
     return TierDecision(
-        tier=PROVISIONAL_BAND_TIER[budget_band],
-        tier_provisional=True,
+        tier=BRACKET_TIER[amount_bracket],
+        tier_provisional=not settled,
         pending_flags=pending_flags,
-        reasons=["tier.provisional_missing_exact_inputs"],
+        reasons=[
+            "tier.from_bracket" if settled else "tier.provisional_missing_exact_inputs"
+        ],
+        clause_ref=thresholds.get("clause_ref") if settled else None,
     )
 
 
@@ -140,7 +157,7 @@ def key_drama_by_promotion(
 
 
 def judge_tier(
-    budget_band: BudgetBand,
+    amount_bracket: AmountBracket,
     pack3: dict,
     snapshot_thresholds_published: bool | None = None,
     investment_amount_rmb: float | None = None,
@@ -162,8 +179,10 @@ def judge_tier(
     threshold_sets = pack3.get("threshold_sets") or {}
 
     if threshold_sets and is_ai_generated is None:
-        return _provisional_from_band(
-            budget_band,
+        return _from_bracket(
+            amount_bracket,
+            {},
+            settled=False,
             pending_flags=["generation_mode_required"],
         )
 
@@ -189,18 +208,28 @@ def judge_tier(
             )
 
     if published and investment_amount_rmb is None:
-        return _provisional_from_band(
-            budget_band,
+        # The bracket settles the tier. The exact figure is still wanted — the
+        # freeze gate lists investment_amount_rmb among its required facts — so
+        # it stays reported as outstanding, just not as a reason to hedge the
+        # tier that the bracket has already decided.
+        return _from_bracket(
+            amount_bracket,
+            thresholds,
+            settled=bool(thresholds),
             pending_flags=["amount_required"],
         )
 
     if published:
-        return _provisional_from_band(
-            budget_band,
+        return _from_bracket(
+            amount_bracket,
+            thresholds,
+            settled=False,
             pending_flags=["thresholds_unavailable"],
         )
 
-    return _provisional_from_band(
-        budget_band,
+    return _from_bracket(
+        amount_bracket,
+        thresholds,
+        settled=False,
         pending_flags=["amount_official"],
     )

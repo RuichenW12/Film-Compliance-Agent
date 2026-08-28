@@ -207,7 +207,7 @@ EDGE_INTENT = {
     "logline": "一名缉毒警察在边境执行卧底任务。",
     "episode_count": 24,
     "episode_minutes": 3,
-    "budget_band": "band_b",
+    "amount_bracket": "between",
     "is_ai_generated": True,
 }
 

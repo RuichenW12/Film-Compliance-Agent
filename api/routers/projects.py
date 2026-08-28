@@ -173,7 +173,7 @@ def choose_tier(
     project = workflow.get_project(project_id)
     _assert_owner(principal, project.owner_uid)
 
-    project, outcome = workflow.choose_tier(project_id, body.budget_band)
+    project, outcome = workflow.choose_tier(project_id, body.amount_bracket)
     return _classify_response(request, project_id, project, outcome)
 
 

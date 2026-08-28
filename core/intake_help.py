@@ -55,7 +55,7 @@ FIELD_CLAUSES: dict[str, tuple[str, ...]] = {
     "logline": ("nrta-order-16-article-5",),
     "genre_keywords": ("nrta-order-16-article-5",),
     "investment_amount_rmb": ("tier-live-action-2026", "tier-ai-generated-2026"),
-    "budget_band": ("tier-live-action-2026", "tier-ai-generated-2026"),
+    "amount_bracket": ("tier-live-action-2026", "tier-ai-generated-2026"),
     "is_ai_generated": ("tier-ai-generated-2026", "nrta-order-16-article-34"),
     # Nothing. Both conditions come from 广电办发〔2024〕35号, which this snapshot
     # carries no clause for -- the document is in docs/policy-library as P-002

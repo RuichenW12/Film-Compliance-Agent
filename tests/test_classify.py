@@ -11,7 +11,7 @@ from core.classify.chain import filing_route
 from core.classify.d1c import judge_tier
 from core.llm import ScriptedLLM
 from schemas.common import EvidenceRef
-from schemas.enums import BudgetBand, ExitKind, FormType, ProjectState, Tier
+from schemas.enums import AmountBracket, ExitKind, FormType, ProjectState, Tier
 from schemas.policy_snapshot import PackName, VerificationStatus
 from schemas.snapshot import SnapshotService
 
@@ -158,7 +158,7 @@ def test_semantic_hits_must_quote_real_text(intent_romance, channels, snapshots)
 
 
 def test_unknown_budget_assumes_the_stricter_tier_without_blocking(snapshots):
-    decision = judge_tier(BudgetBand.UNKNOWN, {"thresholds": None}, False)
+    decision = judge_tier(AmountBracket.UNKNOWN, {"thresholds": None}, False)
 
     assert decision.tier is Tier.T2
     assert decision.tier_provisional is True
@@ -169,7 +169,7 @@ def test_unknown_budget_assumes_the_stricter_tier_without_blocking(snapshots):
 def test_published_thresholds_make_the_tier_final():
     pack = {"thresholds": {"T1_min_rmb": 5_000_000, "T2_min_rmb": 1_000_000}, "official_published": True}
     decision = judge_tier(
-        BudgetBand.UNKNOWN,
+        AmountBracket.UNKNOWN,
         pack,
         True,
         investment_amount_rmb=2_000_000,
@@ -282,7 +282,7 @@ def test_published_threshold_sets_use_mode_and_exact_amount(
     """
 
     decision = judge_tier(
-        BudgetBand.UNKNOWN,
+        AmountBracket.UNKNOWN,
         PUBLISHED_THRESHOLD_PACK,
         True,
         investment_amount_rmb=amount,
@@ -316,7 +316,7 @@ def test_a_pack_can_still_declare_one_boundary_disputed():
     }
 
     on_edge = judge_tier(
-        BudgetBand.UNKNOWN, disputed, True,
+        AmountBracket.UNKNOWN, disputed, True,
         investment_amount_rmb=3_000_000, is_ai_generated=False,
     )
     assert on_edge.tier is Tier.T1
@@ -324,7 +324,7 @@ def test_a_pack_can_still_declare_one_boundary_disputed():
     assert "threshold_boundary_disputed" in on_edge.pending_flags
 
     other_edge = judge_tier(
-        BudgetBand.UNKNOWN, disputed, True,
+        AmountBracket.UNKNOWN, disputed, True,
         investment_amount_rmb=1_000_000, is_ai_generated=False,
     )
     assert other_edge.tier_provisional is False
@@ -333,7 +333,7 @@ def test_a_pack_can_still_declare_one_boundary_disputed():
 
 def test_exact_amount_without_generation_mode_stays_provisional():
     decision = judge_tier(
-        BudgetBand.BAND_B,
+        AmountBracket.BETWEEN,
         PUBLISHED_THRESHOLD_PACK,
         True,
         investment_amount_rmb=1_500_000,
@@ -345,9 +345,20 @@ def test_exact_amount_without_generation_mode_stays_provisional():
     assert decision.clause_ref is None
 
 
-def test_published_thresholds_without_exact_amount_stay_provisional():
+def test_a_bracket_settles_the_tier_even_without_an_exact_amount():
+    """The change from `BudgetBand` in one test.
+
+    `band_c` was an invented label, so a tier from it could only be a
+    placeholder. `below_lower` is defined by the published thresholds, and says
+    the same thing a figure under 1,000,000 would say — reporting it as
+    provisional understated what the creator had told us.
+
+    The exact amount is still wanted: the freeze gate needs it, so
+    `amount_required` stays. It just stops being a reason to hedge the tier.
+    """
+
     decision = judge_tier(
-        BudgetBand.BAND_C,
+        AmountBracket.BELOW_LOWER,
         PUBLISHED_THRESHOLD_PACK,
         True,
         investment_amount_rmb=None,
@@ -355,13 +366,46 @@ def test_published_thresholds_without_exact_amount_stay_provisional():
     )
 
     assert decision.tier is Tier.T3
-    assert decision.tier_provisional is True
+    assert decision.tier_provisional is False
+    assert decision.reasons == ["tier.from_bracket"]
+    assert decision.clause_ref == "tier-live-action-2026"
     assert "amount_required" in decision.pending_flags
+
+
+def test_the_same_bracket_reads_against_the_ai_thresholds_when_ai():
+    """One enum, two threshold sets. The bracket is relative, not numeric."""
+
+    decision = judge_tier(
+        AmountBracket.AT_OR_ABOVE_UPPER,
+        PUBLISHED_THRESHOLD_PACK,
+        True,
+        investment_amount_rmb=None,
+        is_ai_generated=True,
+    )
+
+    assert decision.tier is Tier.T1
+    assert decision.tier_provisional is False
+    assert decision.clause_ref == "tier-ai-generated-2026"
+
+
+def test_a_bracket_stays_provisional_when_the_thresholds_are_not_usable():
+    """With nothing to be relative to, a bracket is back to being a guess."""
+
+    decision = judge_tier(
+        AmountBracket.BELOW_LOWER,
+        {"thresholds_published": True},
+        True,
+        investment_amount_rmb=None,
+        is_ai_generated=False,
+    )
+
+    assert decision.tier_provisional is True
+    assert decision.clause_ref is None
 
 
 def test_published_flag_without_usable_thresholds_stays_provisional():
     decision = judge_tier(
-        BudgetBand.BAND_C,
+        AmountBracket.BELOW_LOWER,
         {"thresholds_published": True},
         True,
         investment_amount_rmb=1_500_000,
@@ -375,14 +419,14 @@ def test_published_flag_without_usable_thresholds_stays_provisional():
 
 def test_same_amount_can_land_in_different_mode_specific_tiers():
     live = judge_tier(
-        BudgetBand.UNKNOWN,
+        AmountBracket.UNKNOWN,
         PUBLISHED_THRESHOLD_PACK,
         True,
         investment_amount_rmb=500_000,
         is_ai_generated=False,
     )
     ai = judge_tier(
-        BudgetBand.UNKNOWN,
+        AmountBracket.UNKNOWN,
         PUBLISHED_THRESHOLD_PACK,
         True,
         investment_amount_rmb=500_000,
@@ -475,7 +519,7 @@ def test_platform_promotion_makes_a_small_drama_a_key_drama():
     """
 
     decision = judge_tier(
-        BudgetBand.UNKNOWN,
+        AmountBracket.UNKNOWN,
         PUBLISHED_THRESHOLD_PACK,
         True,
         investment_amount_rmb=300_000,
@@ -492,7 +536,7 @@ def test_declaring_voluntarily_makes_it_a_key_drama():
     """「自愿按重点微短剧申报」 is also enough on its own."""
 
     decision = judge_tier(
-        BudgetBand.UNKNOWN,
+        AmountBracket.UNKNOWN,
         PUBLISHED_THRESHOLD_PACK,
         True,
         investment_amount_rmb=50_000,
@@ -509,7 +553,7 @@ def test_neither_condition_leaves_the_amount_in_charge():
 
     for promoted, voluntary in ((None, None), (False, False)):
         decision = judge_tier(
-            BudgetBand.UNKNOWN,
+            AmountBracket.UNKNOWN,
             PUBLISHED_THRESHOLD_PACK,
             True,
             investment_amount_rmb=300_000,
@@ -524,7 +568,7 @@ def test_the_condition_beats_the_amount_not_the_other_way_round():
     """Any one condition is enough, so a large amount cannot cancel it out."""
 
     decision = judge_tier(
-        BudgetBand.UNKNOWN,
+        AmountBracket.UNKNOWN,
         PUBLISHED_THRESHOLD_PACK,
         True,
         investment_amount_rmb=5_000_000,
@@ -672,7 +716,7 @@ def test_classification_carries_the_route_for_its_own_tier(channels):
         logline="一支年轻团队在城市里从零做起一家小店的创业故事。",
         episode_count=30,
         episode_minutes=3.0,
-        budget_band=BudgetBand.BAND_A,
+        amount_bracket=AmountBracket.AT_OR_ABOVE_UPPER,
         investment_amount_rmb=3_200_000,
         is_ai_generated=False,
     )

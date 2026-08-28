@@ -20,7 +20,7 @@ from schemas.enums import (
     AssetKind,
     FindingStatus,
     MaterialStatus,
-    BudgetBand,
+    AmountBracket,
     FactStatus,
     FindingSeverity,
     NotificationKind,
@@ -234,10 +234,10 @@ class WorkflowService:
         project = self._persist_classification(project, outcome)
         return project, outcome
 
-    def choose_tier(self, project_id: str, budget_band: BudgetBand) -> tuple[Project, ClassificationOutcome]:
+    def choose_tier(self, project_id: str, amount_bracket: AmountBracket) -> tuple[Project, ClassificationOutcome]:
         """User picks a budget band -> D1c runs again on the same chain."""
 
-        project, _ = self.submit_intent(project_id, {"budget_band": budget_band})
+        project, _ = self.submit_intent(project_id, {"amount_bracket": amount_bracket})
         return self.run_classification(project.project_id)
 
     def recalc_tier(self, project_id: str, snapshot_version: str) -> RecalcResult:
@@ -263,7 +263,7 @@ class WorkflowService:
 
         pack3 = self._snapshots.get_pack(PackName.P3_TIER_THRESHOLDS, snapshot_version)
         decision = judge_tier(
-            project.intent_profile.budget_band,
+            project.intent_profile.amount_bracket,
             pack3,
             self._thresholds_published(snapshot_version),
             investment_amount_rmb=project.intent_profile.investment_amount_rmb,

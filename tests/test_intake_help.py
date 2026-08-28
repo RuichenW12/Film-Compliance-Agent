@@ -47,7 +47,7 @@ def test_the_reply_has_nowhere_to_put_a_value():
 
 
 def test_every_field_the_form_asks_about_can_be_explained():
-    assert "budget_band" in EXPLAINABLE_KEYS
+    assert "amount_bracket" in EXPLAINABLE_KEYS
     assert "platform_promoted" in EXPLAINABLE_KEYS
     assert "tier" not in EXPLAINABLE_KEYS
 

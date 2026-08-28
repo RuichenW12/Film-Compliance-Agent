@@ -423,7 +423,7 @@ def _classify(
         )
 
     tier_decision = judge_tier(
-        intent.budget_band,
+        intent.amount_bracket,
         pack3,
         thresholds_published,
         investment_amount_rmb=intent.investment_amount_rmb,

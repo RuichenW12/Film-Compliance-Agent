@@ -6,7 +6,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from schemas.enums import (
     AssetKind,
-    BudgetBand,
+    AmountBracket,
     ClaimedFormType,
     ExitKind,
     ProductionStage,
@@ -40,7 +40,7 @@ class IntentRequest(ApiModel):
     synopsis: str | None = None
     episode_count: int | None = Field(default=None, ge=1)
     episode_minutes: float | None = Field(default=None, gt=0)
-    budget_band: BudgetBand | None = None
+    amount_bracket: AmountBracket | None = None
     investment_amount_rmb: int | None = Field(default=None, ge=0)
     is_ai_generated: bool | None = None
     production_stage: ProductionStage | None = None
@@ -109,7 +109,7 @@ class ClassifyResponse(ApiModel):
 
 
 class TierChoiceRequest(ApiModel):
-    budget_band: BudgetBand
+    amount_bracket: AmountBracket
 
 
 class GateResponse(ApiModel):

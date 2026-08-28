@@ -9,7 +9,11 @@ import {
   apiFetch,
   type PolicyVerificationStatus,
 } from "../../lib/api";
-import { BudgetBand } from "../../lib/enums";
+import {
+  AMOUNT_BRACKETS,
+  BRACKET_LABELS,
+  type AmountBracket,
+} from "../../lib/enums";
 import { t } from "../../lib/i18n";
 
 interface ClassifyResponse {
@@ -39,7 +43,7 @@ interface ClassifyResponse {
   state: string;
 }
 
-const BANDS: BudgetBand[] = ["band_a", "band_b", "band_c", "unknown"];
+
 
 type ProductionStage = "idea" | "script_ready" | "shooting" | "finished" | "unknown";
 const STAGES: ProductionStage[] = [
@@ -58,11 +62,12 @@ export default function WizardPage() {
   const [genres, setGenres] = useState("");
   const [episodeCount, setEpisodeCount] = useState("24");
   const [episodeMinutes, setEpisodeMinutes] = useState("3");
-  // Not "band_b". A creator who never opened this dropdown has not told us their
-// budget is medium, and defaulting to one invents the fact the tier rests on.
-// "unknown" is handled properly downstream: it assumes the stricter tier, flags
-// budget_unknown, and returns a three-tier comparison card.
-  const [budgetBand, setBudgetBand] = useState<BudgetBand>("unknown");
+  // "unknown", not a range. A creator who never opened this dropdown has not
+  // told us anything about their budget, and picking one for them would invent
+  // the fact the tier rests on. Handled properly downstream: the stricter tier
+  // is assumed, `budget_unknown` is flagged, and a three-tier comparison card
+  // comes back.
+  const [amountBracket, setAmountBracket] = useState<AmountBracket>("unknown");
   const [investmentAmount, setInvestmentAmount] = useState("");
   const [isAiGenerated, setIsAiGenerated] = useState(true);
   // 广电办发〔2024〕35号: platform promotion and voluntary declaration each make
@@ -106,7 +111,7 @@ export default function WizardPage() {
           production_stage: stage,
           episode_count: Number(episodeCount),
           episode_minutes: Number(episodeMinutes),
-          budget_band: budgetBand,
+          amount_bracket: amountBracket,
           ...(investmentAmount === ""
             ? {}
             : { investment_amount_rmb: Number(investmentAmount) }),
@@ -221,20 +226,30 @@ export default function WizardPage() {
           />
         </label>
         <label>
-          <span>{t("wizard.budget_band")}</span>
-          <FieldHelp field="budget_band" label="Rough budget" />
+          <span>{t("wizard.amount_bracket")}</span>
+          <FieldHelp field="amount_bracket" label="Budget range" />
           <select
-            value={budgetBand}
-            onChange={(event) => setBudgetBand(event.target.value as BudgetBand)}
+            value={amountBracket}
+            onChange={(event) =>
+              setAmountBracket(event.target.value as AmountBracket)
+            }
           >
-            {BANDS.map((band) => (
-              <option key={band} value={band}>
-                {t(`budget_band.${band}`)}
+            {AMOUNT_BRACKETS.map((bracket) => (
+              <option key={bracket} value={bracket}>
+                {bracket === "unknown"
+                  ? t("amount_bracket.unknown")
+                  : /* The figures follow the AI checkbox: the same range means
+                       a different tier, and showing live-action numbers to
+                       someone making an AI drama would be worse than showing
+                       none. */
+                    BRACKET_LABELS[isAiGenerated ? "ai" : "live_action"][
+                      bracket
+                    ]}
               </option>
             ))}
           </select>
         </label>
-        <p className="muted">{t("wizard.budget_band.hint")}</p>
+        <p className="muted">{t("wizard.amount_bracket.hint")}</p>
         <label>
           <span>AI generated content</span>
           <FieldHelp field="is_ai_generated" label="AI generated content" />

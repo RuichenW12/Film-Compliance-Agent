@@ -1218,3 +1218,50 @@ was being asked was.
 Revisit if field help lands and people still abandon the form, which would mean
 the problem was typing after all.
 
+
+## D-036
+
+**A threshold-aligned bracket settles a tier; an invented band never could** · Area: Shared · Status: Accepted · 2026-08-28 · Supersedes the band half of [D-003](#d-003)
+
+D-003 mapped `band_a/b/c` to T1/T2/T3 and marked every such tier provisional.
+That was right at the time and for the reason it gave: the thresholds were not
+published, so the bands were a placeholder and a tier from one was a guess
+dressed as an answer.
+
+The thresholds are published now — 1,000,000 and 3,000,000 for live action,
+300,000 and 800,000 for AI — and that changes what a range can mean. `band_c`
+was a label somebody chose. `below_lower` is defined *by* the published figures,
+so answering it says exactly what a number under 1,000,000 would say. Continuing
+to report that as provisional understated what the creator had told us, and made
+the honest answer — "I don't know the exact figure yet" — cost them a settled
+result they were entitled to.
+
+So `BudgetBand` becomes `AmountBracket`, and a bracket produces a **settled**
+tier whenever the thresholds behind it are usable. It stays provisional when
+they are not — no published set, or no production mode to choose a set with —
+because then there is nothing for the bracket to be relative to.
+
+**Why relative rather than numeric.** The brackets are not `under_1m` and
+`under_300k`; they are `below_lower`, `between`, `at_or_above_upper`. The figures
+differ by production mode, and encoding either set into the enum would have put
+policy data into a type. One enum, resolved against whichever set applies, and
+the interface fills in the numbers — which it does from the AI checkbox, so the
+same dropdown reads "Under ¥1,000,000" or "Under ¥300,000" depending.
+
+**What this does not change.** The exact amount is still wanted: the freeze gate
+lists `investment_amount_rmb` among its required facts, so `amount_required`
+still appears on a bracket-derived classification. It has simply stopped being a
+reason to hedge a tier the bracket already decided.
+
+**The boundary.** `at_or_above_upper` includes the threshold itself, and
+[D-033](#d-033) records that one source states that boundary two ways. The pack
+may still flag a disputed boundary and nothing in the seed does, so the inclusive
+reading stands and the bracket is settled. Revisit if a snapshot ever populates
+`disputed_boundaries`: the most-chosen option becoming provisional would be a
+poor trade, and the better answer would then be to ask for the figure instead.
+
+**The one duplication.** `web/lib/enums.ts` carries the figures so the dropdown
+can show them, which is a second copy of policy data. The tier is still computed
+server-side from the pinned snapshot and stays correct if the two drift; the
+labels would not. Accepted because a range with no numbers is a question nobody
+can answer, and recorded here so the staleness is findable.

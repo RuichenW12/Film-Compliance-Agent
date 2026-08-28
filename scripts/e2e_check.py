@@ -24,7 +24,7 @@ CRIME_INTENT = {
     "logline": "卧底警察深入毒枭内部，在缉毒行动中面临身份暴露的危机。",
     "episode_count": 24,
     "episode_minutes": 3,
-    "budget_band": "band_b",
+    "amount_bracket": "between",
     "is_ai_generated": True,
     "production_stage": "script_ready",
 }
@@ -35,7 +35,7 @@ ROMANCE_INTENT = {
     "logline": "总裁与实习生在职场相遇，逐渐走到一起的爱情故事。",
     "episode_count": 30,
     "episode_minutes": 2,
-    "budget_band": "band_c",
+    "amount_bracket": "below_lower",
     "is_ai_generated": False,
 }
 
@@ -51,7 +51,7 @@ KEY_BY_AMOUNT_INTENT = {
     "logline": "一支年轻团队在城市里从零做起一家小店的创业故事。",
     "episode_count": 30,
     "episode_minutes": 3,
-    "budget_band": "band_a",
+    "amount_bracket": "at_or_above_upper",
     "investment_amount_rmb": 3200000,
     "is_ai_generated": False,
 }
@@ -63,7 +63,7 @@ ORDINARY_BY_AMOUNT_INTENT = {
     "logline": "三代人围绕一间老房子的搬迁做出各自的选择。",
     "episode_count": 24,
     "episode_minutes": 3,
-    "budget_band": "band_b",
+    "amount_bracket": "between",
     "investment_amount_rmb": 1500000,
     "is_ai_generated": False,
 }
@@ -76,7 +76,7 @@ AI_KEY_INTENT = {
     "logline": "一名工程师在虚拟城市里寻找失踪同事的下落。",
     "episode_count": 20,
     "episode_minutes": 2,
-    "budget_band": "band_b",
+    "amount_bracket": "between",
     "investment_amount_rmb": 900000,
     "is_ai_generated": True,
 }
@@ -87,7 +87,7 @@ VLOG_INTENT = {
     "logline": "一支记录城市清晨的短片。",
     "episode_count": 1,
     "episode_minutes": 8,
-    "budget_band": "band_c",
+    "amount_bracket": "below_lower",
     "is_ai_generated": True,
 }
 

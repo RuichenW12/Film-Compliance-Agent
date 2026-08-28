@@ -10,7 +10,7 @@ import pytest
 from core.clock import FixedClock
 from core.llm import ScriptedLLM, UnavailableLLM
 from core.workflow_service import WorkflowService
-from schemas.enums import BudgetBand, ClaimedFormType, ProductionStage
+from schemas.enums import AmountBracket, ClaimedFormType, ProductionStage
 from schemas.project import ChannelProfile, IntentProfile
 from schemas.snapshot import FileSnapshotService
 from store.memory import InMemoryStores
@@ -65,7 +65,7 @@ def intent_crime() -> IntentProfile:
         logline=CRIME_LOGLINE,
         episode_count=24,
         episode_minutes=3.0,
-        budget_band=BudgetBand.BAND_B,
+        amount_bracket=AmountBracket.BETWEEN,
         is_ai_generated=True,
         production_stage=ProductionStage.SCRIPT_READY,
     )
@@ -81,7 +81,7 @@ def intent_romance() -> IntentProfile:
         logline="总裁与实习生在职场相遇，逐渐走到一起的爱情故事。",
         episode_count=30,
         episode_minutes=2.0,
-        budget_band=BudgetBand.BAND_C,
+        amount_bracket=AmountBracket.BELOW_LOWER,
         is_ai_generated=False,
         production_stage=ProductionStage.SCRIPT_READY,
     )
@@ -97,7 +97,7 @@ def intent_single_video() -> IntentProfile:
         logline="一支记录城市清晨的短片。",
         episode_count=1,
         episode_minutes=8.0,
-        budget_band=BudgetBand.BAND_C,
+        amount_bracket=AmountBracket.BELOW_LOWER,
         is_ai_generated=True,
         production_stage=ProductionStage.FINISHED,
     )

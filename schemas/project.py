@@ -6,7 +6,7 @@ from pydantic import AwareDatetime, Field, model_validator
 
 from .common import DomainModel, EvidenceRef
 from .enums import (
-    BudgetBand,
+    AmountBracket,
     ClaimedFormType,
     FormType,
     Phase,
@@ -29,7 +29,7 @@ class IntentProfile(DomainModel):
     synopsis: str | None = None
     episode_count: int | None = Field(default=None, ge=1)
     episode_minutes: float | None = Field(default=None, gt=0)
-    budget_band: BudgetBand = BudgetBand.UNKNOWN
+    amount_bracket: AmountBracket = AmountBracket.UNKNOWN
     investment_amount_rmb: int | None = Field(default=None, ge=0)
     is_ai_generated: bool | None = None
     # Replaces `has_finished_film`, which nothing read. A bool could not say

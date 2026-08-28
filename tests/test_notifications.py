@@ -34,7 +34,7 @@ ROMANCE_INTENT = {
     "logline": "总裁与实习生在职场相遇，逐渐走到一起的爱情故事。",
     "episode_count": 30,
     "episode_minutes": 2,
-    "budget_band": "band_c",
+    "amount_bracket": "below_lower",
     "investment_amount_rmb": 1_500_000,
     "is_ai_generated": False,
 }

@@ -22,6 +22,36 @@ Conventions:
 
 ## 2026-08-28
 
+### Shared — a budget range now settles a tier, because the ranges are the thresholds
+
+- **`BudgetBand` becomes `AmountBracket`**: `below_lower` / `between` /
+  `at_or_above_upper` / `unknown`, replacing `band_a/b/c`. A bracket produces a
+  **settled** tier whenever the thresholds behind it are usable, where a band
+  could only ever be provisional.
+- The difference is not cosmetic. D-003 marked band-derived tiers provisional
+  because the bands were invented before any threshold was published. These are
+  defined *by* the published figures, so "under the lower line" says exactly what
+  a number under 1,000,000 says — and reporting that as provisional understated
+  what the creator had told us. Answering honestly ("I don't know the exact
+  figure") used to cost them a settled result. See
+  [D-036](docs/decisions.md#d-036), superseding that half of D-003.
+- **The brackets are relative, not numeric**, because the figures differ by
+  production mode — 1,000,000 / 3,000,000 live action, 300,000 / 800,000 AI.
+  One enum resolved against whichever set applies; the interface fills in the
+  numbers from the AI checkbox, so the same dropdown reads "Under ¥1,000,000" or
+  "Under ¥300,000". Verified in Chrome: ticking AI changes all three options.
+- **The exact amount stays.** The freeze gate lists `investment_amount_rmb`
+  among its required facts, so `amount_required` still appears on a
+  bracket-derived classification — it has stopped being a reason to hedge the
+  tier, not stopped being wanted.
+- Verified: `python -m pytest` (461 passed, 3 skipped), `npx tsc --noEmit`
+  clean, and in Chrome with the amount left blank and only a range chosen:
+  `Tier T3`, **no provisional marker**, citing `tier-live-action-2026`, with
+  `amount_required` still listed.
+- **Known duplication:** `web/lib/enums.ts` carries the figures so the dropdown
+  can name them. The tier is computed server-side from the pinned snapshot and
+  stays correct if the two drift; the labels would not.
+
 ### A — ask what a creator can answer, and what actually decides something
 
 Five changes to what intake asks, from reviewing the form question by question.
