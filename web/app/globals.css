@@ -640,3 +640,51 @@ main label span {
   border: 1px solid #b6bec9;
   border-radius: 4px;
 }
+
+/* Genre keywords: suggestions beside the box, not instead of it. Nothing in the
+   chain treats a chosen word differently from a typed one, so the list can be
+   incomplete without making an answer wrong. */
+.genre-picker {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+  max-width: 34rem;
+}
+
+.genre-toggle {
+  font-size: 0.8rem;
+  padding: 0.15rem 0.5rem;
+  border: 1px solid #c3cad4;
+  border-radius: 4px;
+  background: #fff;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.genre-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  flex-basis: 100%;
+  margin-top: 0.15rem;
+}
+
+.chip {
+  font-size: 0.85rem;
+  padding: 0.15rem 0.55rem;
+  border: 1px solid #c3cad4;
+  border-radius: 999px;
+  background: #fff;
+  cursor: pointer;
+}
+
+.chip:hover {
+  border-color: #8d99a8;
+}
+
+.chip-on {
+  background: #eef4ff;
+  border-color: #6f8fc9;
+  color: #23406e;
+}

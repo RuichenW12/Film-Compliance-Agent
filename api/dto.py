@@ -36,7 +36,7 @@ class IntentRequest(ApiModel):
 
     form_type_claimed: ClaimedFormType | None = None
     genre_keywords: list[str] | None = None
-    logline: str | None = None
+    synopsis: str | None = None
     synopsis: str | None = None
     episode_count: int | None = Field(default=None, ge=1)
     episode_minutes: float | None = Field(default=None, gt=0)

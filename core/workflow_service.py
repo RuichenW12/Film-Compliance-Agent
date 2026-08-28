@@ -697,10 +697,14 @@ class WorkflowService:
         """
 
         project = self.get_project(project_id)
-        logline = (project.intent_profile.logline or "").strip()
+        # `core.teaser` still calls its input a logline, which is the right word
+        # for what a teaser is generated from. The intake field it comes from is
+        # now the synopsis — one story field, and it is the one the filing form
+        # actually asks for.
+        logline = (project.intent_profile.synopsis or "").strip()
         if not logline:
             raise ValidationFailedError(
-                "a teaser needs a logline to work from", {"project_id": project_id}
+                "a teaser needs a synopsis to work from", {"project_id": project_id}
             )
 
         latest = self._latest_script(project_id)

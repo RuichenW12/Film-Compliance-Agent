@@ -52,7 +52,7 @@ FIELD_CLAUSES: dict[str, tuple[str, ...]] = {
     "form_type_claimed": ("nrta-order-16-article-2",),
     "episode_count": ("nrta-order-16-article-2",),
     "episode_minutes": ("nrta-order-16-article-2",),
-    "logline": ("nrta-order-16-article-5",),
+    "synopsis": ("nrta-order-16-article-5",),
     "genre_keywords": ("nrta-order-16-article-5",),
     "investment_amount_rmb": ("tier-live-action-2026", "tier-ai-generated-2026"),
     "amount_bracket": ("tier-live-action-2026", "tier-ai-generated-2026"),

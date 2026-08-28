@@ -22,8 +22,8 @@ class IntentProfile(DomainModel):
 
     form_type_claimed: ClaimedFormType = ClaimedFormType.UNKNOWN
     genre_keywords: list[str] = Field(default_factory=list)
-    logline: str | None = None
-    # Longer than the logline and read by the same subject stage. One sentence
+    synopsis: str | None = None
+    # Longer than the synopsis and read by the same subject stage. One sentence
     # is thin evidence for a special-subject match; a paragraph gives the
     # check something to quote.
     synopsis: str | None = None
@@ -49,8 +49,8 @@ class IntentProfile(DomainModel):
             missing.append("episode_count")
         if self.episode_minutes is None:
             missing.append("episode_minutes")
-        if not self.logline:
-            missing.append("logline")
+        if not self.synopsis:
+            missing.append("synopsis")
         return missing
 
 

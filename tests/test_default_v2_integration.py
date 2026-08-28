@@ -48,7 +48,7 @@ def test_default_mock_v2_reaches_gate_and_frozen_form(monkeypatch) -> None:
             json={
                 "form_type_claimed": "micro_drama",
                 "genre_keywords": ["都市"],
-                "logline": "两位创业者共同完成一部作品。",
+                "synopsis": "两位创业者共同完成一部作品。",
                 "episode_count": 20,
                 "episode_minutes": 3,
                 "amount_bracket": "between",

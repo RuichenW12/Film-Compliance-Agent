@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 
 import { FieldHelp } from "../../components/field-help";
+import { GenrePicker } from "../../components/genre-picker";
 import { PolicyVerificationBanner } from "../../components/policy-verification-banner";
 import {
   ApiError,
@@ -56,7 +57,6 @@ const STAGES: ProductionStage[] = [
 
 export default function WizardPage() {
   const [title, setTitle] = useState("");
-  const [logline, setLogline] = useState("");
   const [synopsis, setSynopsis] = useState("");
   const [stage, setStage] = useState<ProductionStage>("unknown");
   const [genres, setGenres] = useState("");
@@ -106,7 +106,6 @@ export default function WizardPage() {
             .split(",")
             .map((value) => value.trim())
             .filter(Boolean),
-          logline,
           synopsis: synopsis.trim() || null,
           production_stage: stage,
           episode_count: Number(episodeCount),
@@ -152,14 +151,9 @@ export default function WizardPage() {
           />
         </label>
         <label>
-          <span>Logline</span>
-          <FieldHelp field="logline" label="Logline" />
-          <input
-            value={logline}
-            onChange={(event) => setLogline(event.target.value)}
-            size={60}
-            required
-          />
+          <span>Genre keywords (comma separated)</span>
+          <FieldHelp field="genre_keywords" label="Genre keywords" />
+          <GenrePicker value={genres} onChange={setGenres} />
         </label>
         <label>
           <span>{t("wizard.synopsis")}</span>
@@ -185,44 +179,12 @@ export default function WizardPage() {
           </select>
         </label>
         <label>
-          <span>Genre keywords (comma separated)</span>
-          <FieldHelp field="genre_keywords" label="Genre keywords" />
+          <span>AI generated content</span>
+          <FieldHelp field="is_ai_generated" label="AI generated content" />
           <input
-            value={genres}
-            onChange={(event) => setGenres(event.target.value)}
-            size={40}
-          />
-        </label>
-        <label>
-          <span>Episodes</span>
-          <FieldHelp field="episode_count" label="Episodes" />
-          <input
-            type="number"
-            min={1}
-            value={episodeCount}
-            onChange={(event) => setEpisodeCount(event.target.value)}
-          />
-        </label>
-        <label>
-          <span>Minutes per episode</span>
-          <FieldHelp field="episode_minutes" label="Minutes per episode" />
-          <input
-            type="number"
-            min={0.5}
-            step={0.5}
-            value={episodeMinutes}
-            onChange={(event) => setEpisodeMinutes(event.target.value)}
-          />
-        </label>
-        <label>
-          <span>{t("wizard.investment_amount_rmb")}</span>
-          <FieldHelp field="investment_amount_rmb" label="Investment amount (RMB)" />
-          <input
-            type="number"
-            min={0}
-            step={1}
-            value={investmentAmount}
-            onChange={(event) => setInvestmentAmount(event.target.value)}
+            type="checkbox"
+            checked={isAiGenerated}
+            onChange={(event) => setIsAiGenerated(event.target.checked)}
           />
         </label>
         <label>
@@ -251,12 +213,35 @@ export default function WizardPage() {
         </label>
         <p className="muted">{t("wizard.amount_bracket.hint")}</p>
         <label>
-          <span>AI generated content</span>
-          <FieldHelp field="is_ai_generated" label="AI generated content" />
+          <span>{t("wizard.investment_amount_rmb")}</span>
+          <FieldHelp field="investment_amount_rmb" label="Investment amount (RMB)" />
           <input
-            type="checkbox"
-            checked={isAiGenerated}
-            onChange={(event) => setIsAiGenerated(event.target.checked)}
+            type="number"
+            min={0}
+            step={1}
+            value={investmentAmount}
+            onChange={(event) => setInvestmentAmount(event.target.value)}
+          />
+        </label>
+        <label>
+          <span>Episodes</span>
+          <FieldHelp field="episode_count" label="Episodes" />
+          <input
+            type="number"
+            min={1}
+            value={episodeCount}
+            onChange={(event) => setEpisodeCount(event.target.value)}
+          />
+        </label>
+        <label>
+          <span>Minutes per episode</span>
+          <FieldHelp field="episode_minutes" label="Minutes per episode" />
+          <input
+            type="number"
+            min={0.5}
+            step={0.5}
+            value={episodeMinutes}
+            onChange={(event) => setEpisodeMinutes(event.target.value)}
           />
         </label>
         {/* Neither is answerable at intake: platform promotion is settled

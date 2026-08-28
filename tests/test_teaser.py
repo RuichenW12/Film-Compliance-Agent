@@ -2,7 +2,7 @@
 
 A teaser is promotional material and says nothing about compliance. The checks
 that matter are the ones that keep it that way: no backend means no teaser, the
-logline is data rather than instructions, and nothing generated here carries a
+synopsis is data rather than instructions, and nothing generated here carries a
 tier, a clause, or a filing claim.
 """
 
@@ -23,7 +23,7 @@ OTHER = {"X-Mock-Role": "creator", "X-User-Id": "u_other"}
 INTENT = {
     "form_type_claimed": "micro_drama",
     "genre_keywords": ["甜宠"],
-    "logline": "总裁与实习生在职场相遇，逐渐走到一起的爱情故事。",
+    "synopsis": "总裁与实习生在职场相遇，逐渐走到一起的爱情故事。",
     "episode_count": 30,
     "episode_minutes": 2,
     "amount_bracket": "below_lower",
@@ -62,14 +62,14 @@ def video_client(stores, snapshots, clock) -> TestClient:
     return make_client(stores, snapshots, clock, flag=True, video=ScriptedVideo())
 
 
-def project_with_logline(client: TestClient, logline: str | None = None) -> str:
+def project_with_synopsis(client: TestClient, synopsis: str | None = None) -> str:
     created = client.post(
         "/v1/projects", json={"title_working": "Sweet Office"}, headers=OWNER
     )
     project_id = created.json()["project_id"]
     intent = dict(INTENT)
-    if logline is not None:
-        intent["logline"] = logline
+    if synopsis is not None:
+        intent["synopsis"] = synopsis
     client.post(f"/v1/projects/{project_id}/intent", json=intent, headers=OWNER)
     return project_id
 
@@ -84,7 +84,7 @@ def ask(client: TestClient, project_id: str, headers=OWNER):
 def test_the_feature_is_off_by_default(off_client):
     """Off means told so, not a mysterious 404."""
 
-    project_id = project_with_logline(off_client)
+    project_id = project_with_synopsis(off_client)
     refused = ask(off_client, project_id)
 
     assert refused.status_code == 403
@@ -99,7 +99,7 @@ def test_healthz_reports_the_flag(off_client):
 
 
 def test_without_a_backend_the_task_needs_a_human(offline_client):
-    project_id = project_with_logline(offline_client)
+    project_id = project_with_synopsis(offline_client)
     response = ask(offline_client, project_id)
 
     assert response.status_code == 200
@@ -112,7 +112,7 @@ def test_without_a_backend_the_task_needs_a_human(offline_client):
 def test_a_missing_teaser_is_never_a_placeholder(offline_client):
     """No uri at all beats a uri pointing at nothing."""
 
-    project_id = project_with_logline(offline_client)
+    project_id = project_with_synopsis(offline_client)
     task = ask(offline_client, project_id).json()["task"]
     assert task.get("result") in (None, {})
 
@@ -121,7 +121,7 @@ def test_a_missing_teaser_is_never_a_placeholder(offline_client):
 
 
 def test_a_generated_teaser_records_where_it_came_from(video_client):
-    project_id = project_with_logline(video_client)
+    project_id = project_with_synopsis(video_client)
     task = ask(video_client, project_id).json()["task"]
 
     assert task["status"] == "succeeded"
@@ -131,7 +131,7 @@ def test_a_generated_teaser_records_where_it_came_from(video_client):
 
 
 def test_the_task_pins_the_snapshot_and_prompt_version(video_client):
-    project_id = project_with_logline(video_client)
+    project_id = project_with_synopsis(video_client)
     payload = ask(video_client, project_id).json()["task"]["payload"]
 
     assert payload["snapshot_version"] == "v1"
@@ -141,7 +141,7 @@ def test_the_task_pins_the_snapshot_and_prompt_version(video_client):
 def test_the_teaser_carries_no_compliance_claim(video_client):
     """Nothing in the request or the result states a tier, clause, or approval."""
 
-    project_id = project_with_logline(video_client)
+    project_id = project_with_synopsis(video_client)
     ask(video_client, project_id)
 
     sent = video_client.app.state.context.video.calls[0].render()
@@ -151,8 +151,8 @@ def test_the_teaser_carries_no_compliance_claim(video_client):
     assert "Do not add claims about approval" in sent
 
 
-def test_the_logline_is_wrapped_as_data(video_client):
-    project_id = project_with_logline(video_client, INJECTED)
+def test_the_synopsis_is_wrapped_as_data(video_client):
+    project_id = project_with_synopsis(video_client, INJECTED)
     ask(video_client, project_id)
 
     sent = video_client.app.state.context.video.calls[0].render()
@@ -163,7 +163,7 @@ def test_the_logline_is_wrapped_as_data(video_client):
 def test_asking_twice_returns_the_first_task(video_client):
     """Idempotent on {project}:{type}:{version}, like every other job."""
 
-    project_id = project_with_logline(video_client)
+    project_id = project_with_synopsis(video_client)
     first = ask(video_client, project_id).json()["task"]
     second = ask(video_client, project_id).json()["task"]
 
@@ -174,9 +174,9 @@ def test_asking_twice_returns_the_first_task(video_client):
 # ---------------------------------------------------------------- guardrails
 
 
-def test_a_project_with_no_logline_is_refused(video_client):
+def test_a_project_with_no_synopsis_is_refused(video_client):
     created = video_client.post(
-        "/v1/projects", json={"title_working": "No logline"}, headers=OWNER
+        "/v1/projects", json={"title_working": "No synopsis"}, headers=OWNER
     )
     refused = ask(video_client, created.json()["project_id"])
 
@@ -185,12 +185,12 @@ def test_a_project_with_no_logline_is_refused(video_client):
 
 
 def test_another_creator_cannot_ask(video_client):
-    project_id = project_with_logline(video_client)
+    project_id = project_with_synopsis(video_client)
     assert ask(video_client, project_id, OTHER).status_code == 403
 
 
 def test_the_request_is_on_the_timeline_and_the_task_list(video_client):
-    project_id = project_with_logline(video_client)
+    project_id = project_with_synopsis(video_client)
     task = ask(video_client, project_id).json()["task"]
 
     tasks = video_client.get(f"/v1/projects/{project_id}/tasks", headers=OWNER).json()
@@ -216,7 +216,7 @@ def test_a_backend_failure_is_recorded_as_a_failure(stores, snapshots, clock):
             raise RuntimeError("quota exhausted")
 
     client = make_client(stores, snapshots, clock, flag=True, video=FailingVideo())
-    project_id = project_with_logline(client)
+    project_id = project_with_synopsis(client)
     task = ask(client, project_id).json()["task"]
 
     assert task["status"] == "failed"

@@ -41,7 +41,7 @@ def test_recalc_uses_stored_amount_mode_and_selected_evidence():
         project.project_id,
         {
             "form_type_claimed": ClaimedFormType.MICRO_DRAMA,
-            "logline": "A general workplace romance.",
+            "synopsis": "A general workplace romance.",
             "episode_count": 30,
             "episode_minutes": 2,
             "amount_bracket": AmountBracket.BELOW_LOWER,

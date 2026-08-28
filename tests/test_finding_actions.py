@@ -204,7 +204,7 @@ EDGE_PACK = {
 EDGE_INTENT = {
     "form_type_claimed": "micro_drama",
     "genre_keywords": ["缉毒"],
-    "logline": "一名缉毒警察在边境执行卧底任务。",
+    "synopsis": "一名缉毒警察在边境执行卧底任务。",
     "episode_count": 24,
     "episode_minutes": 3,
     "amount_bracket": "between",

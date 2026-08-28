@@ -15,7 +15,7 @@ INTERNAL_TOKEN = "t_test_internal"
 CRIME_INTENT = {
     "form_type_claimed": "micro_drama",
     "genre_keywords": ["缉毒", "卧底"],
-    "logline": "卧底警察深入毒枭内部，在缉毒行动中面临身份暴露的危机。",
+    "synopsis": "卧底警察深入毒枭内部，在缉毒行动中面临身份暴露的危机。",
     "episode_count": 24,
     "episode_minutes": 3,
     "amount_bracket": "between",
@@ -26,7 +26,7 @@ CRIME_INTENT = {
 ROMANCE_INTENT = {
     "form_type_claimed": "micro_drama",
     "genre_keywords": ["甜宠"],
-    "logline": "总裁与实习生在职场相遇，逐渐走到一起的爱情故事。",
+    "synopsis": "总裁与实习生在职场相遇，逐渐走到一起的爱情故事。",
     "episode_count": 30,
     "episode_minutes": 2,
     "amount_bracket": "below_lower",
@@ -89,7 +89,7 @@ def test_full_intake_to_classification(client):
 def test_partial_intent_reports_what_is_missing(client):
     project_id = create_project(client)
     response = client.post(
-        f"/v1/projects/{project_id}/intent", json={"logline": "一个故事"}
+        f"/v1/projects/{project_id}/intent", json={"synopsis": "一个故事"}
     )
     assert response.json()["missing"] == ["episode_count", "episode_minutes"]
 
@@ -170,7 +170,7 @@ def test_classification_projects_exact_amount_as_a_user_answer_fact(client):
 
 def test_classify_without_enough_answers_returns_state_invalid(client):
     project_id = create_project(client)
-    client.post(f"/v1/projects/{project_id}/intent", json={"logline": "一个故事"})
+    client.post(f"/v1/projects/{project_id}/intent", json={"synopsis": "一个故事"})
 
     response = client.post(f"/v1/projects/{project_id}/classify")
     assert response.status_code == 409

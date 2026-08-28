@@ -77,11 +77,11 @@ def test_the_clauses_behind_a_field_are_read_from_the_pinned_snapshot(snapshots)
 
 def test_a_clause_the_snapshot_lacks_is_simply_not_offered(snapshots):
     version = snapshots.latest_version()
-    FIELD_CLAUSES["logline"] = ("nrta-order-16-article-5", "no-such-clause")
+    FIELD_CLAUSES["synopsis"] = ("nrta-order-16-article-5", "no-such-clause")
     try:
-        found = clauses_for("logline", snapshots, version)
+        found = clauses_for("synopsis", snapshots, version)
     finally:
-        FIELD_CLAUSES["logline"] = ("nrta-order-16-article-5",)
+        FIELD_CLAUSES["synopsis"] = ("nrta-order-16-article-5",)
 
     assert [c["clause_id"] for c in found] == ["nrta-order-16-article-5"]
 

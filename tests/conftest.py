@@ -62,7 +62,7 @@ def intent_crime() -> IntentProfile:
     return IntentProfile(
         form_type_claimed=ClaimedFormType.MICRO_DRAMA,
         genre_keywords=["缉毒", "卧底"],
-        logline=CRIME_LOGLINE,
+        synopsis=CRIME_LOGLINE,
         episode_count=24,
         episode_minutes=3.0,
         amount_bracket=AmountBracket.BETWEEN,
@@ -78,7 +78,7 @@ def intent_romance() -> IntentProfile:
     return IntentProfile(
         form_type_claimed=ClaimedFormType.MICRO_DRAMA,
         genre_keywords=["甜宠", "都市"],
-        logline="总裁与实习生在职场相遇，逐渐走到一起的爱情故事。",
+        synopsis="总裁与实习生在职场相遇，逐渐走到一起的爱情故事。",
         episode_count=30,
         episode_minutes=2.0,
         amount_bracket=AmountBracket.BELOW_LOWER,
@@ -94,7 +94,7 @@ def intent_single_video() -> IntentProfile:
     return IntentProfile(
         form_type_claimed=ClaimedFormType.SINGLE_VIDEO,
         genre_keywords=["生活"],
-        logline="一支记录城市清晨的短片。",
+        synopsis="一支记录城市清晨的短片。",
         episode_count=1,
         episode_minutes=8.0,
         amount_bracket=AmountBracket.BELOW_LOWER,

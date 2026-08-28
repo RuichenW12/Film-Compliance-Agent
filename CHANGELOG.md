@@ -22,6 +22,32 @@ Conventions:
 
 ## 2026-08-28
 
+### A — one story field, suggested genres, and an order that follows the logic
+
+- **`logline` is gone; `synopsis` is the one story field.** Two free-text boxes
+  for the same thing was redundant the moment the synopsis landed, and of the
+  two only the synopsis has standing — 剧情梗概 is the material the filing form
+  asks for. D1a's edge-phrase check and D1b's subject match both read it now.
+  `core.teaser` keeps calling its input a logline, which is the right word for
+  what a teaser is written from; it is fed the synopsis.
+- **One consequence worth watching:** D1a's edge-phrase detection used to run on
+  one sentence and now runs on a paragraph, so more text means more chances to
+  trip a phrase and land in `NEEDS_HUMAN_FORMTYPE`. That errs toward caution,
+  but it will be noisier.
+- **Genre keywords move up under the title and gain suggestions.** Twelve common
+  ones as chips; the box stays open for anything else. Nothing downstream treats
+  a chosen word differently from a typed one — the subject check reads the text
+  and has to quote it either way — so the list can be incomplete without making
+  an answer wrong.
+- **Reordered so each field can be answered when it is asked.** AI generated now
+  sits *above* the budget range, because it decides which ranges the dropdown
+  shows. The exact figure moves below the range: the range settles the tier, and
+  the figure is for the filing form.
+- Verified: `python -m pytest` (461 passed, 3 skipped), `npx tsc --noEmit`
+  clean, `scripts/e2e_check.py` **ALL CHECKS PASSED**, and in Chrome — picking
+  two chips fills the box as `悬疑,科幻`, and a synopsis-only subject hit still
+  returns `T1` quoting the creator's own sentence.
+
 ### Shared — a budget range now settles a tier, because the ranges are the thresholds
 
 - **`BudgetBand` becomes `AmountBracket`**: `below_lower` / `between` /

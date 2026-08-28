@@ -92,7 +92,7 @@ def _pattern_stage(
                             MatchedRule(
                                 rule_id=rule.rule_id,
                                 quote=_quote_around(text, pattern)
-                                if source == "logline"
+                                if source == "synopsis"
                                 else pattern,
                                 confidence=1.0,
                                 stage=f"pattern:{source}",
@@ -106,7 +106,7 @@ def _pattern_stage(
     return hits
 
 
-def _document(logline: str, keywords: str, synopsis: str) -> str:
+def _document(synopsis: str, keywords: str) -> str:
     """What the semantic stage reads, and what a quote must be found in.
 
     Joined rather than concatenated blindly so an absent part does not leave a
@@ -114,7 +114,7 @@ def _document(logline: str, keywords: str, synopsis: str) -> str:
     against exactly this string.
     """
 
-    return chr(10).join(part for part in (logline, keywords, synopsis) if part)
+    return chr(10).join(part for part in (synopsis, keywords) if part)
 
 
 def judge_subject(
@@ -124,18 +124,12 @@ def judge_subject(
 ) -> SubjectDecision:
     rules = load_subject_rules(pack2)
     by_id = {rule.rule_id: rule for rule in rules}
-    logline = intent.logline or ""
-    keywords = " ".join(intent.genre_keywords)
-    # The synopsis is read alongside the logline, not instead of it: a match has
-    # to quote something the creator wrote, and a paragraph gives that check more
-    # to find than one sentence does. Kept as its own haystack so a hit says
-    # which text it came from.
+    # One story field. The logline used to sit beside this; a synopsis says
+    # everything a logline did and is the text the filing form actually asks for
+    # (剧情梗概), so keeping both was two ways to write the same thing.
     synopsis = intent.synopsis or ""
-    haystacks = {
-        "logline": logline,
-        "genre_keywords": keywords,
-        "synopsis": synopsis,
-    }
+    keywords = " ".join(intent.genre_keywords)
+    haystacks = {"synopsis": synopsis, "genre_keywords": keywords}
 
     decision = SubjectDecision()
     matched: dict[str, tuple[SubjectRule, MatchedRule]] = {}
@@ -143,14 +137,14 @@ def judge_subject(
     for rule, hit in _pattern_stage(rules, haystacks):
         matched.setdefault(rule.rule_id, (rule, hit))
 
-    if llm is not None and llm.available() and (logline or keywords or synopsis):
+    if llm is not None and llm.available() and (synopsis or keywords):
         try:
             reply = llm.structured(
                 LLMRequest(
                     prompt_id=PROMPT_ID,
                     prompt_version=PROMPT_VERSION,
                     instruction=INSTRUCTION,
-                    document=_document(logline, keywords, synopsis),
+                    document=_document(synopsis, keywords),
                     response_schema=SUBJECT_SCHEMA,
                     temperature=0.2,
                     context={
@@ -168,7 +162,7 @@ def judge_subject(
         except UpstreamLLMError:
             decision.pending_flags.append("subject_semantic_check_pending")
         else:
-            document = _document(logline, keywords, synopsis)
+            document = _document(synopsis, keywords)
             for raw in reply.get("hits", []) + reply.get("edge_hits", []):
                 rule = by_id.get(str(raw.get("rule_id", "")))
                 quote = str(raw.get("quote", ""))
@@ -187,7 +181,7 @@ def judge_subject(
                         ),
                     ),
                 )
-    elif logline or keywords or synopsis:
+    elif synopsis or keywords:
         decision.pending_flags.append("subject_semantic_check_pending")
 
     for rule, hit in matched.values():
