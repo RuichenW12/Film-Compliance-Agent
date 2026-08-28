@@ -22,6 +22,17 @@ Conventions:
 
 ## 2026-08-28
 
+### A — the help panel closes when you click away
+
+- Clicking anywhere outside an open `?` panel closes it, and so does Escape.
+  Previously the only way out was finding the same `?` again, and with nine of
+  them on the page that is worse than having opened it.
+- Clicks **inside** the panel do not close it, so the question box can be
+  focused and typed into. The listener exists only while a panel is open.
+- Verified in Chrome: opening, clicking the question box (stays open, takes
+  focus), clicking the page background (closes). `npx tsc --noEmit` clean,
+  `python -m pytest` unchanged at 456 passed, 3 skipped.
+
 ### A — field help: explain the question instead of reading the answer
 
 - Every intake field gains a `?`: hover the label for a hint, open it for the

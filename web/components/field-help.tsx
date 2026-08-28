@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { apiFetch } from "@/lib/api";
 import { t } from "@/lib/i18n";
@@ -34,6 +34,28 @@ export function FieldHelp({ field, label }: { field: string; label: string }) {
   const [answer, setAnswer] = useState<HelpResponse | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const root = useRef<HTMLSpanElement | null>(null);
+
+  // Close on a click anywhere else, and on Escape. Nine of these can be open at
+  // once otherwise, and hunting for the same "?" to close it is worse than
+  // having opened it. The listener only exists while the panel does.
+  useEffect(() => {
+    if (!open) return;
+
+    function onPointerDown(event: MouseEvent) {
+      if (!root.current?.contains(event.target as Node)) setOpen(false);
+    }
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") setOpen(false);
+    }
+
+    document.addEventListener("mousedown", onPointerDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [open]);
 
   const hint = t(`help.${field}`);
   const example = t(`help.${field}.example`);
@@ -59,7 +81,7 @@ export function FieldHelp({ field, label }: { field: string; label: string }) {
   }
 
   return (
-    <span className="field-help">
+    <span className="field-help" ref={root}>
       <button
         type="button"
         className="field-help-toggle"
