@@ -1169,3 +1169,52 @@ Revisit when the Chinese bundle is written, or if a user testing the English UI
 cannot find on a government site the thing the product told them about — that is
 the failure mode this trades away, and it is worth watching for.
 
+## D-035
+
+**Intake help explains the question rather than reading the answer** · Area: A · Status: Accepted · 2026-08-28 · Replaces the conversational extraction built earlier the same day
+
+Testing the wizard in a browser found three fields a first-time creator cannot
+answer, all of the same shape: `budget_band` rendering raw enum values and
+defaulting to one, `domestic_platforms` prefilled with platforms nobody named,
+and two 广电办发〔2024〕35号 conditions with no hint that leaving both off is
+normal. Better labels fixed the symptom. The disease is that **a form cannot
+answer a question back**.
+
+The first attempt at the cure was conversational intake: the creator describes
+the project, a model reads their sentence, and proposed values appear in the
+form for confirmation. It was built and it worked — `core/intake_chat.py`, a
+traceability guard, twenty tests, an endpoint that could not write. It is
+deleted.
+
+**Why it went.** Reading someone's answer accepts their confusion and works
+around it. Explaining the question removes it. Both help a creator who does not
+know what 招商主推 means; only one of them leaves them understanding the form
+they are signing. And the extraction route carried a permanent cost for that
+weaker outcome: every value it proposed was a value a model had chosen, so the
+whole apparatus of quotes, inferred flags and confirmation existed to make that
+survivable.
+
+The replacement has no such apparatus because it has nothing to guard. The
+reply schema is `{answer, clause_refs}` — **there is no value field**, so no
+phrasing of a question and no instruction buried in one can reach the form. A
+test asserts that shape directly, because if a value field ever reappears the
+guard has to come back with it.
+
+**What survived the change**, because neither was about extraction:
+
+- Explanations are drawn from clause text passed as trusted context, and a
+  clause id the model names but the pinned snapshot does not carry is dropped.
+  A reference nobody can follow is worse than none — and this domain has already
+  burned us once, with thresholds sourced from a republished municipal page.
+- The model may say what the tiers are. It may not say which one a project is
+  in. That answer comes from the chain, with evidence; a conversational guess
+  would carry none and be believed anyway.
+
+**What was given up.** Someone who types a paragraph describing their whole
+project still fills the form field by field. That is a real cost, and the reason
+to accept it is that the paragraph was never the hard part — understanding what
+was being asked was.
+
+Revisit if field help lands and people still abandon the form, which would mean
+the problem was typing after all.
+

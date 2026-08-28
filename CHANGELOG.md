@@ -22,6 +22,52 @@ Conventions:
 
 ## 2026-08-28
 
+### A — field help: explain the question instead of reading the answer
+
+- Every intake field gains a `?`: hover the label for a hint, open it for the
+  hint plus a worked example, and ask a question answered from the clauses
+  behind that field, with clause ids and the snapshot version shown.
+- **The two conversational-extraction commits earlier today are reverted.**
+  `core/intake_chat.py`, its endpoint and its twenty tests are deleted;
+  `POST /v1/intake/turn` becomes `POST /v1/intake/explain`. Reading a creator's
+  answer accepts their confusion and copes with it. Explaining the question
+  removes it, and leaves them understanding the form they are signing. See
+  [D-035](docs/decisions.md#d-035).
+- The risk goes with it. The reply schema is `{answer, clause_refs}` — **no
+  value field** — so nothing a question says can reach the form, and the
+  traceability guard the previous design needed is replaced by the shape of the
+  reply. `test_the_reply_has_nowhere_to_put_a_value` holds that line.
+- Two disciplines kept: answers come from clause text passed as trusted context,
+  and a clause the model names but the snapshot does not carry is dropped; the
+  model may say what the tiers are and never which one a project is in.
+- The first two layers need no backend at all. Offline the `?` still shows its
+  hint and example, and says only the question layer is unavailable.
+- **Three defects found by driving it in Chrome, none of which the tests could
+  have caught:**
+  - The ask box was a `<form>` **nested inside the wizard's form**. React lets
+    that into the DOM, the browser warns, and the inner submit reaches the outer
+    form: the page reloaded and wiped the answer between the 200 coming back and
+    anything rendering it. The request had succeeded every time. Now a `div`
+    with a button and an Enter handler.
+  - The first answers named the field by its key and rendered 联调门槛 as "joint
+    adjustment thresholds", with no figures — correct, sourced, and less use than
+    the static hint above it. The form's own label is now sent with the question,
+    and the prompt asks for the figure where a clause carries one. The same
+    question now answers with 800,000 and 300,000.
+  - `platform_promoted` and `voluntary_key_declaration` were mapped to Order 16
+    articles 5 and 17, which do not mention sponsor promotion — so the model
+    answered that the clauses did not explain the field, which reads as a failure
+    rather than as the hint being the whole answer. Both now map to nothing, and
+    a field with no clauses **does not reach the model at all**: asking anyway
+    invites a paraphrase of half-remembered regulation, which is the one thing
+    this must not produce. The panel says so, and names 广电办发〔2024〕35号 as
+    the document the snapshot cannot cite yet.
+- Verified: `python -m pytest` (456 passed, 3 skipped — 26 extraction tests
+  removed, 13 added), `npx tsc --noEmit` clean, and all three paths driven in
+  Chrome: a field with clauses answering with figures and a citation, a field
+  without them showing the hint-only message, and the static layer with no
+  network at all.
+
 ### A — the intake turn endpoint, which cannot write
 
 - `POST /v1/intake/turn` takes one sentence and returns proposals: the value,

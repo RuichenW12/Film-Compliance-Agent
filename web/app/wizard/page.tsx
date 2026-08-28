@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 
+import { FieldHelp } from "../../components/field-help";
 import { PolicyVerificationBanner } from "../../components/policy-verification-banner";
 import {
   ApiError,
@@ -137,6 +138,7 @@ export default function WizardPage() {
       <form onSubmit={onSubmit} className="card">
         <label>
           <span>Logline</span>
+          <FieldHelp field="logline" label="Logline" />
           <input
             value={logline}
             onChange={(event) => setLogline(event.target.value)}
@@ -146,6 +148,7 @@ export default function WizardPage() {
         </label>
         <label>
           <span>Genre keywords (comma separated)</span>
+          <FieldHelp field="genre_keywords" label="Genre keywords" />
           <input
             value={genres}
             onChange={(event) => setGenres(event.target.value)}
@@ -154,6 +157,7 @@ export default function WizardPage() {
         </label>
         <label>
           <span>Episodes</span>
+          <FieldHelp field="episode_count" label="Episodes" />
           <input
             type="number"
             min={1}
@@ -163,6 +167,7 @@ export default function WizardPage() {
         </label>
         <label>
           <span>Minutes per episode</span>
+          <FieldHelp field="episode_minutes" label="Minutes per episode" />
           <input
             type="number"
             min={0.5}
@@ -173,6 +178,7 @@ export default function WizardPage() {
         </label>
         <label>
           <span>{t("wizard.investment_amount_rmb")}</span>
+          <FieldHelp field="investment_amount_rmb" label="Investment amount (RMB)" />
           <input
             type="number"
             min={0}
@@ -183,6 +189,7 @@ export default function WizardPage() {
         </label>
         <label>
           <span>{t("wizard.budget_band")}</span>
+          <FieldHelp field="budget_band" label="Rough budget" />
           <select
             value={budgetBand}
             onChange={(event) => setBudgetBand(event.target.value as BudgetBand)}
@@ -197,6 +204,7 @@ export default function WizardPage() {
         <p className="muted">{t("wizard.budget_band.hint")}</p>
         <label>
           <span>AI generated content</span>
+          <FieldHelp field="is_ai_generated" label="AI generated content" />
           <input
             type="checkbox"
             checked={isAiGenerated}
@@ -205,6 +213,7 @@ export default function WizardPage() {
         </label>
         <label>
           <span>{t("wizard.platform_promoted")}</span>
+          <FieldHelp field="platform_promoted" label="Platform will feature it" />
           <input
             type="checkbox"
             checked={platformPromoted}
@@ -213,6 +222,7 @@ export default function WizardPage() {
         </label>
         <label>
           <span>{t("wizard.voluntary_key")}</span>
+          <FieldHelp field="voluntary_key_declaration" label="Declaring it voluntarily as a key micro-drama" />
           <input
             type="checkbox"
             checked={voluntaryKey}

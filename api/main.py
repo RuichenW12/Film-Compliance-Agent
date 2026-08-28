@@ -30,7 +30,7 @@ from .routers import (
     forms,
     health,
     institution,
-    intake_chat,
+    intake_help,
     internal,
     materials,
     notifications,
@@ -96,7 +96,7 @@ def create_app(
     install_policy_error_handler(app)
     app.include_router(health.router)
     app.include_router(projects.router)
-    app.include_router(intake_chat.router)
+    app.include_router(intake_help.router)
     app.include_router(assets.router)
     app.include_router(materials.router)
     app.include_router(review.router)

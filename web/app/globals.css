@@ -534,3 +534,81 @@ main label span {
   display: inline-block;
   min-width: 12rem;
 }
+
+/* Per-field help. Two layers: a static hint that is always there, and a
+   question answered from the clauses behind the field. Neither can write to
+   the input it sits beside. */
+.field-help {
+  position: relative;
+  display: inline-block;
+  margin-left: 0.35rem;
+}
+
+.field-help-toggle {
+  width: 1.15rem;
+  height: 1.15rem;
+  padding: 0;
+  line-height: 1;
+  border-radius: 50%;
+  border: 1px solid #b6bec9;
+  background: #fff;
+  color: var(--muted);
+  font-size: 0.72rem;
+  cursor: pointer;
+}
+
+.field-help-toggle:hover,
+.field-help-toggle[aria-expanded="true"] {
+  border-color: #6b7684;
+  color: #333;
+}
+
+.field-help-panel {
+  position: absolute;
+  z-index: 20;
+  top: 1.6rem;
+  left: 0;
+  width: min(28rem, 70vw);
+  padding: 0.75rem 0.85rem;
+  border: 1px solid #d7dce3;
+  border-radius: 6px;
+  background: #fff;
+  box-shadow: 0 6px 20px -8px rgba(20, 26, 28, 0.35);
+  font-weight: 400;
+}
+
+.field-help-hint {
+  margin: 0 0 0.4rem;
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.field-help-example {
+  margin: 0 0 0.6rem;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.field-help-ask {
+  display: flex;
+  gap: 0.4rem;
+}
+
+.field-help-ask input {
+  flex: 1;
+  min-width: 0;
+}
+
+.field-help-answer {
+  margin-top: 0.6rem;
+  padding-top: 0.6rem;
+  border-top: 1px solid #eceff3;
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.field-help-sources {
+  margin: 0.4rem 0 0;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
