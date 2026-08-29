@@ -24,7 +24,7 @@ ROOT = Path(__file__).parents[1]
 NOW = datetime(2026, 8, 26, 0, 0, tzinfo=timezone.utc)
 
 
-def test_recalc_uses_stored_amount_mode_and_selected_evidence():
+def test_recalc_uses_the_stored_amount_and_selected_evidence():
     raw = yaml.safe_load(
         (ROOT / "policy" / "seed-snapshot-v1.yaml").read_text(encoding="utf-8")
     )
@@ -46,7 +46,6 @@ def test_recalc_uses_stored_amount_mode_and_selected_evidence():
             "episode_minutes": 2,
             "amount_bracket": AmountBracket.BELOW_LOWER,
             "investment_amount_rmb": 1_500_000,
-            "is_ai_generated": False,
         },
     )
     project, _ = workflow.run_classification(project.project_id)
@@ -64,7 +63,7 @@ def test_recalc_uses_stored_amount_mode_and_selected_evidence():
                 "effective_from": "2026-01-01T00:00:00+08:00",
                 "T1_min_rmb": 3_000_000,
                 "T2_min_rmb": 1_000_000,
-                "clause_ref": "tier-live-action-2026",
+                "clause_ref": "tier-ai-generated-2026",
             },
             "ai_generated": {
                 "effective_from": "2026-07-01T00:00:00+08:00",
@@ -78,7 +77,7 @@ def test_recalc_uses_stored_amount_mode_and_selected_evidence():
     legal["clauses"] = [
         *legal.get("clauses", []),
         {
-            "clause_id": "tier-live-action-2026",
+            "clause_id": "tier-ai-generated-2026",
             "title": "2026 live-action micro-drama thresholds",
             "text": "T1 starts at RMB 3,000,000 and T2 starts at RMB 1,000,000.",
             "source_url": "https://whhlyj.baoji.gov.cn/zzzb/xygl/202601/t20260115_1240723.html",
@@ -106,7 +105,8 @@ def test_recalc_uses_stored_amount_mode_and_selected_evidence():
     result = workflow.recalc_tier(project.project_id, "v2")
     updated = workflow.get_project(project.project_id)
 
-    assert result.tier is Tier.T2
+    # 1,500,000 clears the AI one-class line of 800,000.
+    assert result.tier is Tier.T1
     assert result.tier_provisional is False
     assert result.changed is True
     assert updated.classification.policy_snapshot_version == "v2"
@@ -116,5 +116,5 @@ def test_recalc_uses_stored_amount_mode_and_selected_evidence():
     )
     assert (
         updated.classification.evidence_refs[0].clause_id
-        == "tier-live-action-2026"
+        == "tier-ai-generated-2026"
     )

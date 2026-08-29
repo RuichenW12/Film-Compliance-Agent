@@ -71,18 +71,27 @@ class Tier(StrEnum):
 
 
 class ProductionStage(StrEnum):
-    """How far along the work is.
+    """How far along the work is, and it decides what the product asks for.
 
-    Not idle curiosity: 总局令第16号 article 12 requires a one-class filing
-    *before* shooting starts. Someone who has already shot a one-class project
-    is not early — they are late, and the product should say so rather than
-    hand them a roadmap that begins with a step they have passed.
+    Not idle curiosity twice over. 总局令第16号 article 12 requires a one-class
+    filing *before* production starts, so someone whose work is already made is
+    not early -- they are late, and the product should say so rather than hand
+    them a roadmap beginning with a step they have passed.
+
+    And it governs the interface. At `IDEA` a creator has a premise and nothing
+    else: no budget, no episode count, no running time. Asking anyway produced a
+    form that demanded answers nobody at that stage has, so the stage now
+    decides which questions are worth putting.
+
+    `SHOOTING` was removed when the product narrowed to AI micro-dramas: there
+    is no camera, so there is no state between having a script and having a
+    finished work. `FINISHED` became `PRODUCTION_COMPLETE` for the same reason
+    -- what is finished is the production, not a shoot.
     """
 
     IDEA = "idea"
     SCRIPT_READY = "script_ready"
-    SHOOTING = "shooting"
-    FINISHED = "finished"
+    PRODUCTION_COMPLETE = "production_complete"
     UNKNOWN = "unknown"
 
 

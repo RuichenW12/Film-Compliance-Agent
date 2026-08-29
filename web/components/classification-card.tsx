@@ -46,7 +46,6 @@ const SPEAKABLE_FLAGS = [
   "clause_not_yet_in_force",
   "threshold_boundary_disputed",
   "budget_unknown",
-  "generation_mode_required",
   "thresholds_unavailable",
   "amount_required",
   "amount_official",

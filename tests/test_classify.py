@@ -173,7 +173,6 @@ def test_published_thresholds_make_the_tier_final():
         pack,
         True,
         investment_amount_rmb=2_000_000,
-        is_ai_generated=False,
     )
 
     assert decision.tier is Tier.T2
@@ -221,22 +220,24 @@ class HumanVerifiedThresholdSnapshots(ThresholdSnapshots):
         return VerificationStatus.HUMAN_VERIFIED
 
 
-def test_chain_reads_amount_and_mode_from_intent_and_uses_selected_evidence(
+def test_chain_reads_the_amount_from_intent_and_uses_selected_evidence(
     intent_romance, channels, snapshots
 ):
+    """1,500,000 was two-class against the live-action figures and is one-class
+    against the AI ones. The number is unchanged so the evidence trail stays
+    the point of the test; only what it proves about the tier moved."""
+
     threshold_snapshots = ThresholdSnapshots(snapshots)
-    intent = intent_romance.model_copy(
-        update={"investment_amount_rmb": 1_500_000, "is_ai_generated": False}
-    )
+    intent = intent_romance.model_copy(update={"investment_amount_rmb": 1_500_000})
 
     outcome = classify(intent, channels, threshold_snapshots)
 
-    assert outcome.classification.tier is Tier.T2
+    assert outcome.classification.tier is Tier.T1
     assert outcome.classification.tier_provisional is False
     assert outcome.classification.evidence_refs == [
         EvidenceRef(
             snapshot_version="v2",
-            clause_id="tier-live-action-2026",
+            clause_id="tier-ai-generated-2026",
         )
     ]
 
@@ -246,7 +247,7 @@ def test_classification_pins_the_selected_snapshot_verification(
 ):
     verified_snapshots = HumanVerifiedThresholdSnapshots(snapshots)
     intent = intent_romance.model_copy(
-        update={"investment_amount_rmb": 1_500_000, "is_ai_generated": False}
+        update={"investment_amount_rmb": 1_500_000}
     )
 
     outcome = classify(intent, channels, verified_snapshots)
@@ -259,26 +260,26 @@ def test_classification_pins_the_selected_snapshot_verification(
 
 
 @pytest.mark.parametrize(
-    ("is_ai_generated", "amount", "expected"),
+    ("amount", "expected"),
     [
-        (False, 2_999_999, Tier.T2),
-        (False, 3_000_000, Tier.T1),
-        (False, 999_999, Tier.T3),
-        (False, 1_000_000, Tier.T2),
-        (True, 799_999, Tier.T2),
-        (True, 800_000, Tier.T1),
-        (True, 299_999, Tier.T3),
-        (True, 300_000, Tier.T2),
+        (299_999, Tier.T3),
+        (300_000, Tier.T2),
+        (799_999, Tier.T2),
+        (800_000, Tier.T1),
     ],
 )
-def test_published_threshold_sets_use_mode_and_exact_amount(
-    is_ai_generated, amount, expected
-):
+def test_published_thresholds_settle_a_tier_on_an_exact_amount(amount, expected):
     """Boundaries are inclusive and settled unless the pack disputes one.
 
     广电办发〔2024〕35号 writes 「达到100万元及以上」 and 「30万元（含）—100万元
     之间」, the same inclusive pattern the 2026 adjustment uses, so equality is
     not by itself uncertain. See D-033.
+
+    This used to run eight cases across both threshold sets, half of them
+    proving that a live-action project read against the live-action figures.
+    The product classifies AI micro-dramas only now, so the mode axis is gone
+    and the four cases that remain are the ones that were ever about
+    boundaries: each side of 300,000 and each side of 800,000.
     """
 
     decision = judge_tier(
@@ -286,17 +287,12 @@ def test_published_threshold_sets_use_mode_and_exact_amount(
         PUBLISHED_THRESHOLD_PACK,
         True,
         investment_amount_rmb=amount,
-        is_ai_generated=is_ai_generated,
     )
 
     assert decision.tier is expected
     assert decision.tier_provisional is False
     assert decision.pending_flags == []
-
-    expected_clause = (
-        "tier-ai-generated-2026" if is_ai_generated else "tier-live-action-2026"
-    )
-    assert decision.clause_ref == expected_clause
+    assert decision.clause_ref == "tier-ai-generated-2026"
 
 
 def test_a_pack_can_still_declare_one_boundary_disputed():
@@ -306,43 +302,27 @@ def test_a_pack_can_still_declare_one_boundary_disputed():
     disputed = {
         "thresholds_published": True,
         "threshold_sets": {
-            "live_action": {
-                "T1_min_rmb": 3_000_000,
-                "T2_min_rmb": 1_000_000,
+            "ai_generated": {
+                "T1_min_rmb": 800_000,
+                "T2_min_rmb": 300_000,
                 "disputed_boundaries": ["T1_min_rmb"],
-                "clause_ref": "tier-live-action-2026",
+                "clause_ref": "tier-ai-generated-2026",
             }
         },
     }
 
     on_edge = judge_tier(
-        AmountBracket.UNKNOWN, disputed, True,
-        investment_amount_rmb=3_000_000, is_ai_generated=False,
+        AmountBracket.UNKNOWN, disputed, True, investment_amount_rmb=800_000,
     )
     assert on_edge.tier is Tier.T1
     assert on_edge.tier_provisional is True
     assert "threshold_boundary_disputed" in on_edge.pending_flags
 
     other_edge = judge_tier(
-        AmountBracket.UNKNOWN, disputed, True,
-        investment_amount_rmb=1_000_000, is_ai_generated=False,
+        AmountBracket.UNKNOWN, disputed, True, investment_amount_rmb=300_000,
     )
     assert other_edge.tier_provisional is False
     assert other_edge.pending_flags == []
-
-
-def test_exact_amount_without_generation_mode_stays_provisional():
-    decision = judge_tier(
-        AmountBracket.BETWEEN,
-        PUBLISHED_THRESHOLD_PACK,
-        True,
-        investment_amount_rmb=1_500_000,
-        is_ai_generated=None,
-    )
-
-    assert decision.tier_provisional is True
-    assert "generation_mode_required" in decision.pending_flags
-    assert decision.clause_ref is None
 
 
 def test_a_bracket_settles_the_tier_even_without_an_exact_amount():
@@ -362,25 +342,28 @@ def test_a_bracket_settles_the_tier_even_without_an_exact_amount():
         PUBLISHED_THRESHOLD_PACK,
         True,
         investment_amount_rmb=None,
-        is_ai_generated=False,
     )
 
     assert decision.tier is Tier.T3
     assert decision.tier_provisional is False
     assert decision.reasons == ["tier.from_bracket"]
-    assert decision.clause_ref == "tier-live-action-2026"
+    assert decision.clause_ref == "tier-ai-generated-2026"
     assert "amount_required" in decision.pending_flags
 
 
-def test_the_same_bracket_reads_against_the_ai_thresholds_when_ai():
-    """One enum, two threshold sets. The bracket is relative, not numeric."""
+def test_the_top_bracket_settles_at_the_strictest_tier():
+    """The bracket is relative to the thresholds, not a number of its own.
+
+    This was `…reads_against_the_ai_thresholds_when_ai`, back when the set was
+    chosen by a checkbox. There is one set now, so what it demonstrates is
+    simply that the top bracket lands on one-class.
+    """
 
     decision = judge_tier(
         AmountBracket.AT_OR_ABOVE_UPPER,
         PUBLISHED_THRESHOLD_PACK,
         True,
         investment_amount_rmb=None,
-        is_ai_generated=True,
     )
 
     assert decision.tier is Tier.T1
@@ -396,7 +379,6 @@ def test_a_bracket_stays_provisional_when_the_thresholds_are_not_usable():
         {"thresholds_published": True},
         True,
         investment_amount_rmb=None,
-        is_ai_generated=False,
     )
 
     assert decision.tier_provisional is True
@@ -409,32 +391,11 @@ def test_published_flag_without_usable_thresholds_stays_provisional():
         {"thresholds_published": True},
         True,
         investment_amount_rmb=1_500_000,
-        is_ai_generated=False,
     )
 
     assert decision.tier is Tier.T3
     assert decision.tier_provisional is True
     assert "thresholds_unavailable" in decision.pending_flags
-
-
-def test_same_amount_can_land_in_different_mode_specific_tiers():
-    live = judge_tier(
-        AmountBracket.UNKNOWN,
-        PUBLISHED_THRESHOLD_PACK,
-        True,
-        investment_amount_rmb=500_000,
-        is_ai_generated=False,
-    )
-    ai = judge_tier(
-        AmountBracket.UNKNOWN,
-        PUBLISHED_THRESHOLD_PACK,
-        True,
-        investment_amount_rmb=500_000,
-        is_ai_generated=True,
-    )
-
-    assert live.tier is Tier.T3
-    assert ai.tier is Tier.T2
 
 
 def test_chain_stays_well_under_the_five_second_budget(
@@ -523,7 +484,6 @@ def test_platform_promotion_makes_a_small_drama_a_key_drama():
         PUBLISHED_THRESHOLD_PACK,
         True,
         investment_amount_rmb=300_000,
-        is_ai_generated=False,
         platform_promoted=True,
     )
 
@@ -540,7 +500,6 @@ def test_declaring_voluntarily_makes_it_a_key_drama():
         PUBLISHED_THRESHOLD_PACK,
         True,
         investment_amount_rmb=50_000,
-        is_ai_generated=True,
         voluntary_key_declaration=True,
     )
 
@@ -551,13 +510,17 @@ def test_declaring_voluntarily_makes_it_a_key_drama():
 def test_neither_condition_leaves_the_amount_in_charge():
     """Unanswered or false must not quietly promote a project."""
 
+    # 300,000 is exactly the AI two-class line, so it was moved down to keep
+    # this test about the promotion conditions rather than about a boundary.
+    # It used to read 300,000 against the live-action figures, where that is
+    # comfortably three-class; against the AI figures it is two-class, which
+    # would have made this assert the wrong thing for the right reason.
     for promoted, voluntary in ((None, None), (False, False)):
         decision = judge_tier(
             AmountBracket.UNKNOWN,
             PUBLISHED_THRESHOLD_PACK,
             True,
-            investment_amount_rmb=300_000,
-            is_ai_generated=False,
+            investment_amount_rmb=50_000,
             platform_promoted=promoted,
             voluntary_key_declaration=voluntary,
         )
@@ -572,7 +535,6 @@ def test_the_condition_beats_the_amount_not_the_other_way_round():
         PUBLISHED_THRESHOLD_PACK,
         True,
         investment_amount_rmb=5_000_000,
-        is_ai_generated=False,
         platform_promoted=True,
     )
     assert decision.tier is Tier.T1
@@ -718,7 +680,6 @@ def test_classification_carries_the_route_for_its_own_tier(channels):
         episode_minutes=3.0,
         amount_bracket=AmountBracket.AT_OR_ABOVE_UPPER,
         investment_amount_rmb=3_200_000,
-        is_ai_generated=False,
     )
 
     classification = classify(intent, channels, snapshots).classification
@@ -781,7 +742,7 @@ def test_shooting_a_one_class_project_is_flagged_not_silently_allowed(
     assert "filing_due_before_shooting" not in early.pending_flags
 
     late = classify(
-        intent_crime.model_copy(update={"production_stage": ProductionStage.SHOOTING}),
+        intent_crime.model_copy(update={"production_stage": ProductionStage.PRODUCTION_COMPLETE}),
         channels,
         snapshots,
     ).classification
@@ -798,7 +759,7 @@ def test_the_warning_is_only_for_the_tier_that_files_before_shooting(
     from schemas.enums import ProductionStage
 
     classification = classify(
-        intent_romance.model_copy(update={"production_stage": ProductionStage.FINISHED}),
+        intent_romance.model_copy(update={"production_stage": ProductionStage.PRODUCTION_COMPLETE}),
         channels,
         snapshots,
         thresholds_published=False,

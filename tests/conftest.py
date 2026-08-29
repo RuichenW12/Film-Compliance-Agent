@@ -99,5 +99,5 @@ def intent_single_video() -> IntentProfile:
         episode_minutes=8.0,
         amount_bracket=AmountBracket.BELOW_LOWER,
         is_ai_generated=True,
-        production_stage=ProductionStage.FINISHED,
+        production_stage=ProductionStage.PRODUCTION_COMPLETE,
     )

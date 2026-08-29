@@ -125,13 +125,20 @@ def _from_bracket(
     )
 
 
-def _thresholds_for_mode(pack3: dict, is_ai_generated: bool | None) -> dict:
+# The one set this product classifies against. The snapshot still carries the
+# live-action figures because 总局令第16号 carries them -- deleting them would
+# put a hole in our record of the regulation -- but every project here is an AI
+# micro-drama, so only this set is ever selected. Changing this constant is all
+# it would take to classify live-action work again.
+AI_THRESHOLD_SET = "ai_generated"
+
+
+def _ai_thresholds(pack3: dict) -> dict:
+    """The AI threshold set, or the flat v1 shape when a pack predates the split."""
+
     sets = pack3.get("threshold_sets") or {}
     if sets:
-        if is_ai_generated is None:
-            return {}
-        key = "ai_generated" if is_ai_generated else "live_action"
-        return sets.get(key) or {}
+        return sets.get(AI_THRESHOLD_SET) or {}
     return pack3.get("thresholds") or {}
 
 
@@ -161,7 +168,6 @@ def judge_tier(
     pack3: dict,
     snapshot_thresholds_published: bool | None = None,
     investment_amount_rmb: float | None = None,
-    is_ai_generated: bool | None = None,
     platform_promoted: bool | None = None,
     voluntary_key_declaration: bool | None = None,
 ) -> TierDecision:
@@ -172,21 +178,19 @@ def judge_tier(
             tier=Tier.T1,
             tier_provisional=False,
             reasons=["tier.key_drama_by_condition", promotion],
-            clause_ref=(pack3.get("threshold_sets") or {}).get("live_action", {}).get("clause_ref"),
+            # Was hardcoded to the live-action set, which cited
+            # `tier-live-action-2026` on an AI project -- a decision that never
+            # consults the amount at all, pointing at the wrong instrument.
+            clause_ref=_ai_thresholds(pack3).get("clause_ref"),
         )
 
     published = _thresholds_published(pack3, snapshot_thresholds_published)
-    threshold_sets = pack3.get("threshold_sets") or {}
 
-    if threshold_sets and is_ai_generated is None:
-        return _from_bracket(
-            amount_bracket,
-            {},
-            settled=False,
-            pending_flags=["generation_mode_required"],
-        )
-
-    thresholds = _thresholds_for_mode(pack3, is_ai_generated)
+    # The `generation_mode_required` gate used to sit here: with two threshold
+    # sets and no answer about which applied, no set could be chosen and the
+    # tier could not settle however good the budget data was. There is one set
+    # now, so that question cannot arise and the flag can never fire.
+    thresholds = _ai_thresholds(pack3)
 
     if published and investment_amount_rmb is not None and thresholds:
         tier = _tier_from_amount(investment_amount_rmb, thresholds)

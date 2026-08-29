@@ -58,19 +58,12 @@ export type AmountBracket = (typeof AMOUNT_BRACKETS)[number];
  *  computed server-side from the pinned snapshot and stays correct, but these
  *  labels would need updating with it. */
 export const BRACKET_LABELS: Record<
-  "live_action" | "ai",
-  Record<Exclude<AmountBracket, "unknown">, string>
+  Exclude<AmountBracket, "unknown">,
+  string
 > = {
-  live_action: {
-    below_lower: "Under ¥1,000,000",
-    between: "¥1,000,000 – ¥3,000,000",
-    at_or_above_upper: "¥3,000,000 or more"
-  },
-  ai: {
-    below_lower: "Under ¥300,000",
-    between: "¥300,000 – ¥800,000",
-    at_or_above_upper: "¥800,000 or more"
-  }
+  below_lower: "Under ¥300,000",
+  between: "¥300,000 – ¥800,000",
+  at_or_above_upper: "¥800,000 or more"
 };
 
 export const FINDING_SEVERITIES = [
