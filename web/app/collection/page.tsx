@@ -187,8 +187,24 @@ export default function CollectionPage() {
     }
     await guard("upload", async () => {
       const ticket = await requestUploadUrl(projectId, kind, file.name);
-      await uploadBytes(ticket.upload_url, file);
+      const asset = await uploadBytes(ticket.upload_url, file);
       setFile(null);
+
+      /* Read the file rather than asking the same questions again. The
+         episode count, running time and title are in the script; making
+         someone type them a second time is work the product should be doing.
+         Extraction keeps only what the document backs verbatim, so this fills
+         nothing in that the file does not actually say.
+
+         Best-effort: an upload that succeeded must not report as failed
+         because the reading stumbled, and the button is still there. */
+      if (asset?.version_id) {
+        try {
+          setExtraction(await extractFacts(projectId, asset.version_id));
+        } catch {
+          setExtraction(null);
+        }
+      }
       await refresh(projectId);
     });
   }
@@ -336,9 +352,24 @@ export default function CollectionPage() {
             {extraction ? (
               <>
                 <Flags flags={extraction.pending_flags} />
+                {extraction.facts.length ? (
+                  <p className="alert">
+                    {format("collection.read_from_file", {
+                      fields: extraction.facts
+                        .map((fact) => t(`field.${fact.key}`))
+                        .join(", ")
+                    })}
+                  </p>
+                ) : (
+                  <p className="muted">{t("collection.read_nothing")}</p>
+                )}
                 {extraction.discarded.length ? (
                   <p className="muted">
-                    {t("collection.discarded")}: {extraction.discarded.join(", ")}
+                    {format("collection.discarded_because", {
+                      fields: extraction.discarded
+                        .map((key) => t(`field.${key}`))
+                        .join(", ")
+                    })}
                   </p>
                 ) : null}
               </>

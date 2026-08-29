@@ -156,29 +156,14 @@ export default function WizardPage() {
     }
   }
 
-  /* Everything the idea stage cannot answer. Declared once and rendered in one
-     of two places, so the folded and unfolded forms cannot drift apart. */
-  const scaleFields = (
+  /* Length stays on the form at every stage, and an estimate is fine.
+     Article 2 defines a micro-drama *by* episode length -- under twenty
+     minutes -- so without these the chain cannot tell a micro-drama from a web
+     film at all. Folding them away would not spare the creator the question;
+     it would just submit the defaults on their behalf without showing them,
+     which is inventing two facts rather than asking for them. */
+  const lengthFields = (
     <>
-      <label>
-        <span>{t("wizard.amount_bracket")}</span>
-        <FieldHelp field="amount_bracket" label="Budget range" />
-        <select
-          value={amountBracket}
-          onChange={(event) =>
-            setAmountBracket(event.target.value as AmountBracket)
-          }
-        >
-          {AMOUNT_BRACKETS.map((bracket) => (
-            <option key={bracket} value={bracket}>
-              {bracket === "unknown"
-                ? t("amount_bracket.unknown")
-                : BRACKET_LABELS[bracket]}
-            </option>
-          ))}
-        </select>
-      </label>
-      <p className="muted">{t("wizard.amount_bracket.hint")}</p>
       <label>
         <span>{t("wizard.episode_count")}</span>
         <FieldHelp field="episode_count" label="Episodes" />
@@ -200,6 +185,35 @@ export default function WizardPage() {
           onChange={(event) => setEpisodeMinutes(event.target.value)}
         />
       </label>
+      <p className="muted">{t("wizard.length.hint")}</p>
+    </>
+  );
+
+  /* The budget genuinely has no answer at the idea stage, and unlike length
+     the chain does not need one -- an unanswered budget produces an honest
+     provisional class plus the comparison table. So this is the field that
+     folds. */
+  const budgetField = (
+    <>
+      <label>
+        <span>{t("wizard.amount_bracket")}</span>
+        <FieldHelp field="amount_bracket" label="Budget range" />
+        <select
+          value={amountBracket}
+          onChange={(event) =>
+            setAmountBracket(event.target.value as AmountBracket)
+          }
+        >
+          {AMOUNT_BRACKETS.map((bracket) => (
+            <option key={bracket} value={bracket}>
+              {bracket === "unknown"
+                ? t("amount_bracket.unknown")
+                : BRACKET_LABELS[bracket]}
+            </option>
+          ))}
+        </select>
+      </label>
+      <p className="muted">{t("wizard.amount_bracket.hint")}</p>
     </>
   );
 
@@ -253,14 +267,15 @@ export default function WizardPage() {
             stage has. They are folded away instead of removed: somebody who
             does know can still say so, and the backend has always accepted
             "unknown" for all three. */}
+        {lengthFields}
         {earlyStage ? (
           <details className="if-you-know">
             <summary>{t("wizard.if_you_know")}</summary>
             <p className="muted">{t("wizard.if_you_know.hint")}</p>
-            {scaleFields}
+            {budgetField}
           </details>
         ) : (
-          scaleFields
+          budgetField
         )}
         {/* Neither is answerable at intake: platform promotion is settled
             after the film exists, and declaring voluntarily is a strategic
