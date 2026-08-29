@@ -36,6 +36,13 @@ Conventions:
   once the form has been locked and sent (its class is part of what the filing
   company is holding); and it never moves the state, so materials, roadmap and
   uploads survive — re-deciding is not starting over.
+- **Fixed a flaw in the card I had just written.** Re-running clears the stale
+  flag, and the card hid on that alone — so it vanished at the exact moment it
+  had something to say. A creator pressed the button and the whole thing
+  disappeared without telling them what happened. It now stays to report the
+  result, and says whether the class actually moved. Found in the browser, not
+  by the API test that passed.
+
 - **The dashboard badge stopped speaking our vocabulary:** "policy update
   pending review" is now "rules changed — needs redoing".
 - **`e2e_check.py` section 23 is now re-runnable.** The demo policy source is

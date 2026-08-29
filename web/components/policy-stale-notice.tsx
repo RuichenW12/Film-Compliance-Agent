@@ -45,7 +45,11 @@ export function PolicyStaleNotice({
   const [busy, setBusy] = useState(false);
   const [outcome, setOutcome] = useState<string | null>(null);
 
-  if (!stale) return null;
+  // Stay visible once there is a result to report. Re-running clears the
+  // stale flag, and hiding on that alone made the card vanish at the exact
+  // moment it had something to say -- the creator pressed a button and the
+  // whole thing disappeared without telling them what happened.
+  if (!stale && outcome === null) return null;
 
   const sent = state !== null && SENT_STATES.includes(state);
 
@@ -74,10 +78,12 @@ export function PolicyStaleNotice({
 
   return (
     <section className="card">
-      <h2>{t("stale.title")}</h2>
-      <p className="alert warning-alert">{t("stale.body")}</p>
+      <h2>{stale ? t("stale.title") : t("stale.done_title")}</h2>
+      {stale ? (
+        <p className="alert warning-alert">{t("stale.body")}</p>
+      ) : null}
 
-      {sent ? (
+      {!stale ? null : sent ? (
         <p className="muted">{t("stale.locked")}</p>
       ) : (
         <>

@@ -274,6 +274,7 @@
   "stale.action": "Work it out again",
   "stale.body": "A policy update was published after your project was classified. Your answer was worked out under the older version, so it may no longer be right.",
   "stale.changed": "Redone. Your class changed from {from} to {to} — check what you have to do below, it may have changed too.",
+  "stale.done_title": "Worked out again",
   "stale.hint": "This re-runs the whole check against the current rules. Everything else about your project — your uploads, your materials, your roadmap — stays exactly as it is.",
   "stale.locked": "This project's form has already been locked and sent, so its class cannot be changed here — it is part of what the filing company is reviewing. Take it back for changes first if it needs redoing.",
   "stale.title": "The rules behind this answer have changed",
