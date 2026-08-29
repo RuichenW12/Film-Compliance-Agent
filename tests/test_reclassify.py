@@ -111,3 +111,47 @@ def test_re_deciding_twice_needs_a_second_reason(workflow, classified) -> None:
 
     with pytest.raises(StateInvalidError):
         workflow.reclassify(classified)
+
+
+def test_an_alert_with_no_quote_does_not_crash(workflow, intent_romance) -> None:
+    """`_write_alert_finding` read `intent_profile.logline`, a removed field.
+
+    Python's `or` short-circuits, so the read only happened when the alert
+    carried no matched-rule quote -- which no existing test produced, and which
+    would have raised AttributeError in front of a creator rather than showing
+    them a boundary-subject decision.
+    """
+
+    from core.classify.chain import ClassificationOutcome
+    from schemas.findings import Alert, AlertChoice, AlertDept, AlertOption
+
+    project_id = workflow.create_project("u_demo", "夏日便利店").project_id
+    workflow.submit_intent(project_id, intent_romance.model_dump())
+    project, _ = workflow.run_classification(project_id)
+
+    # An alert with nothing quotable behind it: the exact shape that crashed.
+    outcome = ClassificationOutcome(
+        classification=None,
+        alert=Alert(
+            risk_reason="alert.subject_edge_case",
+            dept=AlertDept(name="待补充"),
+            options=[
+                AlertChoice(
+                    id=AlertOption.B_MODIFY,
+                    action="alert.option.modify",
+                    impact="alert.impact.rewrite_scenes",
+                ),
+                AlertChoice(
+                    id=AlertOption.A_KEEP_AND_COREVIEW,
+                    action="alert.option.keep_and_coreview",
+                    impact="alert.impact.longer_review",
+                ),
+            ],
+        ),
+    )
+
+    workflow._write_alert_finding(project, outcome)
+
+    findings = workflow._stores.findings.list(project_id)
+    assert findings, "the finding must be written, not lost to an exception"
+    assert findings[-1].alert is not None

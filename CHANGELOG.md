@@ -22,6 +22,29 @@ Conventions:
 
 ## 2026-08-29
 
+### A — a crash waiting on a rare path, and more dead copy
+
+- **`_write_alert_finding` read `intent_profile.logline`, a field that no longer
+  exists.** Python's `or` short-circuits, so it was only reached when an alert
+  carried no matched-rule quote — which no test produced. On that path a
+  creator would have got an `AttributeError` instead of the boundary-subject
+  decision the alert exists to offer. Now reads the synopsis, and a test covers
+  it (confirmed by reintroducing the bug and watching it fail).
+- **`.env.example` pointed at `seed-snapshot-v1.yaml`** while the code defaults
+  to v2. Anyone copying it ran on the older snapshot, whose thresholds are
+  unpublished, and got a provisional class on every project with no clue why.
+- **Fifteen dead copy keys removed** — the `budget_band` field (gone in D-036),
+  the reviewer-side submit card (moved in D-047), the "where will it be
+  distributed" question you asked me to drop, and two gate strings nothing ever
+  rendered.
+
+**Found and left alone, deliberately:** `alert.*` copy has no renderer. The
+backend writes alert findings with options — modify the scenes, keep them and
+accept co-review, escalate — and no screen shows them, so a creator with a
+boundary-subject project never sees the choice. That is a missing feature rather
+than dead copy, and it is the largest remaining hole on the creator's side.
+Recorded as Q-5.
+
 ### A — a copy sweep for our vocabulary and one stale lie
 
 - **Deleted copy for a field that no longer exists.** `help.budget_band` and

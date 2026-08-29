@@ -1937,7 +1937,11 @@ class WorkflowService:
         finding = Finding(
             finding_id=new_id("finding"),
             asset_version="intent_profile",
-            locator=Locator(quote=quote or (project.intent_profile.logline or "")),
+            # `logline` was removed from IntentProfile when the synopsis became
+            # the single story field, and this line still read it. Python's
+            # `or` short-circuits, so the crash only waited on an alert with no
+            # matched-rule quote -- which every existing test happens to have.
+            locator=Locator(quote=quote or (project.intent_profile.synopsis or "")),
             category=outcome.alert_category or "subject_edge_case",
             severity=outcome.alert_severity or FindingSeverity.NEEDS_HUMAN,
             evidence_refs=list(outcome.classification.evidence_refs)

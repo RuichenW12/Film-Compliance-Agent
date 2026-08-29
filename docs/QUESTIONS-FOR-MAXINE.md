@@ -72,3 +72,23 @@ asking. My instinct is no — a classification that changes under someone withou
 them looking is exactly the kind of silent movement the evidence rules exist to
 prevent — but it is your product decision, and "why is my project suddenly
 Class 1" is a worse surprise than an unread notification.
+
+---
+
+## Q-5 · A boundary-subject decision is written but never shown
+
+When the subject check lands on a boundary, the chain writes a finding carrying
+an `Alert`: a risk reason, the department that would decide, and two or three
+options — modify the scenes, keep them and accept co-review, escalate to the
+authority — each with its own impact. `POST /findings/{id}/action` records the
+choice.
+
+**No screen renders any of it.** The copy exists (`alert.option.*`,
+`alert.impact.*`), the route exists, the finding is stored. A creator whose
+project sits on a boundary simply never learns there was a choice.
+
+**What I need from you:** whether this belongs in the demo. It is the one place
+the product asks a creator to make a judgement rather than reporting one, which
+makes it either the most interesting screen to show or a distraction from the
+straight-through story. I did not build it unasked because it is a new
+user-facing surface with real wording implications, not a fix.
