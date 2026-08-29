@@ -106,6 +106,12 @@ class ClassifyResponse(ApiModel):
     roadmap_preview: dict | None = None
     state: ProjectState
     alert_finding_id: str | None = None
+    # What each budget band would mean, read from the pinned snapshot. Sent on
+    # every classification so a creator who has not decided a budget can plan
+    # against the thresholds instead of being asked to guess one. None when the
+    # snapshot cannot support the whole table -- a partial one would be planned
+    # against just as readily.
+    budget_comparison: list[dict] | None = None
 
 
 class TierChoiceRequest(ApiModel):
