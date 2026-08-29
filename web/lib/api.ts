@@ -481,3 +481,30 @@ export async function freezeForm(projectId: string): Promise<FormDraft> {
     method: "POST"
   });
 }
+
+/** One row of the institution's inbox.
+ *
+ *  `title_working` is nullable on purpose: a project whose creator never named
+ *  it stays unnamed here rather than borrowing a title from somewhere.
+ *  `licence_reasons` is empty when the mock check passed -- there is no `ok`
+ *  field, because what a reviewer needs is the reason, not the verdict. */
+export interface QueueRow {
+  project_id: string;
+  title_working: string | null;
+  state: string;
+  tier: string | null;
+  institution_id: string | null;
+  review_id: string | null;
+  decision: string | null;
+  submitted_at: string | null;
+  licence_reasons: string[];
+}
+
+export async function getInstitutionQueue(
+  institutionId?: string
+): Promise<QueueRow[]> {
+  const query = institutionId
+    ? `?institution_id=${encodeURIComponent(institutionId)}`
+    : "";
+  return apiFetch<QueueRow[]>(`/v1/institution/queue${query}`);
+}

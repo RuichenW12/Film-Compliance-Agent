@@ -33,6 +33,8 @@ import urllib.error
 import urllib.request
 
 CREATOR = {"X-Mock-Role": "creator", "X-User-Id": "u_demo"}
+INSTITUTION = {"X-Mock-Role": "institution"}
+ADMIN = {"X-Mock-Role": "admin"}
 
 CRIME_INTENT = {
     "form_type_claimed": "micro_drama",
@@ -491,6 +493,7 @@ def main() -> int:
 
     walk_post_classification(checker, pinned)
     walk_to_a_frozen_form(checker, pinned)
+    walk_the_institution_queue(checker, pinned)
 
     print("\n== not built yet (each line is the next task, not a bug) ==")
     for label, task in PENDING_STEPS:
@@ -501,6 +504,75 @@ def main() -> int:
     )
     return 1 if checker.failures else 0
 
+
+
+
+def frozen_project(checker: "Checker") -> str:
+    """One project taken from intent to a frozen form. Returns its id, or "".
+
+    Section 20 walks these steps with assertions on each. Here they are only
+    setup for the institution side, so failures surface as an empty id rather
+    than as noise about stages another section already covers.
+    """
+
+    project_id = checker.new_project(dict(ROMANCE_INTENT))
+    checker.call("POST", f"/v1/projects/{project_id}/classify")
+    checker.call("POST", f"/v1/projects/{project_id}/roadmap/confirm")
+
+    _, ticket, _ = checker.call(
+        "POST",
+        f"/v1/projects/{project_id}/assets/upload-url",
+        {"kind": "script", "filename": "script.txt"},
+    )
+    if not ticket.get("upload_url"):
+        return ""
+    _, asset = checker.put_bytes(
+        ticket["upload_url"], SAMPLE_SCRIPT.encode("utf-8")
+    )
+    version = asset.get("version_id", "")
+    checker.call(
+        "POST", f"/v1/projects/{project_id}/review", {"asset_version": version}
+    )
+
+    _, cards, _ = checker.call("GET", f"/v1/projects/{project_id}/materials")
+    for card in cards:
+        if card.get("required"):
+            checker.call(
+                "POST",
+                f"/v1/projects/{project_id}/materials/{card['material_id']}/waive",
+                {"reason": "setup for the institution walk"},
+            )
+
+    # Answer whatever this snapshot's form asks for rather than a fixed list:
+    # the seed snapshots disagree about investment_structure vs
+    # investment_amount_rmb, and a hard-coded list breaks when one changes.
+    answers = {
+        "title": "夏日便利店",
+        "episode_count": 30,
+        "episode_minutes": 2,
+        "investment_amount_rmb": 250000,
+        "investment_structure": "自筹",
+    }
+    _, draft, _ = checker.call("GET", f"/v1/projects/{project_id}/form")
+    for key, field in (draft.get("fields") or {}).items():
+        if field.get("status") == "filled":
+            continue
+        if key == "applicant_entity":
+            checker.call(
+                "POST",
+                f"/v1/projects/{project_id}/form/fields/{key}/defer",
+                {"reason": "individual creator"},
+            )
+        elif key in answers:
+            checker.call(
+                "POST",
+                f"/v1/projects/{project_id}/form/fields/{key}/confirm",
+                {"value": answers[key]},
+            )
+
+    checker.call("POST", f"/v1/projects/{project_id}/gate/pass")
+    _, frozen, _ = checker.call("POST", f"/v1/projects/{project_id}/form/freeze")
+    return project_id if frozen.get("frozen") else ""
 
 
 def walk_post_classification(checker: "Checker", pinned: str) -> None:
@@ -738,6 +810,114 @@ def walk_to_a_frozen_form(checker: "Checker", pinned: str) -> None:
     checker.check(
         "freezing twice returns the same hash",
         status == 200 and again.get("hash") == frozen.get("hash"),
+    )
+
+
+def walk_the_institution_queue(checker: "Checker", pinned: str) -> None:
+    """A reviewer can find work without being handed a project id.
+
+    `ProjectStore.list_all` was a port method nothing called, so the console
+    could only open a project somebody had already named. This walks the queue
+    that replaced that: submit, see it listed, decide, see the list change.
+    """
+
+    print()
+    print()
+    print("== 21. the institution queue ==")
+
+    status, before, _ = checker.call(
+        "GET", "/v1/institution/queue", headers=INSTITUTION
+    )
+    checker.check(
+        "the queue answers, institution role only",
+        status == 200 and isinstance(before, list),
+        json.dumps(status),
+    )
+
+    status, _, _ = checker.call("GET", "/v1/institution/queue")
+    checker.check("a creator may not read the queue", status == 403, json.dumps(status))
+
+    checker.call(
+        "PUT",
+        "/v1/admin/institutions",
+        [
+            {
+                "institution_id": "inst_e2e",
+                "name": "待补充",
+                "license_no": "待补充",
+                "valid_until": "2027-12-31",
+                "registered_capital_rmb": 5000000,
+                "has_foreign": False,
+            }
+        ],
+        headers=ADMIN,
+    )
+
+    project_id = frozen_project(checker)
+    if not project_id:
+        checker.check("a frozen project to submit", False, "freeze did not happen")
+        return
+
+    status, _, _ = checker.call(
+        "POST",
+        f"/v1/projects/{project_id}/institution/submit",
+        {"institution_id": "inst_e2e"},
+    )
+    checker.check("the creator submits the frozen form", status == 200)
+
+    status, queue, _ = checker.call(
+        "GET", "/v1/institution/queue", headers=INSTITUTION
+    )
+    mine = [row for row in queue if row.get("project_id") == project_id]
+    checker.check(
+        "the submitted project is waiting in the queue",
+        bool(mine) and mine[0].get("state") == "INSTITUTION_REVIEW",
+        json.dumps([row.get("state") for row in mine]),
+    )
+    checker.check(
+        "the row carries what a reviewer decides on",
+        bool(mine)
+        and mine[0].get("tier") == "T3"
+        and mine[0].get("licence_reasons") == [],
+        json.dumps({"tier": mine[0].get("tier") if mine else None}),
+    )
+
+    status, _, _ = checker.call(
+        "POST",
+        f"/v1/projects/{project_id}/institution/decide",
+        {"decision": "accept", "signed_agreement_uri": "blob://e2e/agreement"},
+        headers=INSTITUTION,
+    )
+    checker.check("the institution accepts", status == 200)
+
+    status, queue, _ = checker.call(
+        "GET", "/v1/institution/queue", headers=INSTITUTION
+    )
+    mine = [row for row in queue if row.get("project_id") == project_id]
+    checker.check(
+        "an accepted project still waits, for its registration number",
+        bool(mine) and mine[0].get("state") == "READY_FOR_EXTERNAL_FILING",
+        json.dumps([row.get("state") for row in mine]),
+    )
+
+    status, body, _ = checker.call(
+        "POST",
+        f"/v1/projects/{project_id}/filing",
+        {"registration_number": "REG-E2E-0001"},
+        headers=INSTITUTION,
+    )
+    checker.check(
+        "recording the filing completes the project",
+        status == 200 and body.get("state") == "FILED",
+        json.dumps(body.get("state")),
+    )
+
+    status, queue, _ = checker.call(
+        "GET", "/v1/institution/queue", headers=INSTITUTION
+    )
+    checker.check(
+        "a filed project leaves the queue",
+        all(row.get("project_id") != project_id for row in queue),
     )
 
 if __name__ == "__main__":

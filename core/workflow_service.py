@@ -848,6 +848,75 @@ class WorkflowService:
     def list_institutions(self) -> list[MockInstitution]:
         return self._stores.institutions.list()
 
+    # The states an institution owns. A project sitting in either of these is
+    # waiting on the reviewer, not on the creator, which is exactly what a queue
+    # has to be able to say.
+    INSTITUTION_QUEUE_STATES = (
+        ProjectState.INSTITUTION_REVIEW,
+        ProjectState.READY_FOR_EXTERNAL_FILING,
+    )
+
+    def institution_queue(self, institution_id: str | None = None) -> list[dict]:
+        """What is waiting on an institution, newest submission first.
+
+        `ProjectStore.list_all` existed as a port method that nothing called, so
+        a reviewer had no way to discover work: they had to be handed a project
+        id out of band and paste it in. A console without a queue is a lookup
+        tool, not an inbox.
+
+        Two states qualify. `INSTITUTION_REVIEW` needs a decision.
+        `READY_FOR_EXTERNAL_FILING` has been accepted and still needs a
+        registration number, which is also the institution's act -- leaving it
+        out would let an accepted project fall off the reviewer's screen with
+        the last step undone.
+        """
+
+        rows: list[dict] = []
+        for project in self._stores.projects.list_all():
+            if project.state not in self.INSTITUTION_QUEUE_STATES:
+                continue
+            review = self._stores.institution_reviews.latest(project.project_id)
+            if institution_id and (
+                review is None or review.institution_id != institution_id
+            ):
+                continue
+            classification = project.classification
+            rows.append(
+                {
+                    "project_id": project.project_id,
+                    # Never invented: a project with no working title says so
+                    # rather than borrowing one from somewhere else.
+                    "title_working": project.title_working,
+                    "state": project.state.value,
+                    "tier": classification.tier.value if classification else None,
+                    "institution_id": review.institution_id if review else None,
+                    "review_id": review.review_id if review else None,
+                    "decision": (
+                        review.decision.value
+                        if review is not None and review.decision is not None
+                        else None
+                    ),
+                    "submitted_at": (
+                        review.created_at.isoformat()
+                        if review is not None and review.created_at is not None
+                        else None
+                    ),
+                    # There is no `ok` field: an empty `reasons` is what
+                    # passing means, and the reasons themselves are what the
+                    # reviewer needs to see when it does not.
+                    "licence_reasons": (
+                        list(review.license_check.reasons)
+                        if review is not None and review.license_check is not None
+                        else []
+                    ),
+                }
+            )
+
+        # Newest submission first, and a row with no timestamp sorts last rather
+        # than crashing the comparison.
+        rows.sort(key=lambda row: row["submitted_at"] or "", reverse=True)
+        return rows
+
     def submit_to_institution(
         self, project_id: str, institution_id: str
     ) -> tuple[Project, InstitutionReview]:

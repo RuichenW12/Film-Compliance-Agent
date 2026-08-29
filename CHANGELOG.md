@@ -22,6 +22,33 @@ Conventions:
 
 ## 2026-08-28
 
+### A — the reviewer can find work
+
+- **New `GET /v1/institution/queue`**, institution role only, listing what is
+  waiting: projects needing a decision and accepted projects still needing a
+  registration number. See [D-046](docs/decisions.md#d-046).
+- **The console had every route and no inbox.** Submit, licence check, accept,
+  return, resume and filing all worked — by hand a project reached `FILED`
+  with a registration number — but the page could only open a project whose id
+  somebody pasted in. `ProjectStore.list_all` had been a port method that
+  **nothing called** since it was written; the queue is what it was for.
+- **An accepted project stays listed** until its registration number is
+  recorded, because that is the institution's act too. A returned project
+  leaves, being the creator's work again.
+- **Nothing is invented in a row:** an unnamed project renders "untitled", and
+  there is no synthesised licence verdict — the row carries the actual reasons,
+  empty meaning passed.
+- **The paste-an-id form stays as a fallback**, same shape as D-041: remove the
+  need, not the option.
+- **Fixed while testing:** a failed queue load left the card on "Loading…"
+  forever, which reads as a hang rather than the 403 it usually is.
+- Verified: `python -m pytest` (563 passed, 3 skipped) including 9 new queue
+  tests; `python scripts/e2e_check.py --base http://localhost:8000` **ALL CHECKS
+  PASSED** with a new section 21 walking submit → queue → accept → file → queue
+  empties; and in Chrome as the institution role: the queue listed the project,
+  *Open* loaded it in one click, *Accept* moved the row to "a registration
+  number", and recording the filing emptied the queue.
+
 ### A — projects survive a restart
 
 - **New `store/sqlite.py` behind the existing ports**, selected with

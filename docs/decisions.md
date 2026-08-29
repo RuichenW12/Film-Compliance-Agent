@@ -1601,3 +1601,44 @@ deleting the file. The e2e docstring and `.env.example` both say so.
 connection under a lock is right for a single-process demo and is not a
 statement about what a deployed service should do.
 
+---
+
+## D-046
+
+**The reviewer had a console but no inbox** · Area: A · Status: Accepted · 2026-08-28
+
+Every institution route worked: submit, the mock licence check, accept, return,
+resume, and filing. Driven by hand a project went from intent to `FILED` with a
+registration number. And yet the reviewer side felt unbuilt, because the console
+could open a project only when somebody handed over its id and it was pasted
+into a box. That is a lookup tool, not an inbox — a reviewer had no way to
+discover that work existed.
+
+`ProjectStore.list_all` had been declared as a port method from the start and
+**nothing ever called it**. The queue is what it was for.
+
+**Which states belong to a reviewer.** `INSTITUTION_REVIEW` needs a decision.
+`READY_FOR_EXTERNAL_FILING` has been accepted and still needs its registration
+number, which is also the institution's act — dropping a project at acceptance
+would let it fall off the screen with the last step undone, and "accepted" is
+not "filed". A returned project leaves the queue, because it is the creator's
+work again.
+
+**What a row says, and does not.** Title, class, what it is waiting for, and the
+licence reasons. `title_working` stays null when a creator never named the
+project rather than borrowing one from anywhere — the queue renders "untitled"
+and does not invent. There is no `ok` field on the licence check and the row
+does not synthesise one: an empty `reasons` is what passing means, and when it
+fails the reasons are what the reviewer needs.
+
+**Institution role only.** The queue spans every creator's projects, so it is
+not a creator's route. A creator reading it would see everyone else's work.
+
+**The paste-an-id form stays.** It is now a fallback rather than the only way
+in, which is the same shape as [D-041](#d-041)'s handoff: remove the need, not
+the option.
+
+**Revisit when** a real identity provider replaces the demo header, at which
+point `institution_id` should come from the principal rather than a query
+parameter, and the unfiltered listing should stop being reachable at all.
+

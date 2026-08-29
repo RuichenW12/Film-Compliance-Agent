@@ -790,3 +790,38 @@ main label span {
   margin: 0.5rem 0 0;
   font-size: 0.8125rem;
 }
+
+/* The institution's inbox. A table because a reviewer scans it for the one
+   project they mean to open, and the columns are what they scan by. */
+.queue-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9375rem;
+  margin: 0.5rem 0;
+}
+
+.queue-table th {
+  text-align: left;
+  font-size: 0.75rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+  font-weight: 500;
+  border-bottom: 1px solid var(--border);
+  padding: 0.375rem 0.75rem 0.375rem 0;
+}
+
+.queue-table td {
+  border-bottom: 1px solid var(--border);
+  padding: 0.5rem 0.75rem 0.5rem 0;
+  vertical-align: top;
+}
+
+.queue-table code {
+  font-size: 0.6875rem;
+}
+
+/* Wide content scrolls in its own box, never the page. */
+.scroll-x {
+  overflow-x: auto;
+}

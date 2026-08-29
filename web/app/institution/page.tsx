@@ -14,6 +14,7 @@ import {
   recordFiling,
   submitToInstitution
 } from "../../lib/api";
+import { InstitutionQueue } from "../../components/institution-queue";
 import { getRole } from "../../lib/demoAuth";
 import { t } from "../../lib/i18n";
 
@@ -70,6 +71,9 @@ function LicenceVerdict({ review }: { review: InstitutionReview }) {
 
 export default function InstitutionPage() {
   const [projectId, setProjectId] = useState("");
+  /* Bumped whenever a decision lands, so the queue reloads and the row just
+     acted on disappears rather than lingering as a stale entry. */
+  const [queueVersion, setQueueVersion] = useState(0);
   const [role, setRole] = useState("creator");
   const [institutions, setInstitutions] = useState<Institution[]>([]);
   const [chosen, setChosen] = useState("");
@@ -165,6 +169,17 @@ export default function InstitutionPage() {
           <p className="muted">{t("institution.load_demo_admin_only")}</p>
         )}
       </section>
+
+      <InstitutionQueue
+        reloadKey={queueVersion}
+        onError={setError}
+        onOpen={(id) => {
+          setProjectId(id);
+          void guard("load_project", async () => {
+            await refreshProject(id);
+          });
+        }}
+      />
 
       <form
         className="card"
@@ -281,6 +296,9 @@ export default function InstitutionPage() {
                           });
                           setReview(result.review);
                           setState(result.state);
+                          // A decision changes what is waiting, so the queue
+                          // must not keep showing the row just acted on.
+                          setQueueVersion((version) => version + 1);
                         })
                       }
                     >
@@ -298,6 +316,9 @@ export default function InstitutionPage() {
                           });
                           setReview(result.review);
                           setState(result.state);
+                          // A decision changes what is waiting, so the queue
+                          // must not keep showing the row just acted on.
+                          setQueueVersion((version) => version + 1);
                         })
                       }
                     >
@@ -325,6 +346,7 @@ export default function InstitutionPage() {
                         const result = await recordFiling(projectId, registration);
                         setState(result.state);
                         await refreshProject(projectId);
+                        setQueueVersion((version) => version + 1);
                       })
                     }
                   >
