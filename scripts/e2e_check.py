@@ -481,6 +481,7 @@ def main() -> int:
     checker.check("another creator sees an empty inbox", other_inbox == [])
 
     walk_post_classification(checker, pinned)
+    walk_to_a_frozen_form(checker, pinned)
 
     print("\n== not built yet (each line is the next task, not a bug) ==")
     for label, task in PENDING_STEPS:
@@ -621,6 +622,113 @@ def walk_post_classification(checker: "Checker", pinned: str) -> None:
         "a form cannot be frozen while the gate is blocked",
         status == 409,
         json.dumps(body.get("error", {}).get("code")),
+    )
+
+
+def walk_to_a_frozen_form(checker: "Checker", pinned: str) -> None:
+    """An individual creator, with no company, reaches a frozen form.
+
+    A 备案 is filed by a company holding the 广播电视节目制作经营许可证, so
+    `applicant_entity` is a field an individual creator cannot answer. Until
+    `defer_form_field` existed the only reachable outcomes were to invent a
+    company, or to leave the field pending and never finish. This walks the
+    fourth: declaring that the filing institution supplies it.
+    """
+
+    print()
+    print()
+    print("== 20. no company, and still a frozen form ==")
+
+    project_id = checker.new_project(dict(ROMANCE_INTENT))
+    checker.call("POST", f"/v1/projects/{project_id}/classify")
+    checker.call("POST", f"/v1/projects/{project_id}/roadmap/confirm")
+
+    status, ticket, _ = checker.call(
+        "POST",
+        f"/v1/projects/{project_id}/assets/upload-url",
+        {"kind": "script", "filename": "script.txt"},
+    )
+    status, asset = checker.put_bytes(
+        ticket["upload_url"], SAMPLE_SCRIPT.encode("utf-8")
+    )
+    version = asset.get("version_id", "")
+    checker.call(
+        "POST", f"/v1/projects/{project_id}/review", {"asset_version": version}
+    )
+
+    status, cards, _ = checker.call("GET", f"/v1/projects/{project_id}/materials")
+    for card in cards:
+        if card.get("required"):
+            checker.call(
+                "POST",
+                f"/v1/projects/{project_id}/materials/{card['material_id']}/waive",
+                {"reason": "walked by the e2e; card content is covered in tests/"},
+            )
+
+    for key, value in (
+        ("title", "夏日便利店"),
+        ("episode_count", 30),
+        ("episode_minutes", 2),
+        ("investment_amount_rmb", 250000),
+    ):
+        checker.call(
+            "POST", f"/v1/projects/{project_id}/form/fields/{key}/confirm",
+            {"value": value},
+        )
+
+    status, gate, _ = checker.call("GET", f"/v1/projects/{project_id}/gate")
+    blocked_on_entity = any(
+        "applicant_entity" in (gap.get("items") or []) for gap in gate.get("gaps") or []
+    )
+    checker.check(
+        "an unanswered applicant_entity blocks the gate",
+        blocked_on_entity,
+        json.dumps([gap.get("items") for gap in gate.get("gaps") or []]),
+    )
+
+    status, draft, _ = checker.call(
+        "POST",
+        f"/v1/projects/{project_id}/form/fields/applicant_entity/defer",
+        {"reason": "individual creator, no 广播电视节目制作经营许可证"},
+    )
+    field = (draft.get("fields") or {}).get("applicant_entity") or {}
+    checker.check(
+        "deferring records the gap without inventing a value",
+        status == 200
+        and field.get("status") == "pending_institution"
+        and field.get("value") is None,
+        json.dumps(field.get("status")),
+    )
+
+    status, gate, _ = checker.call("GET", f"/v1/projects/{project_id}/gate")
+    checker.check(
+        "a declared gap opens the gate an ignored one holds shut",
+        gate.get("passed") is True,
+        json.dumps(gate.get("gaps")),
+    )
+
+    status, body, _ = checker.call("POST", f"/v1/projects/{project_id}/gate/pass")
+    checker.check(
+        "the gate passes", status == 200 and body.get("passed") is True,
+        json.dumps(body.get("state")),
+    )
+
+    status, frozen, _ = checker.call("POST", f"/v1/projects/{project_id}/form/freeze")
+    checker.check(
+        "the form freezes, with a hash",
+        status == 200 and frozen.get("frozen") is True and bool(frozen.get("hash")),
+        json.dumps({"frozen": frozen.get("frozen")}),
+    )
+    entity = (frozen.get("fields") or {}).get("applicant_entity") or {}
+    checker.check(
+        "the frozen form still shows the gap, it is not quietly complete",
+        entity.get("value") is None and entity.get("status") == "pending_institution",
+        json.dumps(entity.get("status")),
+    )
+    status, again, _ = checker.call("POST", f"/v1/projects/{project_id}/form/freeze")
+    checker.check(
+        "freezing twice returns the same hash",
+        status == 200 and again.get("hash") == frozen.get("hash"),
     )
 
 if __name__ == "__main__":

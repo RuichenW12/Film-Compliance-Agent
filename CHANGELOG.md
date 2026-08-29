@@ -22,6 +22,29 @@ Conventions:
 
 ## 2026-08-28
 
+### A — an individual creator can reach a frozen form
+
+- **`applicant_entity` can be declared blank instead of invented.** A 备案 is
+  filed by a company holding the 广播电视节目制作经营许可证, which an individual
+  creator does not have. New `POST /v1/projects/{id}/form/fields/{key}/defer`
+  records a fact with no value and `PENDING_INSTITUTION` status. See
+  [D-044](docs/decisions.md#d-044).
+- **The gap stays visible.** The field renders 待补充, the hash covers field
+  status so a deferred field and a filled one hash differently, `deferred_keys`
+  lists it on the frozen form, and the freeze event records which fields were
+  left open. A confirmed value outranks a later deferral.
+- **Most of this already existed and was unreachable.** `evaluate_gate_d3`
+  accepted `PENDING_INSTITUTION` and `FieldStatus` had the member, but nothing
+  produced it and `pending_keys` blocked anything not `FILLED`.
+- **e2e section 20** walks an individual creator with no company from intent to
+  a frozen form: eight checks, including that an *unanswered* entity still
+  blocks and that the frozen form is not quietly complete.
+- **This closes D-038's loop.** Intake takes a budget range; the freeze stage is
+  where `investment_amount_rmb` is actually collected, and the walk confirms it.
+- Verified: `python -m pytest` (502 passed, 3 skipped), `python
+  scripts/e2e_check.py --base http://localhost:8000` on a fresh process **ALL
+  CHECKS PASSED**.
+
 ### A — the frontier was three stages further along than we thought
 
 - **Correction, and the reason it matters.** Planning the work after

@@ -1498,3 +1498,50 @@ passing by checking nothing. Five schemas are currently covered.
 which point the check should key off the configured backend rather than ban the
 construct outright.
 
+---
+
+## D-044
+
+**A field can be left blank on the record, and that is not the same as unanswered** · Area: A · Status: Accepted · 2026-08-28
+
+`applicant_entity` is required before a form freezes, because a 备案 is filed by
+a company holding the 广播电视节目制作经营许可证. An individual creator has no
+such company, and the licensed company that files on their behalf supplies its
+own details. So the field is one an individual creator is not merely unable to
+answer — it is one they should not answer.
+
+Before this the reachable outcomes were three, and all bad: invent a company
+name, which [the ground rules](../CLAUDE.md) forbid outright; leave the field
+pending, which holds the form shut forever; or abandon the filing.
+`confirm_form_field` even refuses an empty value with "leave it pending
+instead", which named the trap without offering a way out.
+
+**The fourth option.** `POST /v1/projects/{id}/form/fields/{key}/defer` records
+a fact with **no value** and `PENDING_INSTITUTION` status, against the creator
+who declared it. The field renders 待补充 exactly as an unanswered one does, and
+`deferred_keys` lists it on the frozen form, so the gap stays visible to
+everyone downstream.
+
+**Why this needed almost no new machinery.** `evaluate_gate_d3` already accepted
+`PENDING_INSTITUTION` alongside `CONFIRMED`, and `FieldStatus` already had the
+member. Nothing produced it and `pending_keys` blocked anything not `FILLED`,
+so the design's own answer was unreachable. This connects two halves that were
+already there.
+
+**What keeps it honest.** The value stays `None`, so nothing is invented. The
+hash covers field *status*, so a deferred field and a filled one produce
+different hashes and a frozen form cannot pass as complete. A confirmed value
+outranks a later deferral, so answering then deferring never discards the
+answer. The freeze event records `deferred` so the timeline says which kind of
+document was frozen. Nine tests in `tests/test_deferred_fields.py` pin these,
+including a parametrised one over `FactStatus` so a new member cannot fall
+through to a silent `PENDING`.
+
+**Scope.** Deferral is general rather than special-cased to `applicant_entity`,
+because the status means "the filing institution supplies this" and that is a
+true statement about more than one field. It is not a waiver: an institution
+reading the frozen form sees an explicit gap it is expected to fill.
+
+**Revisit when** the institution console ships, since that is where a deferred
+field should become a required input for the reviewer rather than a note.
+

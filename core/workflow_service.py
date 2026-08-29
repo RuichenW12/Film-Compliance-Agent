@@ -61,7 +61,7 @@ from .errors import (
     StateInvalidError,
     ValidationFailedError,
 )
-from .forms import build_fields, draft_hash, pending_keys
+from .forms import build_fields, deferred_keys, draft_hash, pending_keys
 from .gate import GateResult, evaluate_gate_d3, required_fact_keys
 from .institution import check_licence
 from .jobs import InlineRunner, JobOutcome, JobRunner, idempotency_key
@@ -646,6 +646,60 @@ class WorkflowService:
         )
         return self.form_draft(project_id)
 
+    def defer_form_field(
+        self, project_id: str, key: str, reason: str | None = None
+    ) -> FormDraft:
+        """The creator states this value comes from the institution, not them.
+
+        The commonest case is `applicant_entity`: an individual creator has no
+        广播电视节目制作经营许可证, so the licensed company that files the
+        project supplies its own details. Before this there was no way to say
+        that -- `confirm_form_field` refuses an empty value and tells you to
+        leave the field pending, and a pending field holds the form shut
+        forever. So the honest answer was unreachable and the only reachable
+        answers were inventing a company or abandoning the filing.
+
+        Deferring records a fact with no value and `PENDING_INSTITUTION`
+        status. Nothing is invented: the field still renders 待补充, still
+        hashes as unfilled, and `deferred_keys` lists it on the frozen form.
+        What changes is that the gate and the freeze stop treating a declared
+        gap as an unanswered one.
+        """
+
+        draft = self.form_draft(project_id)
+        if draft.frozen:
+            raise ConflictError(
+                "a frozen form cannot be edited", {"draft_id": draft.draft_id}
+            )
+        if key not in draft.fields:
+            raise NotFoundError(f"this form has no field named {key}", {"key": key})
+
+        existing = self._stores.facts.get_by_key(project_id, key)
+        if existing is not None and existing.status is FactStatus.CONFIRMED:
+            raise ValidationFailedError(
+                "this field already has a confirmed value; deferring would discard it",
+                {"key": key},
+            )
+
+        fact = Fact(
+            fact_id=new_id("fact"),
+            key=key,
+            value=None,
+            source_ref=SourceRef(
+                type=SourceRefType.USER_ANSWER, answer_id=new_id("fact")
+            ),
+            status=FactStatus.PENDING_INSTITUTION,
+            created_at=self._clock.now(),
+        )
+        self._stores.facts.add(project_id, fact)
+        self._record_event(
+            project_id,
+            Actor.CREATOR,
+            "form.field_deferred",
+            {"key": key, "reason": reason},
+        )
+        return self.form_draft(project_id)
+
     def freeze_form(self, project_id: str) -> FormDraft:
         """Freeze only from GATE_D3_PASSED, and only with no field left pending."""
 
@@ -680,7 +734,13 @@ class WorkflowService:
             project_id,
             Actor.CREATOR,
             "form.frozen",
-            {"draft_id": frozen.draft_id, "hash": frozen.hash},
+            {
+                "draft_id": frozen.draft_id,
+                "hash": frozen.hash,
+                # A frozen form with declared gaps is a different document from
+                # a complete one, and the timeline should say which it was.
+                "deferred": deferred_keys(frozen),
+            },
         )
         self._transition(
             project, ProjectState.FORM_FROZEN, Actor.CREATOR, "form.frozen"

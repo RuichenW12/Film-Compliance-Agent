@@ -197,6 +197,12 @@ class ConfirmFieldRequest(ApiModel):
     reason: str | None = None
 
 
+class DeferFieldRequest(ApiModel):
+    """A field the creator states the filing institution will supply."""
+
+    reason: str | None = None
+
+
 class GatePassResponse(ApiModel):
     state: ProjectState
     passed: bool
