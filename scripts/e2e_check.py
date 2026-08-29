@@ -29,6 +29,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+import time
 import urllib.error
 import urllib.request
 
@@ -117,8 +118,11 @@ VLOG_INTENT = {
 # code, and anyone reading the output would have concluded the product stops
 # at classification. A step belongs here only when openapi.json has no route
 # for it -- section 19 is what proves the rest.
-PENDING_STEPS = [
-    ("15-16. policy crawl, publish, stale + recalc fan-out", "T-B1..T-B3"),
+PENDING_STEPS: list[tuple[str, str]] = [
+    # Empty, and that is the news. Section 23 now walks the policy loop end to
+    # end, so nothing in contract section 7 is unimplemented. What remains is
+    # infrastructure rather than steps: the Firestore adapter, and the Veo
+    # teaser behind its flag.
 ]
 
 # A short script for the pre-check. Deliberately ordinary: this walks the
@@ -495,8 +499,11 @@ def main() -> int:
     walk_to_a_frozen_form(checker, pinned)
     walk_the_institution_queue(checker, pinned)
     walk_the_revision_loop(checker, pinned)
+    walk_the_policy_loop(checker, pinned)
 
     print("\n== not built yet (each line is the next task, not a bug) ==")
+    if not PENDING_STEPS:
+        print("  nothing: every step in contract section 7 is walked above.")
     for label, task in PENDING_STEPS:
         print(f"  [PENDING {task}] {label}")
 
@@ -1021,6 +1028,113 @@ def walk_the_revision_loop(checker: "Checker", pinned: str) -> None:
         "and sent again -- this used to answer 409 forever",
         status == 200 and body.get("state") == "INSTITUTION_REVIEW",
         json.dumps(body.get("state")),
+    )
+
+
+def walk_the_policy_loop(checker: "Checker", pinned: str) -> None:
+    """A rule change reaches the projects it affects.
+
+    Everything upstream of the fan-out already worked: crawl produced a
+    proposal, publishing produced a new snapshot, and `/healthz` reported it.
+    What did not happen was the part the loop exists for. The consumer was
+    written and wired to a fake repository holding no projects, so a project
+    pinned to the old version stayed pinned, unflagged, and its creator was
+    never told.
+    """
+
+    print()
+    print()
+    print("== 23. the policy loop reaches real projects ==")
+
+    # No budget answer, so the tier is provisional. A settled tier is never
+    # recalculated on purpose (D-031: a special-subject T1 must not be relaxed
+    # by a threshold it was not decided by), so a settled project would walk
+    # the stale path and skip the recalc this section exists to prove.
+    unsettled = dict(ROMANCE_INTENT)
+    unsettled["amount_bracket"] = "unknown"
+    project_id = checker.new_project(unsettled)
+    status, body, _ = checker.call("POST", f"/v1/projects/{project_id}/classify")
+    before = body.get("classification") or {}
+    checker.check(
+        "a project pinned to the current snapshot, tier still provisional",
+        status == 200
+        and before.get("policy_snapshot_version") == pinned
+        and before.get("tier_provisional") is True,
+        json.dumps(
+            {
+                "pinned": before.get("policy_snapshot_version"),
+                "provisional": before.get("tier_provisional"),
+            }
+        ),
+    )
+
+    status, run, _ = checker.call(
+        "POST", "/v1/admin/policy/crawl", {"source_id": "nrta_micro_drama"},
+        headers=ADMIN,
+    )
+    checker.check("a crawl starts", status == 202 and bool(run.get("run_id")))
+
+    proposal_id = ""
+    for _ in range(12):
+        time.sleep(1.0)
+        _, proposals, _ = checker.call(
+            "GET", "/v1/admin/policy/proposals", headers=ADMIN
+        )
+        pending = [p for p in proposals if p.get("status") == "pending"]
+        if pending:
+            proposal_id = pending[0]["proposal_id"]
+            break
+    checker.check(
+        "the crawl produces a proposal for a human", bool(proposal_id), proposal_id
+    )
+    if not proposal_id:
+        return
+
+    status, published, _ = checker.call(
+        "POST", f"/v1/admin/policy/proposals/{proposal_id}/publish", {},
+        headers=ADMIN,
+    )
+    new_version = published.get("snapshot_version")
+    checker.check(
+        "publishing produces a new snapshot",
+        status == 201 and new_version and new_version != pinned,
+        json.dumps(new_version),
+    )
+
+    status, health, _ = checker.call("GET", "/healthz")
+    checker.check(
+        "the product reads the new snapshot",
+        health.get("snapshot_version") == new_version,
+        json.dumps(health.get("snapshot_version")),
+    )
+
+    time.sleep(1.5)
+    _, timeline, _ = checker.call("GET", f"/v1/projects/{project_id}/timeline")
+    events = [row.get("event") for row in timeline]
+    checker.check(
+        "the affected project was marked stale",
+        "policy.stale" in events,
+        json.dumps(events[-4:]),
+    )
+
+    _, inbox, _ = checker.call("GET", "/v1/notifications")
+    checker.check(
+        "and its creator was told",
+        any(row.get("kind") == "policy_stale" for row in inbox),
+        json.dumps([row.get("kind") for row in inbox]),
+    )
+
+    _, project, _ = checker.call("GET", f"/v1/projects/{project_id}")
+    after = (project.get("project") or {}).get("classification") or {}
+    checker.check(
+        "a provisional tier was recalculated against the new snapshot",
+        after.get("policy_snapshot_version") == new_version,
+        json.dumps(
+            {
+                "was": before.get("policy_snapshot_version"),
+                "now": after.get("policy_snapshot_version"),
+            }
+        ),
     )
 
 if __name__ == "__main__":

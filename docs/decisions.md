@@ -1704,3 +1704,77 @@ the sent form stays locked. It now says a fresh copy is started.
 **Revisit when** a reviewer needs to compare a resubmission against what they
 first saw. The lineage is recorded, and nothing reads it yet.
 
+---
+
+## D-049
+
+**The policy loop published to nobody** · Area: Shared · Status: Accepted · 2026-08-28
+
+Driving workstream B by hand, every part worked: a crawl produced a proposal, a
+human published it, the snapshot became `v3`, and `/healthz` reported the new
+version. Then a project pinned to `v2` stayed pinned, was never flagged, and its
+creator was never told. The loop ran to completion and reached nothing.
+
+`PolicyUpdatedConsumer` was fully written the whole time — idempotency
+receipts, impact filtering, the recalc rules. It was wired to
+`InMemoryProjectRepository`, a fake holding no projects, and `FakeRecalcClient`.
+Every test passed because every test used those fakes. This is the same shape as
+[D-042](#d-042): a component that looks finished because nothing ever asked it
+to touch reality.
+
+**What was added.** `workers/policy/adapters/live_projects.py`:
+`LiveProjectRepository` projects the product's real `Project` rows into the
+`ProjectPolicyState` the consumer expects, and `LiveRecalcClient` calls
+`recalc_tier`. `ConsumerEventPublisher` delivers in-process what Pub/Sub would
+deliver over the wire.
+
+**The boundary is respected in ownership, not in transport.** `CLAUDE.md` says B
+reaches the product only through `/v1/internal/*`. These adapters call exactly
+the two `WorkflowService` methods those routes call — `mark_policy_stale` and
+`recalc_tier` — and live under `workers/policy/`, so B still owns its side and
+no product code changed. Making a process issue HTTP requests to itself would
+satisfy the letter of the rule and nothing else.
+
+**Writes go through the service, never the projection.** The repository is
+read-only in the direction that matters, so staleness and recalculation produce
+the state transition, the timeline entry, the audit line and the creator's
+notification exactly as a hand-called internal route does.
+
+**Dispatch and delivery stay separate.** `OutboxDispatcher.dispatch` marks a row
+sent; `drain` hands it to the consumer. "Sent" and "handled" are different facts
+and the outbox records only the first, so collapsing them would lose the
+distinction that makes redelivery reasonable.
+
+**One thing that is honest rather than right.** Receipts live in memory. After a
+restart an event could be handled twice; the consumer's own guards make that
+harmless in effect — `mark_policy_stale` is idempotent on `already_stale` and
+recalc no-ops when the version already matches — so the cost is a duplicate
+timeline line, not a duplicate notice. A deployed version persists them.
+
+**A caller's own state is not overridden.** The first version of this wiring
+replaced the dispatcher unconditionally and broke a test that had deliberately
+pointed one at a failing publisher. Live wiring now happens only on the default
+path.
+
+## D-050
+
+**A subject-rule change had no way to reach anyone** · Area: Shared · Status: Accepted · 2026-08-28
+
+`ImpactNode` carried `D1c` and `C1-a`. The subject match — D1b, the stage that
+decides whether a project is a special subject — had no node at all, so a
+snapshot could change the trigger vocabulary, publish, and mark nobody stale.
+This was recorded as an open gap well before today and is the last one the loop
+could not express.
+
+**Marking stale is the whole of the fix, and that is deliberate.** A D1b change
+flags every classified project and tells its creator. It does **not**
+recalculate. `recalc_tier` re-runs the amount stage only, so pointing it at a
+subject question would answer with money — and re-deciding a subject match
+needs the full chain, the verbatim-quote guard, and a human reading the result.
+An automatic answer here would be a compliance conclusion asserted without the
+evidence path that justifies it.
+
+**Revisit when** there is a re-classification entry point that runs D1a→D1b→D1c
+under human review. Until then the honest output is "your classification rests
+on rules that have moved", which is exactly what a stale flag says.
+

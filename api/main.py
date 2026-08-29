@@ -16,7 +16,16 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
+from dataclasses import replace
+
 from api.deps.policy import PolicyApiState, build_local_policy_api_state
+from workers.policy.adapters.live_projects import (
+    ConsumerEventPublisher,
+    LiveProjectRepository,
+    LiveRecalcClient,
+)
+from workers.policy.consumer import PolicyUpdatedConsumer
+from workers.policy.outbox import OutboxDispatcher
 from api.errors import install_policy_error_handler
 from api.routers.admin_policy import router as admin_policy_router
 from core.errors import AppError
@@ -50,7 +59,9 @@ def create_app(
 ) -> FastAPI:
     settings = Settings.from_env()
 
-    def install_policy_state(app: FastAPI, resolved: PolicyApiState) -> None:
+    def install_policy_state(
+        app: FastAPI, resolved: PolicyApiState, *, wire_fan_out: bool
+    ) -> None:
         app.state.policy = resolved
         if context is None:
             app.state.context = build_context(
@@ -58,10 +69,37 @@ def create_app(
                 snapshots=RepositorySnapshotService(resolved.repository),
             )
 
+        # Point the policy loop at the product's real projects.
+        #
+        # The consumer was always written -- idempotency receipts, impact
+        # filtering, recalc -- and was wired to a fake repository holding no
+        # projects. So a publish produced a new snapshot and told nobody: a
+        # project pinned to the old version stayed pinned, unflagged, and its
+        # creator never heard. This is the wire that was missing. See D-049.
+        # Only on the default path. A caller who hands in a `policy_state`
+        # has configured its dispatcher deliberately -- a test pointing it at a
+        # failing publisher, say -- and replacing that would quietly defeat the
+        # thing they set up.
+        product = getattr(app.state, "context", None)
+        if wire_fan_out and product is not None:
+            repository = LiveProjectRepository(
+                product.stores.projects, product.workflow
+            )
+            delivery = ConsumerEventPublisher(
+                PolicyUpdatedConsumer(repository, LiveRecalcClient(product.workflow))
+            )
+            app.state.policy = replace(
+                resolved,
+                dispatcher=OutboxDispatcher(
+                    resolved.repository, delivery, clock=resolved.clock
+                ),
+                delivery=delivery,
+            )
+
     @asynccontextmanager
     async def lifespan(app: FastAPI):
         if policy_state is not None:
-            install_policy_state(app, policy_state)
+            install_policy_state(app, policy_state, wire_fan_out=False)
             yield
             return
         with TemporaryDirectory(prefix="film-compliance-policy-") as temp_dir:
@@ -69,7 +107,7 @@ def create_app(
                 Path(temp_dir) / "blobs",
                 seed_path=settings.snapshot_path,
             )
-            install_policy_state(app, resolved)
+            install_policy_state(app, resolved, wire_fan_out=True)
             yield
 
     app = FastAPI(

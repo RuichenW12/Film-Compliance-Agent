@@ -159,7 +159,7 @@ def get_proposal(
     status_code=201,
     response_model=PublishResponse,
 )
-def publish_proposal(
+async def publish_proposal(
     proposal_id: str,
     state: Annotated[PolicyApiState, Depends(get_policy_state)],
 ) -> PublishResponse:
@@ -177,6 +177,19 @@ def publish_proposal(
         _LOGGER.exception(
             "best-effort policy outbox dispatch failed after publish"
         )
+    # Dispatching marks the outbox row sent; delivering is what reaches the
+    # projects. Kept separate because "sent" and "handled" are different facts
+    # and only the first is recorded in the outbox. Best-effort like the
+    # dispatch above: a publication that succeeded must not be reported as
+    # failed because the fan-out stumbled, and the snapshot is durable either
+    # way -- but the failure is logged rather than swallowed silently.
+    if state.delivery is not None:
+        try:
+            await state.delivery.drain()
+        except Exception:
+            _LOGGER.exception(
+                "policy fan-out failed after publishing %s", result.snapshot_version
+            )
     return PublishResponse(snapshot_version=result.snapshot_version)
 
 

@@ -107,6 +107,17 @@ class PolicyUpdatedConsumer:
     def _is_affected(
         project: ProjectPolicyState, event: PolicyUpdatedEvent
     ) -> bool:
+        # A subject-rule change reaches every classified project: the match
+        # was decided against a vocabulary that has now moved. It is marked
+        # stale and the creator is told, and deliberately *not* recalculated --
+        # `recalc_tier` re-runs the amount stage only, so using it here would
+        # answer a subject question with a money answer. Re-deciding a subject
+        # needs the full chain and a human looking at it.
+        d1b = (
+            ImpactNode.D1B in event.impact
+            and ImpactNode.D1B in project.impact_nodes
+            and project.has_classification
+        )
         d1c = (
             ImpactNode.D1C in event.impact
             and ImpactNode.D1C in project.impact_nodes
@@ -117,7 +128,7 @@ class PolicyUpdatedConsumer:
             and ImpactNode.C1A in project.impact_nodes
             and project.has_review
         )
-        return d1c or c1a
+        return d1b or d1c or c1a
 
     def _upsert_effect(
         self,

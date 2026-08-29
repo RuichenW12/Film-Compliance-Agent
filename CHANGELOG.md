@@ -22,6 +22,36 @@ Conventions:
 
 ## 2026-08-28
 
+### Shared — the policy loop reaches real projects
+
+- **A publish now flags the projects it affects.** Crawl, propose and publish
+  all worked already; the fan-out ran against a fake project store, so a
+  snapshot could be published and no creator was ever told. New
+  `workers/policy/adapters/live_projects.py` points the consumer at the
+  product's real projects. See [D-049](docs/decisions.md#d-049).
+- **The boundary holds in ownership, not transport.** The adapters call exactly
+  the two `WorkflowService` methods `/v1/internal/*` calls, live under
+  `workers/policy/`, and change no product code. Writes go through the service,
+  so a stale flag produces its transition, timeline entry, audit line and
+  notification just as the hand-called route does.
+- **New `D1b` impact node**, closing the last gap the loop could not express: a
+  change to the subject-trigger vocabulary now marks affected projects stale.
+  **It deliberately does not recalculate** — `recalc_tier` redoes the amount
+  stage, and answering a subject question with money would assert a conclusion
+  the evidence does not support. See [D-050](docs/decisions.md#d-050).
+- **`PENDING_STEPS` is now empty.** Every step in contract section 7 is walked
+  by the e2e. What remains is infrastructure, not steps: the Firestore adapter
+  and the Veo teaser behind its flag.
+- **Two of my own assertions were wrong and were fixed, not worked around.** The
+  first wiring overrode a dispatcher a test had deliberately pointed at a
+  failing publisher; live wiring now only happens on the default path. And the
+  first version of the new e2e section used a settled-tier fixture and then
+  demanded a recalculation — which D-031 forbids on purpose.
+- Verified: `python -m pytest` (569 passed, 3 skipped) including 5 new D1b
+  tests; `python scripts/e2e_check.py --base http://localhost:8000` **ALL CHECKS
+  PASSED** with a new section 23 walking crawl → proposal → publish → stale →
+  notified → recalculated, the project moving `v2` → `v3`.
+
 ### A — the creator can send the form, and a returned one can come back
 
 - **The submit card moved from `/institution` to `/collection`**, beneath the
