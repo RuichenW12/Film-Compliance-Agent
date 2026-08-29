@@ -224,9 +224,16 @@ export default function InstitutionPage() {
             <section className="card">
               <h2>{t("institution.review")}</h2>
               <p>
-                <span className="chip">{review.decision}</span>
+                <span className="chip">{t(`decision.${review.decision}`)}</span>
                 {review.institution_id ? (
-                  <span className="muted"> · {review.institution_id}</span>
+                  <span className="muted">
+                    {" · "}
+                    {/* The company's name, not its id. The registry is right
+                        here, so there is no reason to show the key instead. */}
+                    {institutions.find(
+                      (entry) => entry.institution_id === review.institution_id
+                    )?.name ?? review.institution_id}
+                  </span>
                 ) : null}
               </p>
               <LicenceVerdict review={review} />

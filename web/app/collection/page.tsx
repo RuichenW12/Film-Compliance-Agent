@@ -68,6 +68,16 @@ function Flags({ flags }: { flags: string[] }) {
   );
 }
 
+/** Name a fact by the label the form uses, or fall back to its own key.
+ *
+ *  Falling back is deliberate: a fact key with no label is a gap in the copy,
+ *  and showing the key makes that visible rather than rendering an empty
+ *  strong tag that looks like a rendering bug. */
+function readableKey(key: string): string {
+  const named = t(`field.${key}`);
+  return named === `field.${key}` ? key : named;
+}
+
 export default function CollectionPage() {
   const [projectId, setProjectId] = useState("");
   const [loaded, setLoaded] = useState(false);
@@ -238,7 +248,7 @@ export default function CollectionPage() {
                 <select value={kind} onChange={(event) => setKind(event.target.value)}>
                   {KINDS.map((option) => (
                     <option key={option} value={option}>
-                      {option}
+                      {t(`asset_kind.${option}`)}
                     </option>
                   ))}
                 </select>
@@ -332,8 +342,12 @@ export default function CollectionPage() {
               <ul>
                 {facts.map((fact) => (
                   <li key={fact.fact_id}>
-                    <strong>{fact.key}</strong>: {String(fact.value ?? t("field.pending"))}{" "}
-                    <span className="chip">{fact.status}</span>
+                    {/* A fact key and a status are storage vocabulary. The
+                        form already names most of these fields; the rest are
+                        named alongside them rather than shown raw. */}
+                    <strong>{readableKey(fact.key)}</strong>:{" "}
+                    {String(fact.value ?? t("field.pending"))}{" "}
+                    <span className="chip">{t(`fact_status.${fact.status}`)}</span>
                     {fact.source_ref.locator ? (
                       <div className="muted">
                         {t("collection.quoted")}: “{fact.source_ref.locator}”

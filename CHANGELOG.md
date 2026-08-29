@@ -22,6 +22,29 @@ Conventions:
 
 ## 2026-08-29
 
+### A — a raw-identifier sweep across every screen
+
+Walked each page in the browser with a regex for snake_case identifiers, bare
+class codes and record ids, and fixed what it found:
+
+- **The Facts card** listed `episode_count`, `investment_amount_rmb`,
+  `applicant_entity` and a `pending_institution` status. Facts are now named by
+  the same labels the filing form uses, and the status reads "the filing company
+  supplies this".
+- **The upload dropdown** offered `final_film`, `subtitle_sheet` and
+  `supporting_document` as choices.
+- **The reviewer's screen** showed `inst_demo` beside a decision, with the
+  registry holding that company's name two cards above it — and rendered the
+  decision itself as `pending`.
+- Collection, wizard, institution and dashboard now return nothing to that
+  regex. The one identifier deliberately left is the project reference on the
+  result card, which exists so a creator can quote it when reporting a problem.
+
+This is the fourth time this defect has appeared on a new surface (D-040 on the
+result card, then material cards, then gate gaps, now these), so the fixes keep
+the same shape: the key is a lookup, and a missing label falls back to the key
+so the gap stays visible rather than rendering blank.
+
 ### A — a crash waiting on a rare path, and more dead copy
 
 - **`_write_alert_finding` read `intent_profile.logline`, a field that no longer
