@@ -77,6 +77,13 @@ export default function CollectionPage() {
   const [facts, setFacts] = useState<FactRecord[]>([]);
   const [findings, setFindings] = useState<Finding[]>([]);
   const [roadmap, setRoadmap] = useState<RoadmapView | null>(null);
+  /* Which material card is asking for a waive reason, and what has been
+     typed. This replaces a window.prompt: a native dialog blocks the page,
+     does not appear in a shared browser tab, and silently returns null once
+     Chrome offers "prevent additional dialogs" -- which turns Waive into a
+     button that does nothing without saying so. */
+  const [waiving, setWaiving] = useState<string | null>(null);
+  const [waiveReason, setWaiveReason] = useState("");
   const [form, setForm] = useState<FormDraft | null>(null);
   const [gate, setGate] = useState<GateResult | null>(null);
   const [extraction, setExtraction] = useState<ExtractResult | null>(null);
@@ -384,20 +391,62 @@ export default function CollectionPage() {
                         type="button"
                         className="secondary-button"
                         disabled={busy !== null}
-                        onClick={() =>
-                          guard("waive", async () => {
-                            const reason = window.prompt(t("collection.waive_reason"));
-                            if (!reason) {
-                              return;
-                            }
-                            await waiveMaterial(projectId, card.material_id, reason);
-                            await refresh(projectId);
-                          })
-                        }
+                        onClick={() => {
+                          setWaiving(
+                            waiving === card.material_id ? null : card.material_id
+                          );
+                          setWaiveReason("");
+                        }}
                       >
                         {t("collection.waive")}
                       </button>
                       </div>
+                      {waiving === card.material_id ? (
+                        <div className="waive-box">
+                          <label>
+                            <span>{t("collection.waive_reason")}</span>
+                            <input
+                              autoFocus
+                              value={waiveReason}
+                              placeholder={t("collection.waive_reason_placeholder")}
+                              onChange={(event) =>
+                                setWaiveReason(event.target.value)
+                              }
+                              onKeyDown={(event) => {
+                                if (event.key === "Escape") setWaiving(null);
+                              }}
+                              size={40}
+                            />
+                          </label>
+                          <button
+                            type="button"
+                            className="secondary-button"
+                            disabled={busy !== null || !waiveReason.trim()}
+                            onClick={() =>
+                              guard("waive", async () => {
+                                await waiveMaterial(
+                                  projectId,
+                                  card.material_id,
+                                  waiveReason.trim()
+                                );
+                                setWaiving(null);
+                                setWaiveReason("");
+                                await refresh(projectId);
+                              })
+                            }
+                          >
+                            {t("collection.waive_confirm")}
+                          </button>
+                          <button
+                            type="button"
+                            className="secondary-button"
+                            onClick={() => setWaiving(null)}
+                          >
+                            {t("collection.cancel")}
+                          </button>
+                          <p className="muted">{t("collection.waive_hint")}</p>
+                        </div>
+                      ) : null}
                     </li>
                   );
                 })}

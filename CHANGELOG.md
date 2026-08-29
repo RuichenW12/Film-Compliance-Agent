@@ -22,6 +22,29 @@ Conventions:
 
 ## 2026-08-28
 
+### A — the waive reason is asked in the page, not in a browser dialog
+
+- **`window.prompt` is gone from `app/collection/page.tsx`.** Waive now opens a
+  small box inside the card: a labelled input, *Waive it*, *Cancel*, and a line
+  saying the reason is recorded against the project.
+- **Correcting an overstatement in the previous entry.** That entry said the
+  prompt "will bite in a live demo". For a person clicking by hand it worked
+  — the cancel path was handled and no data was at risk. What it actually
+  cost was narrower and worth naming precisely: a native dialog is frequently
+  absent from a shared *browser tab*, so an audience sees a frozen page while
+  the presenter types into a box they cannot see; and once Chrome offers
+  "prevent this page from creating additional dialogs", `prompt` returns null
+  and Waive becomes a button that silently does nothing. It also blocks
+  automated browser checks, which is how it was found — it froze the tab twice
+  during the previous change.
+- **Confirm is disabled until a reason is typed**, so the silent no-op is not
+  reproduced in the replacement. Escape and *Cancel* both close the box.
+- Verified in Chrome on the case that previously froze the tab: the box opens
+  and the tab stays alive, the confirm button is disabled while the reason is
+  empty, waiving with a reason marks the card `waived` and drops it out of the
+  gate's gaps, and both Escape and Cancel close without waiving. Plus
+  `python -m pytest` (502 passed, 3 skipped) and `npx tsc --noEmit` clean.
+
 ### A — the filing form is on screen, and the journey reaches a lock
 
 - **New "The filing form" card on `/collection`.** Shows every field the 备案

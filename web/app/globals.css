@@ -759,3 +759,34 @@ main label span {
 .form-table button {
   margin-right: 0.375rem;
 }
+
+/* The waive reason, asked inline instead of through window.prompt. A native
+   dialog blocks the page, is often missing from a shared browser tab, and
+   returns null without a word once Chrome offers to suppress further dialogs. */
+.waive-box {
+  margin: 0.5rem 0 0.25rem;
+  padding: 0.625rem 0.75rem;
+  background: var(--soft-blue);
+  border: 1px solid var(--border);
+  border-radius: 0.375rem;
+}
+
+.waive-box label {
+  display: block;
+  margin-bottom: 0.5rem;
+}
+
+.waive-box label span {
+  display: block;
+  font-size: 0.875rem;
+  margin-bottom: 0.25rem;
+}
+
+.waive-box button {
+  margin-right: 0.375rem;
+}
+
+.waive-box p {
+  margin: 0.5rem 0 0;
+  font-size: 0.8125rem;
+}
