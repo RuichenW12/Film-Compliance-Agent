@@ -869,3 +869,22 @@ main label span {
   background: var(--soft-blue);
   font-weight: 500;
 }
+
+/* Where to look in the finished cut. A numbered list because it is walked in
+   order, one scene at a time. */
+.scene-list {
+  margin: 0.5rem 0;
+  padding-left: 1.5rem;
+  line-height: 1.7;
+}
+
+.scene-list li {
+  margin-bottom: 0.625rem;
+}
+
+.scene-quote {
+  margin-top: 0.25rem;
+  padding-left: 0.75rem;
+  border-left: 2px solid var(--border);
+  color: var(--muted);
+}

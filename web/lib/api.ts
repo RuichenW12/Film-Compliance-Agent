@@ -68,6 +68,10 @@ export interface ProjectResponse {
   project: Record<string, unknown> & {
     state?: string;
     policy_stale?: boolean;
+    /** What the creator said about how far along the work is. Read by the
+     *  collection page to decide whether a finished cut exists to check
+     *  findings against. */
+    intent_profile?: { production_stage?: string };
     classification: {
       tier?: string;
       tier_provisional?: boolean;
