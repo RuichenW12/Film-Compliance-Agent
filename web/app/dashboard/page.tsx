@@ -21,6 +21,28 @@ interface TimelineEvent {
   event: string;
 }
 
+/** Render a notification's parameters in the words the rest of the UI uses.
+ *
+ *  The API sends keys and parameters rather than prose, which is right -- it
+ *  keeps the message translatable and stops the backend writing English. But
+ *  the parameters are raw domain values, so "moved this project from
+ *  {previous_tier} to {tier}" rendered as "from T2 to T3" on the dashboard
+ *  while every other screen said "Class 2" and "Class 3". Mapping happens
+ *  here, at the one place that turns a notification into a sentence. */
+function readableParams(
+  params: Record<string, unknown>
+): Record<string, unknown> {
+  const readable: Record<string, unknown> = { ...params };
+  for (const key of ["tier", "previous_tier"]) {
+    const value = params[key];
+    if (typeof value === "string" && value) {
+      const named = t(`tier.${value}.name`);
+      if (named !== `tier.${value}.name`) readable[key] = named;
+    }
+  }
+  return readable;
+}
+
 export default function DashboardPage() {
   const [projectId, setProjectId] = useState("");
   const [project, setProject] = useState<ProjectResponse | null>(null);
@@ -133,7 +155,7 @@ export default function DashboardPage() {
                 <strong>{t(item.title_key)}</strong>
                 {item.read ? null : <span className="badge">new</span>}
                 <br />
-                {format(item.body_key, item.params)}
+                {format(item.body_key, readableParams(item.params))}
                 {item.read ? null : (
                   <>
                     {" "}

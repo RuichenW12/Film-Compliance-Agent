@@ -288,8 +288,6 @@
   "tier.T3.name": "Class 3 (三类)",
   "tier.undetermined.meaning": "We could not settle a class from what you gave us. The answers below say what is missing.",
   "tier.undetermined.name": "no class yet",
-  "wizard.budget_band": "大致预算（不知道确切数字时填）",
-  "wizard.budget_band.hint": "仅在上方投资额留空时使用。填了确切金额以金额为准，而且只有确切金额才能定档——大致区间一律标为暂定。",
   "wizard.channels.title": "计划发行渠道",
   "wizard.classify": "运行判定",
   "wizard.intent.title": "填写项目意向",

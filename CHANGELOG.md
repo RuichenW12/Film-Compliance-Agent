@@ -22,6 +22,32 @@ Conventions:
 
 ## 2026-08-29
 
+### A — a copy sweep for our vocabulary and one stale lie
+
+- **Deleted copy for a field that no longer exists.** `help.budget_band` and
+  `wizard.budget_band.hint` both told a creator to look at "the exact amount
+  above". That field was replaced in D-036 and moved off intake entirely in
+  D-038, so the help was describing a screen nobody sees.
+- **`help.investment_amount_rmb` was telling creators the wrong thing.** It said
+  "this is the field that decides your tier, and only an exact figure gives a
+  settled answer". Both halves stopped being true at D-038: the range decides
+  the class, and the figure is what the filing form asks for.
+- **Notifications spoke in internal terms.** "Snapshot v3 was published. Review
+  the project before the pre-shoot gate." now reads "A policy update was
+  published after this project was classified. Open it and work the answer out
+  again before you go further" — matching the card that offers to do it.
+- **Raw class codes reached the dashboard.** A recalculation notice renders
+  "moved this project from {previous_tier} to {tier}", and the parameters are
+  raw domain values, so it read "from T2 to T3" while every other screen said
+  "Class 2". The API still sends keys and parameters rather than prose, which is
+  right; the dashboard now maps the tier-shaped ones at the point it turns a
+  notification into a sentence.
+- **Also plainer:** "The pre-shoot gate is blocked" → "Some things are still
+  needed before the form can be locked"; the collection page no longer says
+  "C1-a" at a creator.
+- Verified: `python -m pytest` (583 passed, 3 skipped), `npx tsc --noEmit`
+  clean, and the dashboard read back in the browser.
+
 ### Shared — fixes found by looking at the running product
 
 - **The stale notice named the wrong snapshot.** The dashboard read "Snapshot
