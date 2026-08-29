@@ -508,3 +508,11 @@ export async function getInstitutionQueue(
     : "";
   return apiFetch<QueueRow[]>(`/v1/institution/queue${query}`);
 }
+
+/** Re-decide a project whose rules moved. Only valid while it is stale and
+ *  before its form has been locked and sent. */
+export async function reclassifyProject(
+  projectId: string
+): Promise<{ classification: { tier: string } | null; state: string }> {
+  return apiFetch(`/v1/projects/${projectId}/reclassify`, { method: "POST" });
+}

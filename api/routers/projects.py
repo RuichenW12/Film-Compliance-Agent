@@ -161,6 +161,31 @@ def classify_project(
     return _classify_response(request, project_id, project, outcome)
 
 
+@router.post("/{project_id}/reclassify", response_model=ClassifyResponse)
+def reclassify_project(
+    project_id: str,
+    request: Request,
+    principal: Principal = Depends(get_principal),
+    workflow: WorkflowService = Depends(get_workflow),
+) -> ClassifyResponse:
+    """Re-decide a project whose rules moved, at the creator's request.
+
+    Separate from `/classify` because it means something different. `/classify`
+    is the first answer; this one replaces an answer that policy has since
+    undermined, keeps everything else about the project, and clears the stale
+    flag. It refuses on a project that is not stale -- there would be nothing
+    to redo -- and on one whose form has been locked and sent, because its
+    class is part of what the filing company is holding.
+    """
+
+    principal.require(Role.CREATOR, Role.ADMIN)
+    project = workflow.get_project(project_id)
+    _assert_owner(principal, project.owner_uid)
+
+    project, outcome = workflow.reclassify(project_id)
+    return _classify_response(request, project_id, project, outcome)
+
+
 @router.post("/{project_id}/tier-choice", response_model=ClassifyResponse)
 def choose_tier(
     project_id: str,

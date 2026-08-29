@@ -234,6 +234,107 @@ class WorkflowService:
         project = self._persist_classification(project, outcome)
         return project, outcome
 
+    # States where re-deciding a classification is safe. Everything from
+    # FORM_FROZEN onward is missing on purpose: once a form has been locked and
+    # sent, its class is part of what the filing company is reviewing, and
+    # changing it under them would make the document they hold describe a
+    # different project. A stale project that far along goes round the revision
+    # loop instead, which is visible to both sides.
+    RECLASSIFIABLE_STATES = (
+        ProjectState.CLASSIFIED,
+        ProjectState.ROADMAP_CONFIRMED,
+        ProjectState.COLLECTING_MATERIALS,
+        ProjectState.REVIEW_RUNNING,
+        ProjectState.REVISION_LOOP,
+        ProjectState.GATE_D3_PASSED,
+        ProjectState.NEEDS_HUMAN_SUBJECT,
+        ProjectState.NEEDS_HUMAN_FORMTYPE,
+    )
+
+    def reclassify(self, project_id: str) -> tuple[Project, ClassificationOutcome]:
+        """Re-run the whole chain against the current snapshot, on request.
+
+        A policy change marks a project stale. For a threshold change the tier
+        is recalculated automatically, because `recalc_tier` can answer that
+        question from the amount alone. For a subject-rule change it is not
+        (D-050) -- re-deciding a subject match needs D1a, D1b and D1c together
+        and a human who asked for it. Which left a stale project with nowhere
+        to go: it was told its answer rested on rules that had moved, and had
+        no way to get a new answer.
+
+        This is that way. The creator asks, the full chain runs against the
+        pinned-now snapshot, and the flag clears.
+
+        Unlike `run_classification` this never moves the state. Re-deciding is
+        not starting over: a project halfway through collecting materials keeps
+        its materials, its roadmap and its uploads, and only its classification
+        is replaced.
+        """
+
+        project = self.get_project(project_id)
+        if not project.policy_stale:
+            raise StateInvalidError(
+                "this project is not marked stale, so there is nothing to redo",
+                {"state": project.state.value},
+            )
+        if project.state not in self.RECLASSIFIABLE_STATES:
+            raise StateInvalidError(
+                "a form that has been locked cannot be re-decided in place",
+                {"state": project.state.value},
+            )
+
+        before = project.classification
+        outcome = classify(
+            project.intent_profile,
+            project.channel_profile,
+            self._snapshots,
+            llm=self._llm,
+            thresholds_published=self._thresholds_published(),
+        )
+        if outcome.ask_back:
+            raise StateInvalidError(
+                "classification needs more intent answers",
+                {"missing": outcome.ask_back},
+            )
+        if outcome.classification is None:
+            raise StateInvalidError(
+                "the chain produced no classification to record",
+                {"state": project.state.value},
+            )
+
+        now = self._clock.now()
+        project = project.model_copy(
+            update={
+                "classification": outcome.classification.model_copy(
+                    update={"decided_at": now}
+                ),
+                "policy_stale": False,
+                "updated_at": now,
+            }
+        )
+        self._stores.projects.save(project)
+
+        for proposed in outcome.facts:
+            self._upsert_fact(
+                project_id, proposed.key, proposed.value, proposed.source_ref
+            )
+
+        # What changed, in the timeline, so a later reader can see that the
+        # answer moved and what moved it.
+        self._record_event(
+            project_id,
+            Actor.CREATOR,
+            "classification.rerun_after_policy_change",
+            {
+                "from_snapshot": before.policy_snapshot_version if before else None,
+                "to_snapshot": outcome.classification.policy_snapshot_version,
+                "from_tier": before.tier.value if before else None,
+                "to_tier": outcome.classification.tier.value,
+                "changed": bool(before) and before.tier is not outcome.classification.tier,
+            },
+        )
+        return project, outcome
+
     def choose_tier(self, project_id: str, amount_bracket: AmountBracket) -> tuple[Project, ClassificationOutcome]:
         """User picks a budget band -> D1c runs again on the same chain."""
 

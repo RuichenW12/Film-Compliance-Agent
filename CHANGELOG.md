@@ -20,6 +20,39 @@ Conventions:
 
 ---
 
+## 2026-08-29
+
+### A — a stale project can be worked out again
+
+- **New `POST /v1/projects/{id}/reclassify`**, and a card on `/collection` that
+  offers it: "The rules behind this answer have changed" → *Work it out again*.
+  See [D-051](docs/decisions.md#d-051).
+- **This was a real dead end.** Automatic recalculation covers a provisional
+  tier only. A settled tier is left alone on purpose (D-031) and a subject-rule
+  change is not auto-recalculated at all (D-050) — so those creators were told
+  their answer was out of date and given no way to get a new one.
+- **Three guards, each load-bearing:** it refuses when the project is not stale
+  (the flag is the evidence that a different answer is even likely); it refuses
+  once the form has been locked and sent (its class is part of what the filing
+  company is holding); and it never moves the state, so materials, roadmap and
+  uploads survive — re-deciding is not starting over.
+- **The dashboard badge stopped speaking our vocabulary:** "policy update
+  pending review" is now "rules changed — needs redoing".
+- **`e2e_check.py` section 23 is now re-runnable.** The demo policy source is
+  swapped from its v1 to its v2 fixture once at process start, so a second crawl
+  in the same server finds nothing changed. The section detects that and skips
+  itself with a reason rather than reporting a failure that says nothing about
+  the code.
+- **New `docs/QUESTIONS-FOR-MAXINE.md`** — four things I could not decide alone,
+  each with what I did in the meantime so nothing is blocked waiting on an
+  answer. Q-1 is why Firestore is still unwritten: no Java, no Docker, no
+  `gcloud` on this shell and no client library, so it could be written and never
+  once executed.
+- Verified: `python -m pytest` (578 passed, 3 skipped) including 9 new
+  reclassify tests; `python scripts/e2e_check.py --base http://localhost:8000`
+  on a fresh process **ALL CHECKS PASSED** with a new section 24 walking
+  settled → stale → re-decided → refused again.
+
 ## 2026-08-28
 
 ### Shared — the policy loop reaches real projects

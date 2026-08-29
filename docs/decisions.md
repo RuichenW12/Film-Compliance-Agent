@@ -1778,3 +1778,42 @@ evidence path that justifies it.
 under human review. Until then the honest output is "your classification rests
 on rules that have moved", which is exactly what a stale flag says.
 
+---
+
+## D-051
+
+**A stale project needed a way back** · Area: A · Status: Accepted · 2026-08-29 · Answers the revisit condition on [D-050](#d-050)
+
+A policy change marks a project stale and tells its creator. Two of the three
+cases then had somewhere to go and one did not. A provisional tier is
+recalculated automatically. A settled tier is deliberately left alone
+([D-031](#d-031)), and a subject-rule change is deliberately not
+auto-recalculated at all ([D-050](#d-050)) — both correct, and together they
+left a creator holding a notice that their answer rested on rules that had
+moved, with no way whatever to get a new one.
+
+`POST /v1/projects/{id}/reclassify` re-runs D1a→D1b→D1c against the current
+snapshot, at the creator's request, and clears the flag.
+
+**Why not reuse `/classify`.** `run_classification` transitions toward
+`CLASSIFIED`, so calling it on a project halfway through collecting materials
+would drag the state backwards. Re-deciding is not starting over: the materials,
+roadmap and uploads all stay, and only the classification is replaced. This
+method never moves the state.
+
+**Why it refuses on a locked form.** From `FORM_FROZEN` onward the class is part
+of what the filing company is reviewing. Changing it underneath them would make
+the locked document they hold describe a different project than the one it
+names. Such a project goes round the revision loop instead, which both sides can
+see.
+
+**Why the stale flag is the permission.** Re-deciding is refused when a project
+is not stale. Without that, "re-run it" becomes a button that silently rerolls a
+classification whenever someone is unhappy with it, and the flag is the only
+evidence that there is a real reason to expect a different answer.
+
+**Why the creator asks rather than the system deciding.** Recorded as Q-4 for
+Maxine. My reading: a classification that changes under someone without their
+asking is the silent movement the evidence rules exist to prevent. But an unread
+notification is also a way to be surprised, so it is her call.
+

@@ -33,6 +33,7 @@ import {
 } from "../../lib/api";
 import { FilingForm } from "../../components/filing-form";
 import { FilingSubmission } from "../../components/filing-submission";
+import { PolicyStaleNotice } from "../../components/policy-stale-notice";
 import { PolicyVerificationBanner } from "../../components/policy-verification-banner";
 import { latestAssetOfKind } from "../../lib/assets";
 import { t } from "../../lib/i18n";
@@ -94,6 +95,8 @@ export default function CollectionPage() {
   /* The project's own state drives what the send card offers: under review,
      returned with comments, accepted, or filed. */
   const [projectState, setProjectState] = useState<string | null>(null);
+  const [policyStale, setPolicyStale] = useState(false);
+  const [tier, setTier] = useState<string | null>(null);
 
   const [kind, setKind] = useState("script");
   const [file, setFile] = useState<File | null>(null);
@@ -130,6 +133,8 @@ export default function CollectionPage() {
       nextProject.project.classification?.policy_verification_status ?? null
     );
     setProjectState(nextProject.project.state ?? null);
+    setPolicyStale(nextProject.project.policy_stale ?? false);
+    setTier(nextProject.project.classification?.tier ?? null);
     setLoaded(true);
   }, []);
 
@@ -217,6 +222,14 @@ export default function CollectionPage() {
       {!loaded ? null : (
         <>
           <PolicyVerificationBanner status={verificationStatus} />
+          <PolicyStaleNotice
+            projectId={projectId}
+            stale={policyStale}
+            state={projectState}
+            currentTier={tier}
+            onChange={() => void refresh(projectId)}
+            onError={setError}
+          />
           <section className="card">
             <h2>{t("collection.upload")}</h2>
             <form onSubmit={upload}>

@@ -20,6 +20,11 @@ people out:
   entire point of the backend. Delete the database file first
   (`rm -rf var/`, or whatever `SQLITE_PATH` points at).
 
+Section 23 additionally needs a **fresh API process**, not just a fresh store:
+the demo policy source is swapped from its v1 to its v2 fixture once at
+startup, so a second crawl in the same server finds nothing changed. The
+section detects that and skips itself rather than failing.
+
 `--base` picks a different port when you want to leave a long-lived server
 alone.
 """
@@ -500,6 +505,7 @@ def main() -> int:
     walk_the_institution_queue(checker, pinned)
     walk_the_revision_loop(checker, pinned)
     walk_the_policy_loop(checker, pinned)
+    walk_the_stale_recovery(checker, pinned)
 
     print("\n== not built yet (each line is the next task, not a bug) ==")
     if not PENDING_STEPS:
@@ -1052,6 +1058,18 @@ def walk_the_policy_loop(checker: "Checker", pinned: str) -> None:
     # the stale path and skip the recalc this section exists to prove.
     unsettled = dict(ROMANCE_INTENT)
     unsettled["amount_bracket"] = "unknown"
+    # The demo source changes exactly once per process: the fixture is swapped
+    # from v1 to v2 at startup, so a second crawl in the same server finds no
+    # change and produces no proposal. That is the fixture being honest, not a
+    # failure, so say so and stop rather than asserting against it.
+    _, snapshots, _ = checker.call("GET", "/v1/admin/policy/snapshots", headers=ADMIN)
+    if len(snapshots) > 1:
+        print(
+            "  [SKIP] the demo source has already been consumed in this process; "
+            "restart the API to walk this section again"
+        )
+        return
+
     project_id = checker.new_project(unsettled)
     status, body, _ = checker.call("POST", f"/v1/projects/{project_id}/classify")
     before = body.get("classification") or {}
@@ -1135,6 +1153,79 @@ def walk_the_policy_loop(checker: "Checker", pinned: str) -> None:
                 "now": after.get("policy_snapshot_version"),
             }
         ),
+    )
+
+
+def walk_the_stale_recovery(checker: "Checker", pinned: str) -> None:
+    """A settled project that goes stale can still get a new answer.
+
+    Section 23 covers the automatic path: a provisional tier is recalculated
+    from the amount alone. A settled tier is deliberately left alone (D-031),
+    and a subject-rule change is deliberately not auto-recalculated at all
+    (D-050) -- so those projects were told their answer rested on rules that
+    had moved and had no way to get a new one.
+    """
+
+    print()
+    print()
+    print("== 24. a stale project can be re-decided ==")
+
+    settled = dict(ROMANCE_INTENT)
+    settled["amount_bracket"] = "below_lower"
+    project_id = checker.new_project(settled)
+    status, body, _ = checker.call("POST", f"/v1/projects/{project_id}/classify")
+    before = body.get("classification") or {}
+    checker.check(
+        "a project whose tier is settled, so nothing will auto-recalculate it",
+        status == 200 and before.get("tier_provisional") is False,
+        json.dumps({"provisional": before.get("tier_provisional")}),
+    )
+
+    status, _, _ = checker.call("POST", f"/v1/projects/{project_id}/reclassify")
+    checker.check(
+        "re-deciding is refused while there is nothing to redo",
+        status == 409,
+        json.dumps(status),
+    )
+
+    checker.call(
+        "POST",
+        f"/v1/internal/projects/{project_id}/policy-stale",
+        {"snapshot_version": pinned},
+        headers={"X-Internal-Token": checker.internal_token},
+    )
+    _, project, _ = checker.call("GET", f"/v1/projects/{project_id}")
+    checker.check(
+        "a policy change marks it stale",
+        (project.get("project") or {}).get("policy_stale") is True,
+    )
+
+    status, redone, _ = checker.call("POST", f"/v1/projects/{project_id}/reclassify")
+    checker.check(
+        "the creator can work it out again",
+        status == 200 and (redone.get("classification") or {}).get("tier"),
+        json.dumps((redone.get("classification") or {}).get("tier")),
+    )
+
+    _, project, _ = checker.call("GET", f"/v1/projects/{project_id}")
+    checker.check(
+        "and that clears the flag",
+        (project.get("project") or {}).get("policy_stale") is False,
+    )
+
+    _, timeline, _ = checker.call("GET", f"/v1/projects/{project_id}/timeline")
+    checker.check(
+        "the re-run is recorded with what changed",
+        any(
+            row.get("event") == "classification.rerun_after_policy_change"
+            for row in timeline
+        ),
+        json.dumps([row.get("event") for row in timeline][-2:]),
+    )
+
+    status, _, _ = checker.call("POST", f"/v1/projects/{project_id}/reclassify")
+    checker.check(
+        "and the door closes again", status == 409, json.dumps(status)
     )
 
 if __name__ == "__main__":

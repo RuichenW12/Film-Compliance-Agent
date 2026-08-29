@@ -92,7 +92,9 @@ export default function DashboardPage() {
                 {project.project.classification.tier_provisional ? " (provisional)" : ""}
               </span>
             ) : null}
-            {project.project.policy_stale ? <span className="badge">policy update pending review</span> : null}
+            {project.project.policy_stale ? (
+              <span className="badge">{t("dashboard.stale_badge")}</span>
+            ) : null}
           </p>
           <p>
             Open blocking findings: {project.counts.findings_open_block} · Materials pending:{" "}
