@@ -171,25 +171,23 @@ async def publish_proposal(
         )
     except PolicyPublishError as exc:
         raise _publish_error(exc) from exc
+    # Delivering marks the outbox row sent only after the consumer has handled
+    # it, so a failure here leaves the row PENDING and the next publish retries
+    # it. The older order -- dispatch, mark sent, then hand to the consumer --
+    # lost events outright: a row marked sent is never selected again.
+    #
+    # Best-effort either way: a publication that succeeded must not be reported
+    # as failed because the fan-out stumbled, and the snapshot is durable
+    # regardless. The failure is logged, not swallowed.
     try:
-        state.dispatcher.dispatch()
+        if state.delivery is not None:
+            await state.delivery.deliver()
+        else:
+            state.dispatcher.dispatch()
     except Exception:
         _LOGGER.exception(
-            "best-effort policy outbox dispatch failed after publish"
+            "policy fan-out failed after publishing %s", result.snapshot_version
         )
-    # Dispatching marks the outbox row sent; delivering is what reaches the
-    # projects. Kept separate because "sent" and "handled" are different facts
-    # and only the first is recorded in the outbox. Best-effort like the
-    # dispatch above: a publication that succeeded must not be reported as
-    # failed because the fan-out stumbled, and the snapshot is durable either
-    # way -- but the failure is logged rather than swallowed silently.
-    if state.delivery is not None:
-        try:
-            await state.delivery.drain()
-        except Exception:
-            _LOGGER.exception(
-                "policy fan-out failed after publishing %s", result.snapshot_version
-            )
     return PublishResponse(snapshot_version=result.snapshot_version)
 
 

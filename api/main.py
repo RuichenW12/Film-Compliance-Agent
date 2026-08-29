@@ -20,7 +20,7 @@ from dataclasses import replace
 
 from api.deps.policy import PolicyApiState, build_local_policy_api_state
 from workers.policy.adapters.live_projects import (
-    ConsumerEventPublisher,
+    InlineOutboxDelivery,
     LiveProjectRepository,
     LiveRecalcClient,
 )
@@ -85,16 +85,12 @@ def create_app(
             repository = LiveProjectRepository(
                 product.stores.projects, product.workflow
             )
-            delivery = ConsumerEventPublisher(
-                PolicyUpdatedConsumer(repository, LiveRecalcClient(product.workflow))
+            delivery = InlineOutboxDelivery(
+                resolved.repository,
+                PolicyUpdatedConsumer(repository, LiveRecalcClient(product.workflow)),
+                resolved.clock,
             )
-            app.state.policy = replace(
-                resolved,
-                dispatcher=OutboxDispatcher(
-                    resolved.repository, delivery, clock=resolved.clock
-                ),
-                delivery=delivery,
-            )
+            app.state.policy = replace(resolved, delivery=delivery)
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):

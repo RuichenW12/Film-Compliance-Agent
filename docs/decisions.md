@@ -1745,11 +1745,12 @@ sent; `drain` hands it to the consumer. "Sent" and "handled" are different facts
 and the outbox records only the first, so collapsing them would lose the
 distinction that makes redelivery reasonable.
 
-**One thing that is honest rather than right.** Receipts live in memory. After a
-restart an event could be handled twice; the consumer's own guards make that
-harmless in effect — `mark_policy_stale` is idempotent on `already_stale` and
-recalc no-ops when the version already matches — so the cost is a duplicate
-timeline line, not a duplicate notice. A deployed version persists them.
+**A paragraph here was wrong, and is corrected by [D-052](#d-052).** It said
+receipts living in memory risked handling an event *twice* after a restart. The
+real risk ran the other way: the original wiring marked the outbox row sent
+before the consumer had touched it, and a row marked sent is never selected
+again, so a crash in between lost the rule change outright. Losing one silently
+is far worse than applying one twice, and the ordering is now reversed.
 
 **A caller's own state is not overridden.** The first version of this wiring
 replaced the dispatcher unconditionally and broke a test that had deliberately
@@ -1816,4 +1817,37 @@ evidence that there is a real reason to expect a different answer.
 Maxine. My reading: a classification that changes under someone without their
 asking is the silent movement the evidence rules exist to prevent. But an unread
 notification is also a way to be surprised, so it is her call.
+
+---
+
+## D-052
+
+**Deliver first, acknowledge second** · Area: Shared · Status: Accepted · 2026-08-29 · Corrects [D-049](#d-049)
+
+The wiring in D-049 published each event to a queue, marked the outbox row sent,
+and handed it to the consumer afterwards. `list_pending_outbox` selects only
+`PENDING` rows, so once a row is marked sent it is never offered again. A
+process that died between the mark and the handoff left an outbox claiming the
+event was delivered and projects that were never flagged — with nothing left to
+notice or retry.
+
+D-049 described this risk as handling an event twice. That was backwards, and
+the direction matters: applying a rule change twice is absorbed by the
+consumer's own guards, while losing one means a creator is never told their
+classification rests on rules that have moved. Silence is the worse failure, and
+it is the one the code actually had.
+
+**`InlineOutboxDelivery` replaces `ConsumerEventPublisher`.** It hands the event
+to the consumer and marks the row sent only if that returns. A failure leaves it
+`PENDING` for the next publish to pick up, and the receipt guard makes the retry
+a no-op if it had in fact succeeded. At-least-once with an idempotent handler,
+rather than at-most-once with none.
+
+**The dispatcher is still used** on the path where a caller supplies their own
+`policy_state`, so a test that points one at a failing publisher keeps testing
+what it set up.
+
+**Revisit when** delivery stops being in-process. With real Pub/Sub the
+acknowledgement is the subscriber's, and this class is replaced rather than
+adapted — but the ordering it encodes is the same one that transport requires.
 

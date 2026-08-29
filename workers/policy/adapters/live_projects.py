@@ -178,34 +178,41 @@ class LiveRecalcClient:
         )
 
 
-class ConsumerEventPublisher:
-    """An `EventPublisher` that hands each event to the consumer in-process.
+class InlineOutboxDelivery:
+    """Deliver first, acknowledge second.
 
-    `OutboxDispatcher` publishes and marks the outbox row sent; something then
-    has to deliver. In deployment that is Pub/Sub calling a subscriber. Here
-    there is one process, so publishing appends to a pending list and `drain`
-    delivers -- keeping the two halves separate rather than having the
-    dispatcher call the consumer directly, because "sent" and "handled" are
-    genuinely different facts and the outbox already records only the first.
+    The first version of this wiring used `OutboxDispatcher` with a publisher
+    that queued events, then handed them to the consumer afterwards. That order
+    loses events. `list_pending_outbox` selects only `PENDING` rows, so once
+    `mark_outbox_sent` has run the row is never offered again -- and a process
+    that died between the two left an outbox saying "sent" and projects that
+    were never flagged, with nothing to notice or retry. (D-049 originally
+    described this the wrong way round, as a risk of handling an event twice.
+    It is the opposite, and losing a rule change silently is far worse than
+    applying one twice.)
 
-    Delivery failures are the caller's to see: `drain` does not swallow, so a
-    consumer that raises leaves its event unconsumed rather than silently lost.
+    So this delivers to the consumer and marks the row sent only if that
+    returns. A failure leaves it `PENDING` for the next attempt, and the
+    consumer's receipt guard makes the retry a no-op if it had in fact
+    succeeded. That is the right way round: at-least-once with an idempotent
+    handler, rather than at-most-once with none.
     """
 
-    def __init__(self, consumer) -> None:
+    def __init__(self, repository, consumer, clock) -> None:
+        self._repository = repository
         self._consumer = consumer
-        self.pending: list = []
-        self.published: list = []
+        self._clock = clock
+        self.delivered: list = []
 
-    def publish(self, event) -> str:
-        self.pending.append(event)
-        self.published.append(event)
-        return f"message-{event.snapshot_version}"
-
-    async def drain(self) -> list:
+    async def deliver(self, limit: int = 20) -> list:
         results = []
-        while self.pending:
-            event = self.pending[0]
-            results.append(await self._consumer.handle(event))
-            self.pending.pop(0)
+        for outbox_id, row in self._repository.list_pending_outbox(limit):
+            result = await self._consumer.handle(row.payload)
+            self._repository.mark_outbox_sent(
+                outbox_id,
+                self._clock(),
+                f"inline-{row.payload.snapshot_version}",
+            )
+            self.delivered.append(row.payload)
+            results.append(result)
         return results
