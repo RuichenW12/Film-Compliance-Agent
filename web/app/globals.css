@@ -825,3 +825,15 @@ main label span {
 .scroll-x {
   overflow-x: auto;
 }
+
+/* The reviewer's own words, when a filing company sends a project back.
+   Quoted rather than restated: a paraphrase of an instruction the creator has
+   to act on is a chance to get it subtly wrong. */
+.review-comments {
+  margin: 0.5rem 0;
+  padding: 0.625rem 0.875rem;
+  border-left: 3px solid var(--border);
+  background: var(--soft-blue);
+  border-radius: 0 0.25rem 0.25rem 0;
+  white-space: pre-wrap;
+}

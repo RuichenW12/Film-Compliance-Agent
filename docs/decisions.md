@@ -1642,3 +1642,65 @@ the option.
 point `institution_id` should come from the principal rather than a query
 parameter, and the unfiltered listing should stop being reachable at all.
 
+---
+
+## D-047
+
+**Submitting is the creator's act, so it lives on the creator's page** · Area: A · Status: Accepted · 2026-08-28
+
+The submit card sat on `/institution`. That was wrong twice over.
+`submit_to_institution` calls `_assert_owner`, so it is the creator's act by
+contract — it only worked from that page because the demo auth gives every
+role the same `user_id`. And it stranded the creator at the lock, with the next
+step of their own journey on a page belonging to someone else.
+
+It now sits on `/collection` beneath the form it sends, along with `resume`,
+which is the creator answering the reviewer rather than the reviewer acting
+again. The card shows what came back: under review, returned with the
+reviewer's comments **quoted verbatim**, accepted, or filed. A paraphrase of an
+instruction the creator has to act on is a chance to get it subtly wrong.
+
+**Chinese in a quoted comment is not a violation of [D-039](#d-039).** That
+decision governs the product's own copy, not text a human typed. The
+`test_result_copy` guard checks `locales/en.json` and nothing else, which is the
+right boundary.
+
+**The demo option moved with it.** The reviewer's picker had "an institution not
+in the registry (see what happens)", which is how the failing licence path is
+demonstrated. It now sits on the creator's picker, labelled as a demo entry
+rather than offered as a real choice.
+
+## D-048
+
+**A returned project could never be sent again** · Area: A · Status: Accepted · 2026-08-28 · Found while implementing [D-047](#d-047)
+
+Building the creator's send card surfaced a dead end. `form_draft` returns a
+frozen draft unchanged, and `freeze_form` early-returns one without
+transitioning. So a returned project could be resumed and its gate re-passed,
+and then: the state never reached `FORM_FROZEN` again, and every resubmission
+answered 409 forever. A creator could read the reviewer's comments and had no
+way whatever to act on them.
+
+Both short-circuits are individually right. `form_draft` must not rebuild a
+frozen form, and freezing twice in a row must be idempotent. What was missing
+was the transition between them.
+
+**The fix.** `resume_after_return` now starts a **successor draft** whose
+`parent_draft` is the frozen one — a field that has been on `FormDraft` since it
+was written and was never once set to a new value. The reviewed version is not
+reopened: it is the record of what was sent, and resuming must not rewrite
+history. The successor rebuilds from facts on the next read, so corrections
+appear and re-freezing produces a genuinely different hash.
+
+**A wrong assertion caught in passing.** The first version of the e2e check
+asserted that re-freezing yields a new hash. It does not, and should not, when
+nothing changed — that is what a content hash means. The check now corrects a
+field first, which is the only version of the assertion that says anything.
+
+**The copy was wrong too, and was fixed rather than kept.** "This reopens the
+form for editing" described behaviour the product does not have and should not:
+the sent form stays locked. It now says a fresh copy is started.
+
+**Revisit when** a reviewer needs to compare a resubmission against what they
+first saw. The lineage is recorded, and nothing reads it yet.
+

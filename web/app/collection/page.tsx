@@ -32,6 +32,7 @@ import {
   waiveMaterial
 } from "../../lib/api";
 import { FilingForm } from "../../components/filing-form";
+import { FilingSubmission } from "../../components/filing-submission";
 import { PolicyVerificationBanner } from "../../components/policy-verification-banner";
 import { latestAssetOfKind } from "../../lib/assets";
 import { t } from "../../lib/i18n";
@@ -90,6 +91,9 @@ export default function CollectionPage() {
   const [review, setReview] = useState<ReviewResult | null>(null);
   const [verificationStatus, setVerificationStatus] =
     useState<PolicyVerificationStatus | null>(null);
+  /* The project's own state drives what the send card offers: under review,
+     returned with comments, accepted, or filed. */
+  const [projectState, setProjectState] = useState<string | null>(null);
 
   const [kind, setKind] = useState("script");
   const [file, setFile] = useState<File | null>(null);
@@ -125,6 +129,7 @@ export default function CollectionPage() {
     setVerificationStatus(
       nextProject.project.classification?.policy_verification_status ?? null
     );
+    setProjectState(nextProject.project.state ?? null);
     setLoaded(true);
   }, []);
 
@@ -571,6 +576,13 @@ export default function CollectionPage() {
               setForm(nextForm);
               setGate(nextGate);
             }}
+            onError={setError}
+          />
+          <FilingSubmission
+            projectId={projectId}
+            frozen={form?.frozen ?? false}
+            state={projectState}
+            onChange={() => void refresh(projectId)}
             onError={setError}
           />
         </>

@@ -494,6 +494,7 @@ def main() -> int:
     walk_post_classification(checker, pinned)
     walk_to_a_frozen_form(checker, pinned)
     walk_the_institution_queue(checker, pinned)
+    walk_the_revision_loop(checker, pinned)
 
     print("\n== not built yet (each line is the next task, not a bug) ==")
     for label, task in PENDING_STEPS:
@@ -918,6 +919,108 @@ def walk_the_institution_queue(checker: "Checker", pinned: str) -> None:
     checker.check(
         "a filed project leaves the queue",
         all(row.get("project_id") != project_id for row in queue),
+    )
+
+
+def walk_the_revision_loop(checker: "Checker", pinned: str) -> None:
+    """A returned project can be corrected and sent again.
+
+    This was a dead end. `form_draft` returns a frozen draft unchanged and
+    `freeze_form` early-returns one, so a returned project could be resumed and
+    its gate re-passed but never re-frozen -- the state never reached
+    FORM_FROZEN again and every resubmission answered 409. The creator could
+    read the reviewer's comments and had no way to act on them.
+    """
+
+    print()
+    print()
+    print("== 22. the revision loop closes ==")
+
+    project_id = frozen_project(checker)
+    if not project_id:
+        checker.check("a frozen project to send", False, "freeze did not happen")
+        return
+
+    checker.call(
+        "PUT",
+        "/v1/admin/institutions",
+        [
+            {
+                "institution_id": "inst_loop",
+                "name": "待补充",
+                "license_no": "待补充",
+                "valid_until": "2027-12-31",
+                "registered_capital_rmb": 5000000,
+                "has_foreign": False,
+            }
+        ],
+        headers=ADMIN,
+    )
+
+    _, first, _ = checker.call("GET", f"/v1/projects/{project_id}/form")
+    first_hash = first.get("hash")
+
+    checker.call(
+        "POST",
+        f"/v1/projects/{project_id}/institution/submit",
+        {"institution_id": "inst_loop"},
+    )
+    status, _, _ = checker.call(
+        "POST",
+        f"/v1/projects/{project_id}/institution/decide",
+        {"decision": "return", "return_comments": "请补充授权文件。"},
+        headers=INSTITUTION,
+    )
+    checker.check("the institution returns it with comments", status == 200)
+
+    status, body, _ = checker.call(
+        "POST", f"/v1/projects/{project_id}/institution/resume"
+    )
+    checker.check(
+        "the creator takes it back into revision",
+        status == 200 and body.get("state") == "REVISION_LOOP",
+        json.dumps(body.get("state")),
+    )
+
+    _, draft, _ = checker.call("GET", f"/v1/projects/{project_id}/form")
+    checker.check(
+        "a successor draft is editable again",
+        draft.get("frozen") is False,
+        json.dumps({"frozen": draft.get("frozen")}),
+    )
+    checker.check(
+        "the reviewed version is kept as its parent, not overwritten",
+        bool(draft.get("parent_draft")),
+        json.dumps(draft.get("parent_draft")),
+    )
+
+    # Actually act on the comment before re-locking. Re-freezing an unchanged
+    # form yields the same hash, which is what a content hash is for -- so the
+    # assertion has to follow a real change to mean anything.
+    checker.call(
+        "POST",
+        f"/v1/projects/{project_id}/form/fields/title/confirm",
+        {"value": "夏日便利店（修订）"},
+    )
+    checker.call("POST", f"/v1/projects/{project_id}/gate/pass")
+    status, refrozen, _ = checker.call("POST", f"/v1/projects/{project_id}/form/freeze")
+    checker.check(
+        "a corrected form locks again with a different hash",
+        status == 200
+        and refrozen.get("frozen") is True
+        and refrozen.get("hash") != first_hash,
+        json.dumps({"changed": refrozen.get("hash") != first_hash}),
+    )
+
+    status, body, _ = checker.call(
+        "POST",
+        f"/v1/projects/{project_id}/institution/submit",
+        {"institution_id": "inst_loop"},
+    )
+    checker.check(
+        "and sent again -- this used to answer 409 forever",
+        status == 200 and body.get("state") == "INSTITUTION_REVIEW",
+        json.dumps(body.get("state")),
     )
 
 if __name__ == "__main__":

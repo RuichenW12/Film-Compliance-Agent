@@ -11,8 +11,7 @@ import {
   listInstitutions,
   loadInstitutions,
   readReview,
-  recordFiling,
-  submitToInstitution
+  recordFiling
 } from "../../lib/api";
 import { InstitutionQueue } from "../../components/institution-queue";
 import { getRole } from "../../lib/demoAuth";
@@ -76,7 +75,6 @@ export default function InstitutionPage() {
   const [queueVersion, setQueueVersion] = useState(0);
   const [role, setRole] = useState("creator");
   const [institutions, setInstitutions] = useState<Institution[]>([]);
-  const [chosen, setChosen] = useState("");
   const [review, setReview] = useState<InstitutionReview | null>(null);
   const [state, setState] = useState<string | null>(null);
   const [agreement, setAgreement] = useState("blob://demo-agreement");
@@ -93,7 +91,6 @@ export default function InstitutionPage() {
     try {
       const listed = await listInstitutions();
       setInstitutions(listed);
-      setChosen((current) => current || listed[0]?.institution_id || "");
     } catch {
       setInstitutions([]);
     }
@@ -217,38 +214,11 @@ export default function InstitutionPage() {
 
       {state ? (
         <>
-          <section className="card">
-            <h2>{t("institution.submit")}</h2>
-            <p className="muted">{t("institution.submit_note")}</p>
-            <label>
-              <span>{t("institution.choose")}</span>
-              <select value={chosen} onChange={(event) => setChosen(event.target.value)}>
-                <option value="">{t("institution.choose_placeholder")}</option>
-                {institutions.map((entry) => (
-                  <option key={entry.institution_id} value={entry.institution_id}>
-                    {entry.name}
-                  </option>
-                ))}
-                <option value="inst_not_in_registry">
-                  {t("institution.unknown_option")}
-                </option>
-              </select>
-            </label>
-            <button
-              type="button"
-              className="primary-button"
-              disabled={!chosen || busy !== null}
-              onClick={() =>
-                guard("submit", async () => {
-                  const result = await submitToInstitution(projectId, chosen);
-                  setReview(result.review);
-                  setState(result.state);
-                })
-              }
-            >
-              {t("institution.submit")}
-            </button>
-          </section>
+          {/* The submit card used to live here. It is the creator's act --
+              `submit_to_institution` calls `_assert_owner` -- and keeping it on
+              the reviewer's page stranded the creator at the lock with the next
+              step on someone else's screen. It now sits on `/collection`, next
+              to the form being sent. See D-047. */}
 
           {review ? (
             <section className="card">

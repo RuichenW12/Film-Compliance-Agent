@@ -22,6 +22,35 @@ Conventions:
 
 ## 2026-08-28
 
+### A — the creator can send the form, and a returned one can come back
+
+- **The submit card moved from `/institution` to `/collection`**, beneath the
+  form it sends. `submit_to_institution` calls `_assert_owner`, so it was always
+  the creator's act; it only worked on the reviewer's page because demo auth
+  gives every role the same `user_id`. `resume` moved with it. See
+  [D-047](docs/decisions.md#d-047).
+- **The reviewer's comments are quoted verbatim** rather than paraphrased. They
+  are usually Chinese, which is not a D-039 violation: that rule governs our own
+  copy, not text a human typed.
+- **Found and fixed a dead end.** A returned project could be resumed and its
+  gate re-passed but **never resubmitted** — `form_draft` returns a frozen draft
+  unchanged and `freeze_form` early-returns one, so the state never reached
+  `FORM_FROZEN` again and submit answered 409 forever. `resume_after_return` now
+  starts a successor draft with the frozen one as its `parent_draft`, a field
+  that had never been set since it was written. See
+  [D-048](docs/decisions.md#d-048).
+- **Corrected my own copy and my own test.** The resume hint promised the form
+  "reopens for editing", which is not what happens and should not be — the sent
+  form stays locked as the record. And the first e2e assertion demanded a new
+  hash after re-freezing an *unchanged* form, which a content hash must not
+  give; it now corrects a field first.
+- Verified: `python -m pytest` (564 passed, 3 skipped); `python
+  scripts/e2e_check.py --base http://localhost:8000` **ALL CHECKS PASSED** with
+  a new section 22 walking submit → returned → resume → correct → re-lock →
+  resend; and in Chrome: the send card appeared after locking, sending moved it
+  to "the filing company is reviewing it now", a return showed the reviewer's
+  words quoted, and "Take it back and fix it" reopened the loop.
+
 ### A — the reviewer can find work
 
 - **New `GET /v1/institution/queue`**, institution role only, listing what is

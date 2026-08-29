@@ -1043,11 +1043,45 @@ class WorkflowService:
                 {"state": project.state.value},
             )
         review = self._stores.institution_reviews.latest(project_id)
+
+        # Coming back around the loop starts a successor draft.
+        #
+        # Without this the revision loop was a dead end. `form_draft` returns a
+        # frozen draft unchanged, and `freeze_form` early-returns one too, so a
+        # returned project could be resumed and its gate re-passed but never
+        # re-frozen -- the state never reached FORM_FROZEN again and every
+        # resubmission answered 409. The creator could act on the reviewer's
+        # comments and had no way to send the result.
+        #
+        # The frozen draft is not reopened: it is the record of what was
+        # reviewed, and `parent_draft` is the field that was always meant to
+        # carry that lineage. The successor rebuilds from facts on the next
+        # read, so corrections show up and freezing produces a new hash.
+        frozen_draft = self._stores.forms.latest(project_id)
+        if frozen_draft is not None and frozen_draft.frozen:
+            self._stores.forms.put(
+                project_id,
+                FormDraft(
+                    draft_id=new_id("draft"),
+                    form_type=frozen_draft.form_type,
+                    snapshot_version=frozen_draft.snapshot_version,
+                    parent_draft=frozen_draft.draft_id,
+                    created_at=self._clock.now(),
+                ),
+            )
+
         self._record_event(
             project_id,
             Actor.CREATOR,
             "institution.return_acknowledged",
-            {"comments": review.return_comments if review else None},
+            {
+                "comments": review.return_comments if review else None,
+                "supersedes_draft": (
+                    frozen_draft.draft_id
+                    if frozen_draft is not None and frozen_draft.frozen
+                    else None
+                ),
+            },
         )
         return self._transition(
             project,
