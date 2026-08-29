@@ -22,6 +22,38 @@ Conventions:
 
 ## 2026-08-28
 
+### A — the filing form is on screen, and the journey reaches a lock
+
+- **New "The filing form" card on `/collection`.** Shows every field the 备案
+  asks for, what we have, and what is still missing — with a *Save* box per
+  unanswered field and an *I don't have one* button on the fields the filing
+  company supplies. Ends with *Lock the form*.
+- **The gate is stated, not discovered.** The gaps are listed in plain language
+  above the button, and the button is disabled until they clear, so a creator
+  reads why they cannot finish instead of pressing something and getting a 409.
+- **The lock is explained.** "Locking takes a fingerprint of the exact
+  contents, so the version reviewed later is provably the one you approved."
+  — the hash is a promise to the creator, not a database detail.
+- **My own no-Chinese guard caught me.** The first draft of this copy carried
+  待补充, 备案 and 广播电视节目制作经营许可证 in the English bundle;
+  `test_result_copy.py` failed and they are now English. The guard added in
+  D-039 paid for itself within a day.
+- **Fixed a raw key that reappeared on a second surface.** Gate gaps rendered
+  `material.mat_synopsis` because the gate returns `mat_synopsis` while the
+  bundle keys are `material.synopsis`. This is the D-040 defect showing up again
+  the moment another screen rendered the same data; `nameGapItem` now handles
+  both shapes.
+- Verified: `python -m pytest` (502 passed, 3 skipped), `npx tsc --noEmit`
+  clean, and a full Chrome walk — classify, hand off, declare no filing
+  company, answer title and amount, watch the gaps clear, lock the form, and
+  read back `Locked. Fingerprint 2cd1ff12133e…` with the filing company still
+  showing as to be supplied.
+
+**Known, not fixed:** `app/collection/page.tsx:389` waives a material through
+`window.prompt`, which blocks the page and froze the browser during this work.
+It is pre-existing and on a part of the page this change did not touch, so it is
+reported rather than rewritten — but it will bite in a live demo.
+
 ### A — an individual creator can reach a frozen form
 
 - **`applicant_entity` can be declared blank instead of invented.** A 备案 is

@@ -8,6 +8,8 @@ import {
   ExtractResult,
   FactRecord,
   Finding,
+  FormDraft,
+  GateResult,
   MaterialCard,
   PolicyVerificationStatus,
   RoadmapView,
@@ -15,6 +17,8 @@ import {
   attachMaterial,
   confirmRoadmap,
   extractFacts,
+  getForm,
+  getGate,
   getProject,
   getRoadmap,
   listAssets,
@@ -27,6 +31,7 @@ import {
   validateMaterial,
   waiveMaterial
 } from "../../lib/api";
+import { FilingForm } from "../../components/filing-form";
 import { PolicyVerificationBanner } from "../../components/policy-verification-banner";
 import { latestAssetOfKind } from "../../lib/assets";
 import { t } from "../../lib/i18n";
@@ -72,6 +77,8 @@ export default function CollectionPage() {
   const [facts, setFacts] = useState<FactRecord[]>([]);
   const [findings, setFindings] = useState<Finding[]>([]);
   const [roadmap, setRoadmap] = useState<RoadmapView | null>(null);
+  const [form, setForm] = useState<FormDraft | null>(null);
+  const [gate, setGate] = useState<GateResult | null>(null);
   const [extraction, setExtraction] = useState<ExtractResult | null>(null);
   const [review, setReview] = useState<ReviewResult | null>(null);
   const [verificationStatus, setVerificationStatus] =
@@ -87,7 +94,9 @@ export default function CollectionPage() {
       nextFacts,
       nextFindings,
       nextRoadmap,
-      nextProject
+      nextProject,
+      nextForm,
+      nextGate
     ] =
       await Promise.all([
         listAssets(id),
@@ -95,13 +104,17 @@ export default function CollectionPage() {
         listFacts(id),
         listFindings(id),
         getRoadmap(id),
-        getProject(id)
+        getProject(id),
+        getForm(id),
+        getGate(id)
       ]);
     setAssets(nextAssets);
     setMaterials(nextMaterials);
     setFacts(nextFacts);
     setFindings(nextFindings);
     setRoadmap(nextRoadmap);
+    setForm(nextForm);
+    setGate(nextGate);
     setVerificationStatus(
       nextProject.project.classification?.policy_verification_status ?? null
     );
@@ -501,6 +514,16 @@ export default function CollectionPage() {
           </section>
 
           <p className="disclaimer">{t("app.disclaimer")}</p>
+          <FilingForm
+            projectId={projectId}
+            form={form}
+            gate={gate}
+            onChange={(nextForm, nextGate) => {
+              setForm(nextForm);
+              setGate(nextGate);
+            }}
+            onError={setError}
+          />
         </>
       )}
     </section>
