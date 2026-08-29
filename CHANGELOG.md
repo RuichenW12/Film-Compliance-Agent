@@ -22,6 +22,27 @@ Conventions:
 
 ## 2026-08-29
 
+### Shared — fixes found by looking at the running product
+
+- **The stale notice named the wrong snapshot.** The dashboard read "Snapshot
+  v2 was published" at the moment v3 was published — the adapter passed the
+  project's *current* pinned version rather than the event's. A notice naming
+  the version the creator already had is news about nothing. The consumer now
+  passes `event.snapshot_version` through, and a test pins it.
+- **Policy events are delivered before they are acknowledged.** The wiring
+  marked the outbox row sent and handed the event to the consumer afterwards;
+  since only `PENDING` rows are ever selected, a crash in between lost the rule
+  change outright with nothing left to retry. `InlineOutboxDelivery` reverses
+  the order. [D-052](docs/decisions.md#d-052) also corrects D-049, which
+  described the risk backwards as double-handling.
+- **The whole policy loop is verified through the UI**, not just the API: as
+  Admin, *Run fixture crawl* → *Review proposal* → *Publish*, and a waiting
+  creator's project moved `v2` → `v3`, class `T3` → `T2`, with `policy.stale`
+  and `classification.recalculated` in its timeline and a notice in the inbox.
+- Verified: `python -m pytest` (583 passed, 3 skipped); `python
+  scripts/e2e_check.py --base http://localhost:8000` on a fresh process **ALL
+  CHECKS PASSED**.
+
 ### A — a stale project can be worked out again
 
 - **New `POST /v1/projects/{id}/reclassify`**, and a card on `/collection` that

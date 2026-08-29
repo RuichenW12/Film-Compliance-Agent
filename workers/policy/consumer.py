@@ -74,7 +74,12 @@ class PolicyUpdatedConsumer:
             if not self._is_affected(project, event):
                 continue
 
-            self._repository.mark_policy_stale(project.project_id)
+            # The event's version, not the project's. The notice is news
+            # about what was just published; naming the version the project is
+            # already pinned to tells the creator nothing.
+            self._repository.mark_policy_stale(
+                project.project_id, event.snapshot_version
+            )
             self._upsert_effect(event, project.project_id, "policy_stale")
             stale_marked += 1
 

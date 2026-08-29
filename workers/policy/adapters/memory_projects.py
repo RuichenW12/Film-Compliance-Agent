@@ -72,7 +72,16 @@ class InMemoryProjectRepository:
         project_ids = sorted(self._projects)[:limit]
         return [self.get_project(project_id) for project_id in project_ids]
 
-    def mark_policy_stale(self, project_id: str) -> None:
+    def mark_policy_stale(
+        self, project_id: str, snapshot_version: str | None = None
+    ) -> None:
+        """`snapshot_version` is the newly published one.
+
+        Unused here -- this fake only flips a flag -- but present so the fake
+        and the live adapter take the same call. The live one writes it into
+        the creator's notice, where naming the wrong version is a visible bug.
+        """
+
         project = self._projects[project_id]
         self._projects[project_id] = project.model_copy(
             update={"policy_stale": True}

@@ -136,3 +136,36 @@ async def test_redelivery_of_a_subject_change_is_idempotent(repository) -> None:
     assert first.stale_marked == 1
     assert second.already_processed is True
     assert second.stale_marked == 0
+
+
+@pytest.mark.asyncio
+async def test_the_notice_names_the_version_that_was_published(repository) -> None:
+    """Not the one the project is already pinned to.
+
+    The dashboard read "Snapshot v2 was published" at the moment v3 was,
+    because the adapter passed the project's current pinned version instead of
+    the event's. A notice that names the version the creator already had is
+    news about nothing.
+    """
+
+    seen: list[tuple[str, str | None]] = []
+
+    class RecordingRepository:
+        def __init__(self, inner):
+            self._inner = inner
+
+        def __getattr__(self, name):
+            return getattr(self._inner, name)
+
+        def mark_policy_stale(self, project_id, snapshot_version=None):
+            seen.append((project_id, snapshot_version))
+            self._inner.mark_policy_stale(project_id, snapshot_version)
+
+    recording = RecordingRepository(repository)
+    consumer = PolicyUpdatedConsumer(
+        recording, FakeRecalcClient(repository, new_tier="T2")
+    )
+
+    await consumer.handle(_event([ImpactNode.D1B]))
+
+    assert seen == [("proj_1", "v3")], "the event's version, not the project's v2"

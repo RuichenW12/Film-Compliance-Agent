@@ -124,14 +124,22 @@ class LiveProjectRepository:
                 return row
         raise KeyError(project_id)
 
-    def mark_policy_stale(self, project_id: str) -> None:
-        """Through the service, so the creator is notified and it is recorded."""
+    def mark_policy_stale(
+        self, project_id: str, snapshot_version: str | None = None
+    ) -> None:
+        """Through the service, so the creator is notified and it is recorded.
 
-        version = self._workflow.get_project(project_id).classification
-        self._workflow.mark_policy_stale(
-            project_id,
-            version.policy_snapshot_version if version else "",
-        )
+        `snapshot_version` is the version that was just published, and it ends
+        up in the creator's notice. An earlier version of this passed the
+        project's *current* pinned version instead, so the dashboard read
+        "Snapshot v2 was published" at the moment v3 was -- telling the creator
+        news about the version they already had.
+        """
+
+        if snapshot_version is None:
+            pinned = self._workflow.get_project(project_id).classification
+            snapshot_version = pinned.policy_snapshot_version if pinned else ""
+        self._workflow.mark_policy_stale(project_id, snapshot_version)
 
     def upsert_effect(self, effect: ProjectEffect) -> None:
         self.effects[effect.effect_id] = effect
