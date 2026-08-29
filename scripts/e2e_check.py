@@ -49,7 +49,6 @@ CRIME_INTENT = {
     "episode_count": 24,
     "episode_minutes": 3,
     "amount_bracket": "between",
-    "is_ai_generated": True,
     "production_stage": "script_ready",
 }
 
@@ -60,15 +59,15 @@ ROMANCE_INTENT = {
     "episode_count": 30,
     "episode_minutes": 2,
     "amount_bracket": "below_lower",
-    "is_ai_generated": False,
 }
 
 # The three fixtures above leave investment_amount_rmb unset, so each falls through
 # to D1c's band placeholder. These three supply a real amount, which is the path
-# that actually decides a tier once thresholds are published: live action
-# T1 >= 3,000,000 / T2 >= 1,000,000; AI T1 >= 800,000 / T2 >= 300,000.
+# that actually decides a tier once thresholds are published. The product
+# classifies AI micro-dramas only now, so there is one set: T1 >= 800,000,
+# T2 >= 300,000.
 
-# 一类 by amount alone - ordinary subject, over the live-action T1 line.
+# 一类 by amount alone - ordinary subject, over the one-class line.
 KEY_BY_AMOUNT_INTENT = {
     "form_type_claimed": "micro_drama",
     "genre_keywords": ["都市", "创业"],
@@ -77,33 +76,25 @@ KEY_BY_AMOUNT_INTENT = {
     "episode_minutes": 3,
     "amount_bracket": "at_or_above_upper",
     "investment_amount_rmb": 3200000,
-    "is_ai_generated": False,
 }
 
-# 二类 - ordinary subject, between the two live-action lines.
+# 二类 - ordinary subject, between the two lines.
 ORDINARY_BY_AMOUNT_INTENT = {
     "form_type_claimed": "micro_drama",
     "genre_keywords": ["家庭"],
     "synopsis": "三代人围绕一间老房子的搬迁做出各自的选择。",
     "episode_count": 24,
     "episode_minutes": 3,
+    # 500,000 sits between 300,000 and 800,000. It read 1,500,000 against the
+    # live-action figures, which on the AI set is one-class -- the fixture and
+    # its own bracket would have disagreed.
     "amount_bracket": "between",
-    "investment_amount_rmb": 1500000,
-    "is_ai_generated": False,
+    "investment_amount_rmb": 500000,
 }
 
-# AI micro-drama - the same money buys a different tier, because the AI set sits
-# lower. 900,000 is under the live-action T1 line but over the AI one.
-AI_KEY_INTENT = {
-    "form_type_claimed": "micro_drama",
-    "genre_keywords": ["科幻"],
-    "synopsis": "一名工程师在虚拟城市里寻找失踪同事的下落。",
-    "episode_count": 20,
-    "episode_minutes": 2,
-    "amount_bracket": "between",
-    "investment_amount_rmb": 900000,
-    "is_ai_generated": True,
-}
+# AI_KEY_INTENT lived here. Its entire purpose was that 900,000 fell on
+# different sides of the two threshold sets, which is not a distinction this
+# product draws any more.
 
 VLOG_INTENT = {
     "form_type_claimed": "single_video",
@@ -112,7 +103,6 @@ VLOG_INTENT = {
     "episode_count": 1,
     "episode_minutes": 8,
     "amount_bracket": "below_lower",
-    "is_ai_generated": True,
 }
 
 # Contract section 7 steps with no route yet.
@@ -298,9 +288,8 @@ def main() -> int:
     print()
     print("== tier from a real amount, not the band placeholder ==")
     for label, intent, want_tier, want_clause, want_authority in (
-        ("T1 3.2M live action", KEY_BY_AMOUNT_INTENT, "T1", "tier-live-action-2026", "nrta_national"),
-        ("T2 1.5M live action", ORDINARY_BY_AMOUNT_INTENT, "T2", "tier-live-action-2026", "provincial"),
-        ("T1 0.9M AI", AI_KEY_INTENT, "T1", "tier-ai-generated-2026", "nrta_national"),
+        ("T1 3.2M", KEY_BY_AMOUNT_INTENT, "T1", "tier-ai-generated-2026", "nrta_national"),
+        ("T2 0.5M", ORDINARY_BY_AMOUNT_INTENT, "T2", "tier-ai-generated-2026", "provincial"),
     ):
         pid = checker.new_project(intent)
         checker.call(
