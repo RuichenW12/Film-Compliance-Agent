@@ -7,12 +7,21 @@ Steps map to the golden e2e sequence in the API contract (section 7). Steps that
 are not built yet are reported as PENDING with the task that will deliver them,
 so the output doubles as a progress board.
 
-Run it against a **freshly started** API. Section 17 asserts the demo creator has
+Run it against a **fresh store**. Section 17 asserts the demo creator has
 exactly one `policy_stale` notice, and every run adds one more to the same inbox
-— so against a server left running from an earlier run it reports two failures
-that say nothing about the code. The store is in memory, so restarting the API
-is the whole fix. `--base` picks a different port when you want to leave a
-long-lived server alone.
+— so against a store carried over from an earlier run it reports two failures
+that say nothing about the code.
+
+What "fresh" means depends on the backend, and this is the part that catches
+people out:
+
+- `STORE_BACKEND=memory` (the default): restart the API. That is the whole fix.
+- `STORE_BACKEND=sqlite`: restarting is **not** enough, because that is the
+  entire point of the backend. Delete the database file first
+  (`rm -rf var/`, or whatever `SQLITE_PATH` points at).
+
+`--base` picks a different port when you want to leave a long-lived server
+alone.
 """
 
 from __future__ import annotations

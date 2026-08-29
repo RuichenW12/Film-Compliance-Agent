@@ -13,7 +13,8 @@ from core.jobs import InlineRunner, JobRunner
 from core.teaser import UnavailableVideo, VideoBackend
 from core.workflow_service import WorkflowService
 from schemas.snapshot import FileSnapshotService, SnapshotService
-from store.memory import InMemoryStores
+from store.memory import InMemoryStores, Stores
+from store.sqlite import SqliteStores
 
 from ..settings import Settings
 
@@ -21,7 +22,8 @@ from ..settings import Settings
 @dataclass
 class AppContext:
     settings: Settings
-    stores: InMemoryStores
+    # The port, not one implementation: two things satisfy it now.
+    stores: Stores
     snapshots: SnapshotService
     clock: Clock
     llm: LLMClient
@@ -49,6 +51,26 @@ def build_llm(settings: Settings) -> LLMClient:
     )
 
 
+def build_stores(settings: Settings) -> Stores:
+    """Memory by default; SQLite when asked for.
+
+    The default stays memory so tests and a throwaway run keep their clean
+    slate. `STORE_BACKEND=sqlite` is what makes a demo survive a restart, which
+    is the only reason a second backend exists. An unknown value fails loudly
+    rather than falling back: silently running in memory when someone asked for
+    durability is exactly the surprise this is meant to remove.
+    """
+
+    backend = (settings.store_backend or "memory").strip().lower()
+    if backend == "memory":
+        return InMemoryStores()
+    if backend == "sqlite":
+        return SqliteStores.at(settings.sqlite_file)
+    raise ValueError(
+        f"unknown STORE_BACKEND {backend!r}; expected 'memory' or 'sqlite'"
+    )
+
+
 def build_context(
     settings: Settings | None = None,
     *,
@@ -57,7 +79,7 @@ def build_context(
     settings = settings or Settings.from_env()
     return AppContext(
         settings=settings,
-        stores=InMemoryStores(),
+        stores=build_stores(settings),
         snapshots=snapshots or FileSnapshotService(settings.snapshot_path),
         clock=SystemClock(),
         llm=build_llm(settings),

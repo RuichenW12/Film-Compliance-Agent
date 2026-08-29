@@ -1545,3 +1545,59 @@ reading the frozen form sees an explicit gap it is expected to fill.
 **Revisit when** the institution console ships, since that is where a deferred
 field should become a required input for the reviewer rather than a note.
 
+---
+
+## D-045
+
+**A durable store, and it is SQLite rather than Firestore** · Area: A · Status: Accepted · 2026-08-28
+
+Every project vanished when the API stopped. That made the product impossible
+to show twice — a demo had to be rebuilt live each time — and it is why an e2e
+run against a long-lived server told a different story from one against a fresh
+process ([D-042](#d-042)).
+
+**Why not Firestore, which `CLAUDE.md` names as the stack.** It is not enabled
+on the project and Docker is not installed, so the emulator is unavailable. A
+Firestore adapter could have been written here and never once executed, and an
+adapter that has never run is not a verified adapter — it is a plausible one.
+Writing code whose only evidence is that it type-checks is the failure this
+repository's verification rule exists to prevent.
+
+**What was built instead.** `store/sqlite.py`, behind the identical ports, in
+the standard library. One `documents` table of JSON keyed by
+`(collection, doc_key)`, a `parent` column for the owning project, and a
+monotonic `ordinal`. The ordinal is the interesting part: every `list()` in the
+memory store returns insertion order because dicts and lists give that away
+free, and a dozen callers depend on it — `latest()` on forms and reviews, the
+timeline, `get_by_key` taking the last write. Storage does not preserve
+insertion order by accident, so the ordinal is what keeps a promise that was
+previously implicit.
+
+**Firestore is not blocked by this.** It slots in behind the same ports and
+passes the same conformance file, which is now easier to write than it was
+before, not harder.
+
+**The conformance suite is the real deliverable.** `core/repositories.py`
+declared fourteen ports and exactly one thing implemented them. A port with a
+single implementation is an interface nobody has tested the shape of.
+`tests/test_store_conformance.py` runs 26 assertions against both backends —
+list order, last-write-wins on facts, first-writer-wins on idempotency keys, a
+ticket that cannot be spent twice, an inbox that is newest-first, an updated
+form draft that does not become the latest one. A Firestore adapter passes that
+file or it is not finished.
+
+**The default stays `memory`,** so tests and throwaway runs keep their clean
+slate, and an unknown `STORE_BACKEND` raises rather than falling back — running
+in memory when someone asked for durability is exactly the surprise this
+removes.
+
+**The consequence worth stating plainly.** With `sqlite`, restarting the API no
+longer resets anything, which is the whole point and also a new way to be
+confused. Section 17 of the e2e asserts one `policy_stale` notice and a second
+run on the same file fails — verified, not predicted. Resetting now means
+deleting the file. The e2e docstring and `.env.example` both say so.
+
+**Revisit when** Firestore is enabled, or when concurrent writers appear: one
+connection under a lock is right for a single-process demo and is not a
+statement about what a deployed service should do.
+

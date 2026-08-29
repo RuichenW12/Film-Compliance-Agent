@@ -11,3 +11,6 @@ node_modules/
 web/coverage/
 .playwright-mcp/
 web/tsconfig.tsbuildinfo
+
+# Local durable store (STORE_BACKEND=sqlite). Demo data, not source.
+var/

@@ -22,6 +22,39 @@ Conventions:
 
 ## 2026-08-28
 
+### A — projects survive a restart
+
+- **New `store/sqlite.py` behind the existing ports**, selected with
+  `STORE_BACKEND=sqlite` (`SQLITE_PATH` sets the file, default
+  `var/film-compliance.db`). The default stays `memory`, and an unknown value
+  raises rather than silently running in memory. See
+  [D-045](docs/decisions.md#d-045).
+- **SQLite, not Firestore, and the reason is verification.** Firestore is the
+  stack's target but is not enabled and Docker is not installed, so that
+  adapter could have been written and never run. It still slots in behind the
+  same ports later.
+- **`tests/test_store_conformance.py` is the part that matters.** Fourteen
+  ports had exactly one implementation, which means their guarantees had never
+  been tested as guarantees. 26 assertions now run against **both** backends:
+  list order, last-write-wins on facts, first-writer-wins on idempotency keys,
+  a ticket spendable once, a newest-first inbox, and an updated form draft that
+  must not become the latest. **Shared: a future Firestore adapter passes this
+  file or it is not finished.**
+- **`AppContext.stores` is now typed as the `Stores` port**, not
+  `InMemoryStores`.
+- **New confusion this introduces, stated plainly:** with `sqlite`, restarting
+  the API no longer resets anything. A second e2e run on the same file fails
+  section 17 exactly as a long-lived memory server did — verified, not
+  predicted. Resetting means deleting the file; the e2e docstring and
+  `.env.example` both say so now.
+- Verified: `python -m pytest` (554 passed, 3 skipped) including 52 conformance
+  cases across both backends; `python scripts/e2e_check.py --base
+  http://localhost:8000` against `STORE_BACKEND=sqlite` **ALL CHECKS PASSED**;
+  and a real restart test — a project classified before the API was killed came
+  back afterwards with its state, tier, title, four facts, sixteen timeline
+  events and the uploaded script intact, then went on to a frozen form
+  (`hash bfe64e668a5bf65d`).
+
 ### A — the waive reason is asked in the page, not in a browser dialog
 
 - **`window.prompt` is gone from `app/collection/page.tsx`.** Waive now opens a

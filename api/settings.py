@@ -29,6 +29,7 @@ class Settings:
     flag_veo_teaser: bool = False
     flag_us_track: bool = False
     store_backend: str = "memory"
+    sqlite_path: str = "var/film-compliance.db"
 
     @classmethod
     def from_env(cls) -> Settings:
@@ -46,11 +47,17 @@ class Settings:
             flag_veo_teaser=_flag("FLAG_VEO_TEASER"),
             flag_us_track=_flag("FLAG_US_TRACK"),
             store_backend=os.getenv("STORE_BACKEND", "memory"),
+            sqlite_path=os.getenv("SQLITE_PATH", "var/film-compliance.db"),
         )
 
     @property
     def snapshot_path(self) -> Path:
         path = Path(self.snapshot_seed_path)
+        return path if path.is_absolute() else REPO_ROOT / path
+
+    @property
+    def sqlite_file(self) -> Path:
+        path = Path(self.sqlite_path)
         return path if path.is_absolute() else REPO_ROOT / path
 
     @property
