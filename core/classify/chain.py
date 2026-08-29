@@ -12,6 +12,7 @@ from schemas.enums import (
     ExitKind,
     FindingSeverity,
     FormType,
+    ProductionStage,
     ProjectState,
     SourceRefType,
     Tier,
@@ -250,6 +251,8 @@ def classify(
     if route is not None:
         updates["filing_route"] = route
 
+    flags = set(classification.pending_flags)
+
     future = clauses_not_yet_in_force(
         snapshots,
         classification.policy_snapshot_version,
@@ -257,9 +260,20 @@ def classify(
         datetime.now(timezone.utc),
     )
     if future:
-        updates["pending_flags"] = sorted(
-            {*classification.pending_flags, "clause_not_yet_in_force"}
-        )
+        flags.add("clause_not_yet_in_force")
+
+    # Article 12 puts the one-class filing *before* shooting. Someone already
+    # shooting or finished has passed that step, and handing them a roadmap that
+    # opens with it would read as advice when it is a problem. Reported, not
+    # decided: the tier does not change, and no state moves.
+    if classification.tier is Tier.T1 and intent.production_stage in (
+        ProductionStage.SHOOTING,
+        ProductionStage.FINISHED,
+    ):
+        flags.add("filing_due_before_shooting")
+
+    if flags != set(classification.pending_flags):
+        updates["pending_flags"] = sorted(flags)
 
     if not updates:
         return outcome
@@ -409,7 +423,7 @@ def _classify(
         )
 
     tier_decision = judge_tier(
-        intent.budget_band,
+        intent.amount_bracket,
         pack3,
         thresholds_published,
         investment_amount_rmb=intent.investment_amount_rmb,

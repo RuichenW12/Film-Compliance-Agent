@@ -8,7 +8,7 @@ import yaml
 from core.clock import FixedClock
 from core.llm import UnavailableLLM
 from core.workflow_service import WorkflowService
-from schemas.enums import BudgetBand, ClaimedFormType, Tier
+from schemas.enums import AmountBracket, ClaimedFormType, Tier
 from schemas.policy_snapshot import (
     PackName,
     PolicyPacks,
@@ -41,10 +41,10 @@ def test_recalc_uses_stored_amount_mode_and_selected_evidence():
         project.project_id,
         {
             "form_type_claimed": ClaimedFormType.MICRO_DRAMA,
-            "logline": "A general workplace romance.",
+            "synopsis": "A general workplace romance.",
             "episode_count": 30,
             "episode_minutes": 2,
-            "budget_band": BudgetBand.BAND_C,
+            "amount_bracket": AmountBracket.BELOW_LOWER,
             "investment_amount_rmb": 1_500_000,
             "is_ai_generated": False,
         },

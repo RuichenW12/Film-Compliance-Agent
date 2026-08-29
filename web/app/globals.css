@@ -534,3 +534,306 @@ main label span {
   display: inline-block;
   min-width: 12rem;
 }
+
+/* Per-field help. Two layers: a static hint that is always there, and a
+   question answered from the clauses behind the field. Neither can write to
+   the input it sits beside. */
+.field-help {
+  position: relative;
+  display: inline-block;
+  margin-left: 0.35rem;
+}
+
+.field-help-toggle {
+  width: 1.15rem;
+  height: 1.15rem;
+  padding: 0;
+  line-height: 1;
+  border-radius: 50%;
+  border: 1px solid #b6bec9;
+  background: #fff;
+  color: var(--muted);
+  font-size: 0.72rem;
+  cursor: pointer;
+}
+
+.field-help-toggle:hover,
+.field-help-toggle[aria-expanded="true"] {
+  border-color: #6b7684;
+  color: #333;
+}
+
+.field-help-panel {
+  position: absolute;
+  z-index: 20;
+  top: 1.6rem;
+  left: 0;
+  width: min(28rem, 70vw);
+  padding: 0.75rem 0.85rem;
+  border: 1px solid #d7dce3;
+  border-radius: 6px;
+  background: #fff;
+  box-shadow: 0 6px 20px -8px rgba(20, 26, 28, 0.35);
+  font-weight: 400;
+}
+
+.field-help-hint {
+  margin: 0 0 0.4rem;
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.field-help-example {
+  margin: 0 0 0.6rem;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.field-help-ask {
+  display: flex;
+  gap: 0.4rem;
+}
+
+.field-help-ask input {
+  flex: 1;
+  min-width: 0;
+}
+
+.field-help-answer {
+  margin-top: 0.6rem;
+  padding-top: 0.6rem;
+  border-top: 1px solid #eceff3;
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.field-help-sources {
+  margin: 0.4rem 0 0;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+/* The two Circular 35 conditions: kept, because deleting them would let a
+   platform-featured small project read as three-class, but folded away because
+   neither is answerable when the form is first filled in. */
+.more-conditions {
+  margin: 0.5rem 0 0.75rem;
+  border-top: 1px solid #eceff3;
+  padding-top: 0.6rem;
+}
+
+.more-conditions summary {
+  cursor: pointer;
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+
+.more-conditions[open] summary {
+  margin-bottom: 0.5rem;
+  color: #333;
+}
+
+.card textarea {
+  width: min(40rem, 100%);
+  font: inherit;
+  padding: 0.35rem 0.5rem;
+  border: 1px solid #b6bec9;
+  border-radius: 4px;
+}
+
+/* Genre keywords: suggestions beside the box, not instead of it. Nothing in the
+   chain treats a chosen word differently from a typed one, so the list can be
+   incomplete without making an answer wrong. */
+.genre-picker {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+  max-width: 34rem;
+}
+
+.genre-toggle {
+  font-size: 0.8rem;
+  padding: 0.15rem 0.5rem;
+  border: 1px solid #c3cad4;
+  border-radius: 4px;
+  background: #fff;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.genre-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  flex-basis: 100%;
+  margin-top: 0.15rem;
+}
+
+.chip {
+  font-size: 0.85rem;
+  padding: 0.15rem 0.55rem;
+  border: 1px solid #c3cad4;
+  border-radius: 999px;
+  background: #fff;
+  cursor: pointer;
+}
+
+.chip:hover {
+  border-color: #8d99a8;
+}
+
+.chip-on {
+  background: #eef4ff;
+  border-color: #6f8fc9;
+  color: #23406e;
+}
+
+/* The classification result. A creator reads this once, under pressure, to
+   find out what they have to do — so the verdict is set larger than body
+   text, the obligations are a numbered list, and the identifiers that used to
+   headline this card are folded into disclosures that open on demand. */
+.result-card .result-headline {
+  font-size: 1.125rem;
+  line-height: 1.5;
+  margin: 0.25rem 0 0.5rem;
+}
+
+.result-card .result-steps {
+  margin: 0.5rem 0 0;
+  padding-left: 1.25rem;
+  line-height: 1.7;
+}
+
+.result-card .result-steps li {
+  margin-bottom: 0.25rem;
+}
+
+.result-why {
+  margin-top: 1rem;
+  border-top: 1px solid var(--border);
+  padding-top: 0.75rem;
+}
+
+.result-why > summary {
+  cursor: pointer;
+  font-size: 0.875rem;
+  color: var(--muted);
+}
+
+.result-why code {
+  font-size: 0.75rem;
+  margin-right: 0.375rem;
+}
+
+.result-disclaimer {
+  margin-top: 1rem;
+  font-size: 0.8125rem;
+}
+
+/* The filing form. A table because it is a form being previewed, not a form
+   being filled in the browser sense -- the left column is the label the 备案
+   asks for, the middle is what we have, the right is how to supply it. */
+.form-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0.75rem 0;
+}
+
+.form-table td {
+  padding: 0.375rem 0.5rem 0.375rem 0;
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+}
+
+.form-table td:first-child {
+  width: 12rem;
+  color: var(--muted);
+  font-size: 0.875rem;
+}
+
+.form-table input {
+  margin-right: 0.375rem;
+}
+
+.form-table button {
+  margin-right: 0.375rem;
+}
+
+/* The waive reason, asked inline instead of through window.prompt. A native
+   dialog blocks the page, is often missing from a shared browser tab, and
+   returns null without a word once Chrome offers to suppress further dialogs. */
+.waive-box {
+  margin: 0.5rem 0 0.25rem;
+  padding: 0.625rem 0.75rem;
+  background: var(--soft-blue);
+  border: 1px solid var(--border);
+  border-radius: 0.375rem;
+}
+
+.waive-box label {
+  display: block;
+  margin-bottom: 0.5rem;
+}
+
+.waive-box label span {
+  display: block;
+  font-size: 0.875rem;
+  margin-bottom: 0.25rem;
+}
+
+.waive-box button {
+  margin-right: 0.375rem;
+}
+
+.waive-box p {
+  margin: 0.5rem 0 0;
+  font-size: 0.8125rem;
+}
+
+/* The institution's inbox. A table because a reviewer scans it for the one
+   project they mean to open, and the columns are what they scan by. */
+.queue-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9375rem;
+  margin: 0.5rem 0;
+}
+
+.queue-table th {
+  text-align: left;
+  font-size: 0.75rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+  font-weight: 500;
+  border-bottom: 1px solid var(--border);
+  padding: 0.375rem 0.75rem 0.375rem 0;
+}
+
+.queue-table td {
+  border-bottom: 1px solid var(--border);
+  padding: 0.5rem 0.75rem 0.5rem 0;
+  vertical-align: top;
+}
+
+.queue-table code {
+  font-size: 0.6875rem;
+}
+
+/* Wide content scrolls in its own box, never the page. */
+.scroll-x {
+  overflow-x: auto;
+}
+
+/* The reviewer's own words, when a filing company sends a project back.
+   Quoted rather than restated: a paraphrase of an instruction the creator has
+   to act on is a chance to get it subtly wrong. */
+.review-comments {
+  margin: 0.5rem 0;
+  padding: 0.625rem 0.875rem;
+  border-left: 3px solid var(--border);
+  background: var(--soft-blue);
+  border-radius: 0 0.25rem 0.25rem 0;
+  white-space: pre-wrap;
+}

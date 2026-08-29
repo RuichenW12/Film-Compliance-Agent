@@ -37,8 +37,41 @@ export const FORM_TYPES = [
 ] as const;
 export type FormType = (typeof FORM_TYPES)[number];
 
-export const BUDGET_BANDS = ["band_a", "band_b", "band_c", "unknown"] as const;
-export type BudgetBand = (typeof BUDGET_BANDS)[number];
+/** Where the budget sits relative to the tier thresholds, not a fixed figure.
+ *
+ *  The thresholds differ by production mode — 1,000,000 and 3,000,000 for live
+ *  action, 300,000 and 800,000 for AI — so the bracket is relative and the
+ *  interface fills in the numbers from whichever set applies. */
+export const AMOUNT_BRACKETS = [
+  "unknown",
+  "below_lower",
+  "between",
+  "at_or_above_upper"
+] as const;
+export type AmountBracket = (typeof AMOUNT_BRACKETS)[number];
+
+/** The figures behind each bracket, by production mode.
+ *
+ *  Duplicated from the snapshot so the dropdown can name real amounts, which is
+ *  the difference between a question a creator can answer and one they cannot.
+ *  If a future notice moves a threshold this goes stale — the tier itself is
+ *  computed server-side from the pinned snapshot and stays correct, but these
+ *  labels would need updating with it. */
+export const BRACKET_LABELS: Record<
+  "live_action" | "ai",
+  Record<Exclude<AmountBracket, "unknown">, string>
+> = {
+  live_action: {
+    below_lower: "Under ¥1,000,000",
+    between: "¥1,000,000 – ¥3,000,000",
+    at_or_above_upper: "¥3,000,000 or more"
+  },
+  ai: {
+    below_lower: "Under ¥300,000",
+    between: "¥300,000 – ¥800,000",
+    at_or_above_upper: "¥800,000 or more"
+  }
+};
 
 export const FINDING_SEVERITIES = [
   "block",

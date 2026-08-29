@@ -39,6 +39,27 @@ def _assert_institution(principal: Principal) -> None:
         raise ForbiddenError("only the reviewing institution may decide")
 
 
+@router.get("/v1/institution/queue")
+def institution_queue(
+    institution_id: str | None = None,
+    principal: Principal = Depends(get_principal),
+    workflow: WorkflowService = Depends(get_workflow),
+) -> list[dict]:
+    """What is waiting on an institution.
+
+    Without this a reviewer had no way to find work: the console could open a
+    project only if somebody handed them its id. `institution_id` narrows the
+    list to one reviewer; omitted, it shows everything outstanding, which is
+    what the demo registry wants.
+
+    Institution role only. A creator has their own dashboard, and letting them
+    read this one would show them every other creator's project.
+    """
+
+    _assert_institution(principal)
+    return workflow.institution_queue(institution_id)
+
+
 @router.get("/v1/institutions", response_model=list[MockInstitution])
 def list_institutions(
     workflow: WorkflowService = Depends(get_workflow),

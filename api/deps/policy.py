@@ -70,6 +70,11 @@ class PolicyApiState:
     dispatcher: OutboxDispatcher
     blob_store: BlobStore
     clock: Callable[[], datetime]
+    # Set once the product context exists, so a published snapshot reaches real
+    # projects. None means the loop still runs against fakes -- a publish then
+    # produces a snapshot nobody is told about, which is the state this field
+    # was added to end. See D-049.
+    delivery: object | None = None
 
 
 async def build_local_policy_api_state(

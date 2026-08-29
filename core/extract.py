@@ -46,7 +46,14 @@ RESPONSE_SCHEMA = {
                 "type": "object",
                 "properties": {
                     "key": {"type": "string"},
-                    "value": {"type": ["string", "number", "null"]},
+                    # A single type, not a union. Vertex's responseSchema is
+                    # an OpenAPI 3.0 subset and rejects `"type": [...]`, so the
+                    # union here made every real extraction call fail while the
+                    # fake-LLM tests passed. It also bought nothing: `_survives`
+                    # requires str(value) to appear verbatim inside the quote,
+                    # so a value that is not literal document text is discarded
+                    # anyway, and a null value is rejected outright.
+                    "value": {"type": "string"},
                     "quote": {"type": "string"},
                 },
                 "required": ["key", "value", "quote"],

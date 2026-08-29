@@ -406,3 +406,113 @@ export async function recordFiling(
     body: JSON.stringify({ registration_number: registrationNumber })
   });
 }
+
+/** The 备案 form as the product has it so far.
+ *
+ *  A field is `filled` only where a confirmed fact backs it. `pending` is
+ *  unanswered and holds the form shut; `pending_institution` is a gap the
+ *  creator declared and the filing company will supply (D-044). Both render
+ *  待补充 -- the difference is whether anyone said so on the record. */
+export interface FormField {
+  value: string | number | null;
+  status: "filled" | "pending" | "conflict" | "pending_institution";
+  source_ref: { type: string } | null;
+  confirmed_at: string | null;
+  override_reason: string | null;
+}
+
+export interface FormDraft {
+  draft_id: string;
+  form_type: string;
+  frozen: boolean;
+  hash: string | null;
+  fields: Record<string, FormField>;
+  conflicts: { check: string; message_key: string; items: string[] }[];
+  snapshot_version: string;
+}
+
+export interface GateResult {
+  passed: boolean;
+  gaps: { check: string; items: string[] }[];
+}
+
+export async function getForm(projectId: string): Promise<FormDraft> {
+  return apiFetch<FormDraft>(`/v1/projects/${projectId}/form`);
+}
+
+export async function getGate(projectId: string): Promise<GateResult> {
+  return apiFetch<GateResult>(`/v1/projects/${projectId}/gate`);
+}
+
+export async function confirmField(
+  projectId: string,
+  key: string,
+  value: string | number
+): Promise<FormDraft> {
+  return apiFetch<FormDraft>(
+    `/v1/projects/${projectId}/form/fields/${key}/confirm`,
+    { method: "POST", body: JSON.stringify({ value }) }
+  );
+}
+
+/** Declare that the filing institution supplies this one, rather than guessing. */
+export async function deferField(
+  projectId: string,
+  key: string,
+  reason: string
+): Promise<FormDraft> {
+  return apiFetch<FormDraft>(
+    `/v1/projects/${projectId}/form/fields/${key}/defer`,
+    { method: "POST", body: JSON.stringify({ reason }) }
+  );
+}
+
+export async function passGate(
+  projectId: string
+): Promise<{ state: string; passed: boolean }> {
+  return apiFetch<{ state: string; passed: boolean }>(
+    `/v1/projects/${projectId}/gate/pass`,
+    { method: "POST" }
+  );
+}
+
+export async function freezeForm(projectId: string): Promise<FormDraft> {
+  return apiFetch<FormDraft>(`/v1/projects/${projectId}/form/freeze`, {
+    method: "POST"
+  });
+}
+
+/** One row of the institution's inbox.
+ *
+ *  `title_working` is nullable on purpose: a project whose creator never named
+ *  it stays unnamed here rather than borrowing a title from somewhere.
+ *  `licence_reasons` is empty when the mock check passed -- there is no `ok`
+ *  field, because what a reviewer needs is the reason, not the verdict. */
+export interface QueueRow {
+  project_id: string;
+  title_working: string | null;
+  state: string;
+  tier: string | null;
+  institution_id: string | null;
+  review_id: string | null;
+  decision: string | null;
+  submitted_at: string | null;
+  licence_reasons: string[];
+}
+
+export async function getInstitutionQueue(
+  institutionId?: string
+): Promise<QueueRow[]> {
+  const query = institutionId
+    ? `?institution_id=${encodeURIComponent(institutionId)}`
+    : "";
+  return apiFetch<QueueRow[]>(`/v1/institution/queue${query}`);
+}
+
+/** Re-decide a project whose rules moved. Only valid while it is stale and
+ *  before its form has been locked and sent. */
+export async function reclassifyProject(
+  projectId: string
+): Promise<{ classification: { tier: string } | null; state: string }> {
+  return apiFetch(`/v1/projects/${projectId}/reclassify`, { method: "POST" });
+}

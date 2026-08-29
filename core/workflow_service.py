@@ -20,7 +20,7 @@ from schemas.enums import (
     AssetKind,
     FindingStatus,
     MaterialStatus,
-    BudgetBand,
+    AmountBracket,
     FactStatus,
     FindingSeverity,
     NotificationKind,
@@ -61,7 +61,7 @@ from .errors import (
     StateInvalidError,
     ValidationFailedError,
 )
-from .forms import build_fields, draft_hash, pending_keys
+from .forms import build_fields, deferred_keys, draft_hash, pending_keys
 from .gate import GateResult, evaluate_gate_d3, required_fact_keys
 from .institution import check_licence
 from .jobs import InlineRunner, JobOutcome, JobRunner, idempotency_key
@@ -234,10 +234,111 @@ class WorkflowService:
         project = self._persist_classification(project, outcome)
         return project, outcome
 
-    def choose_tier(self, project_id: str, budget_band: BudgetBand) -> tuple[Project, ClassificationOutcome]:
+    # States where re-deciding a classification is safe. Everything from
+    # FORM_FROZEN onward is missing on purpose: once a form has been locked and
+    # sent, its class is part of what the filing company is reviewing, and
+    # changing it under them would make the document they hold describe a
+    # different project. A stale project that far along goes round the revision
+    # loop instead, which is visible to both sides.
+    RECLASSIFIABLE_STATES = (
+        ProjectState.CLASSIFIED,
+        ProjectState.ROADMAP_CONFIRMED,
+        ProjectState.COLLECTING_MATERIALS,
+        ProjectState.REVIEW_RUNNING,
+        ProjectState.REVISION_LOOP,
+        ProjectState.GATE_D3_PASSED,
+        ProjectState.NEEDS_HUMAN_SUBJECT,
+        ProjectState.NEEDS_HUMAN_FORMTYPE,
+    )
+
+    def reclassify(self, project_id: str) -> tuple[Project, ClassificationOutcome]:
+        """Re-run the whole chain against the current snapshot, on request.
+
+        A policy change marks a project stale. For a threshold change the tier
+        is recalculated automatically, because `recalc_tier` can answer that
+        question from the amount alone. For a subject-rule change it is not
+        (D-050) -- re-deciding a subject match needs D1a, D1b and D1c together
+        and a human who asked for it. Which left a stale project with nowhere
+        to go: it was told its answer rested on rules that had moved, and had
+        no way to get a new answer.
+
+        This is that way. The creator asks, the full chain runs against the
+        pinned-now snapshot, and the flag clears.
+
+        Unlike `run_classification` this never moves the state. Re-deciding is
+        not starting over: a project halfway through collecting materials keeps
+        its materials, its roadmap and its uploads, and only its classification
+        is replaced.
+        """
+
+        project = self.get_project(project_id)
+        if not project.policy_stale:
+            raise StateInvalidError(
+                "this project is not marked stale, so there is nothing to redo",
+                {"state": project.state.value},
+            )
+        if project.state not in self.RECLASSIFIABLE_STATES:
+            raise StateInvalidError(
+                "a form that has been locked cannot be re-decided in place",
+                {"state": project.state.value},
+            )
+
+        before = project.classification
+        outcome = classify(
+            project.intent_profile,
+            project.channel_profile,
+            self._snapshots,
+            llm=self._llm,
+            thresholds_published=self._thresholds_published(),
+        )
+        if outcome.ask_back:
+            raise StateInvalidError(
+                "classification needs more intent answers",
+                {"missing": outcome.ask_back},
+            )
+        if outcome.classification is None:
+            raise StateInvalidError(
+                "the chain produced no classification to record",
+                {"state": project.state.value},
+            )
+
+        now = self._clock.now()
+        project = project.model_copy(
+            update={
+                "classification": outcome.classification.model_copy(
+                    update={"decided_at": now}
+                ),
+                "policy_stale": False,
+                "updated_at": now,
+            }
+        )
+        self._stores.projects.save(project)
+
+        for proposed in outcome.facts:
+            self._upsert_fact(
+                project_id, proposed.key, proposed.value, proposed.source_ref
+            )
+
+        # What changed, in the timeline, so a later reader can see that the
+        # answer moved and what moved it.
+        self._record_event(
+            project_id,
+            Actor.CREATOR,
+            "classification.rerun_after_policy_change",
+            {
+                "from_snapshot": before.policy_snapshot_version if before else None,
+                "to_snapshot": outcome.classification.policy_snapshot_version,
+                "from_tier": before.tier.value if before else None,
+                "to_tier": outcome.classification.tier.value,
+                "changed": bool(before) and before.tier is not outcome.classification.tier,
+            },
+        )
+        return project, outcome
+
+    def choose_tier(self, project_id: str, amount_bracket: AmountBracket) -> tuple[Project, ClassificationOutcome]:
         """User picks a budget band -> D1c runs again on the same chain."""
 
-        project, _ = self.submit_intent(project_id, {"budget_band": budget_band})
+        project, _ = self.submit_intent(project_id, {"amount_bracket": amount_bracket})
         return self.run_classification(project.project_id)
 
     def recalc_tier(self, project_id: str, snapshot_version: str) -> RecalcResult:
@@ -263,7 +364,7 @@ class WorkflowService:
 
         pack3 = self._snapshots.get_pack(PackName.P3_TIER_THRESHOLDS, snapshot_version)
         decision = judge_tier(
-            project.intent_profile.budget_band,
+            project.intent_profile.amount_bracket,
             pack3,
             self._thresholds_published(snapshot_version),
             investment_amount_rmb=project.intent_profile.investment_amount_rmb,
@@ -646,6 +747,60 @@ class WorkflowService:
         )
         return self.form_draft(project_id)
 
+    def defer_form_field(
+        self, project_id: str, key: str, reason: str | None = None
+    ) -> FormDraft:
+        """The creator states this value comes from the institution, not them.
+
+        The commonest case is `applicant_entity`: an individual creator has no
+        广播电视节目制作经营许可证, so the licensed company that files the
+        project supplies its own details. Before this there was no way to say
+        that -- `confirm_form_field` refuses an empty value and tells you to
+        leave the field pending, and a pending field holds the form shut
+        forever. So the honest answer was unreachable and the only reachable
+        answers were inventing a company or abandoning the filing.
+
+        Deferring records a fact with no value and `PENDING_INSTITUTION`
+        status. Nothing is invented: the field still renders 待补充, still
+        hashes as unfilled, and `deferred_keys` lists it on the frozen form.
+        What changes is that the gate and the freeze stop treating a declared
+        gap as an unanswered one.
+        """
+
+        draft = self.form_draft(project_id)
+        if draft.frozen:
+            raise ConflictError(
+                "a frozen form cannot be edited", {"draft_id": draft.draft_id}
+            )
+        if key not in draft.fields:
+            raise NotFoundError(f"this form has no field named {key}", {"key": key})
+
+        existing = self._stores.facts.get_by_key(project_id, key)
+        if existing is not None and existing.status is FactStatus.CONFIRMED:
+            raise ValidationFailedError(
+                "this field already has a confirmed value; deferring would discard it",
+                {"key": key},
+            )
+
+        fact = Fact(
+            fact_id=new_id("fact"),
+            key=key,
+            value=None,
+            source_ref=SourceRef(
+                type=SourceRefType.USER_ANSWER, answer_id=new_id("fact")
+            ),
+            status=FactStatus.PENDING_INSTITUTION,
+            created_at=self._clock.now(),
+        )
+        self._stores.facts.add(project_id, fact)
+        self._record_event(
+            project_id,
+            Actor.CREATOR,
+            "form.field_deferred",
+            {"key": key, "reason": reason},
+        )
+        return self.form_draft(project_id)
+
     def freeze_form(self, project_id: str) -> FormDraft:
         """Freeze only from GATE_D3_PASSED, and only with no field left pending."""
 
@@ -680,7 +835,13 @@ class WorkflowService:
             project_id,
             Actor.CREATOR,
             "form.frozen",
-            {"draft_id": frozen.draft_id, "hash": frozen.hash},
+            {
+                "draft_id": frozen.draft_id,
+                "hash": frozen.hash,
+                # A frozen form with declared gaps is a different document from
+                # a complete one, and the timeline should say which it was.
+                "deferred": deferred_keys(frozen),
+            },
         )
         self._transition(
             project, ProjectState.FORM_FROZEN, Actor.CREATOR, "form.frozen"
@@ -697,10 +858,14 @@ class WorkflowService:
         """
 
         project = self.get_project(project_id)
-        logline = (project.intent_profile.logline or "").strip()
+        # `core.teaser` still calls its input a logline, which is the right word
+        # for what a teaser is generated from. The intake field it comes from is
+        # now the synopsis — one story field, and it is the one the filing form
+        # actually asks for.
+        logline = (project.intent_profile.synopsis or "").strip()
         if not logline:
             raise ValidationFailedError(
-                "a teaser needs a logline to work from", {"project_id": project_id}
+                "a teaser needs a synopsis to work from", {"project_id": project_id}
             )
 
         latest = self._latest_script(project_id)
@@ -783,6 +948,75 @@ class WorkflowService:
 
     def list_institutions(self) -> list[MockInstitution]:
         return self._stores.institutions.list()
+
+    # The states an institution owns. A project sitting in either of these is
+    # waiting on the reviewer, not on the creator, which is exactly what a queue
+    # has to be able to say.
+    INSTITUTION_QUEUE_STATES = (
+        ProjectState.INSTITUTION_REVIEW,
+        ProjectState.READY_FOR_EXTERNAL_FILING,
+    )
+
+    def institution_queue(self, institution_id: str | None = None) -> list[dict]:
+        """What is waiting on an institution, newest submission first.
+
+        `ProjectStore.list_all` existed as a port method that nothing called, so
+        a reviewer had no way to discover work: they had to be handed a project
+        id out of band and paste it in. A console without a queue is a lookup
+        tool, not an inbox.
+
+        Two states qualify. `INSTITUTION_REVIEW` needs a decision.
+        `READY_FOR_EXTERNAL_FILING` has been accepted and still needs a
+        registration number, which is also the institution's act -- leaving it
+        out would let an accepted project fall off the reviewer's screen with
+        the last step undone.
+        """
+
+        rows: list[dict] = []
+        for project in self._stores.projects.list_all():
+            if project.state not in self.INSTITUTION_QUEUE_STATES:
+                continue
+            review = self._stores.institution_reviews.latest(project.project_id)
+            if institution_id and (
+                review is None or review.institution_id != institution_id
+            ):
+                continue
+            classification = project.classification
+            rows.append(
+                {
+                    "project_id": project.project_id,
+                    # Never invented: a project with no working title says so
+                    # rather than borrowing one from somewhere else.
+                    "title_working": project.title_working,
+                    "state": project.state.value,
+                    "tier": classification.tier.value if classification else None,
+                    "institution_id": review.institution_id if review else None,
+                    "review_id": review.review_id if review else None,
+                    "decision": (
+                        review.decision.value
+                        if review is not None and review.decision is not None
+                        else None
+                    ),
+                    "submitted_at": (
+                        review.created_at.isoformat()
+                        if review is not None and review.created_at is not None
+                        else None
+                    ),
+                    # There is no `ok` field: an empty `reasons` is what
+                    # passing means, and the reasons themselves are what the
+                    # reviewer needs to see when it does not.
+                    "licence_reasons": (
+                        list(review.license_check.reasons)
+                        if review is not None and review.license_check is not None
+                        else []
+                    ),
+                }
+            )
+
+        # Newest submission first, and a row with no timestamp sorts last rather
+        # than crashing the comparison.
+        rows.sort(key=lambda row: row["submitted_at"] or "", reverse=True)
+        return rows
 
     def submit_to_institution(
         self, project_id: str, institution_id: str
@@ -910,11 +1144,45 @@ class WorkflowService:
                 {"state": project.state.value},
             )
         review = self._stores.institution_reviews.latest(project_id)
+
+        # Coming back around the loop starts a successor draft.
+        #
+        # Without this the revision loop was a dead end. `form_draft` returns a
+        # frozen draft unchanged, and `freeze_form` early-returns one too, so a
+        # returned project could be resumed and its gate re-passed but never
+        # re-frozen -- the state never reached FORM_FROZEN again and every
+        # resubmission answered 409. The creator could act on the reviewer's
+        # comments and had no way to send the result.
+        #
+        # The frozen draft is not reopened: it is the record of what was
+        # reviewed, and `parent_draft` is the field that was always meant to
+        # carry that lineage. The successor rebuilds from facts on the next
+        # read, so corrections show up and freezing produces a new hash.
+        frozen_draft = self._stores.forms.latest(project_id)
+        if frozen_draft is not None and frozen_draft.frozen:
+            self._stores.forms.put(
+                project_id,
+                FormDraft(
+                    draft_id=new_id("draft"),
+                    form_type=frozen_draft.form_type,
+                    snapshot_version=frozen_draft.snapshot_version,
+                    parent_draft=frozen_draft.draft_id,
+                    created_at=self._clock.now(),
+                ),
+            )
+
         self._record_event(
             project_id,
             Actor.CREATOR,
             "institution.return_acknowledged",
-            {"comments": review.return_comments if review else None},
+            {
+                "comments": review.return_comments if review else None,
+                "supersedes_draft": (
+                    frozen_draft.draft_id
+                    if frozen_draft is not None and frozen_draft.frozen
+                    else None
+                ),
+            },
         )
         return self._transition(
             project,
@@ -1669,7 +1937,11 @@ class WorkflowService:
         finding = Finding(
             finding_id=new_id("finding"),
             asset_version="intent_profile",
-            locator=Locator(quote=quote or (project.intent_profile.logline or "")),
+            # `logline` was removed from IntentProfile when the synopsis became
+            # the single story field, and this line still read it. Python's
+            # `or` short-circuits, so the crash only waited on an alert with no
+            # matched-rule quote -- which every existing test happens to have.
+            locator=Locator(quote=quote or (project.intent_profile.synopsis or "")),
             category=outcome.alert_category or "subject_edge_case",
             severity=outcome.alert_severity or FindingSeverity.NEEDS_HUMAN,
             evidence_refs=list(outcome.classification.evidence_refs)

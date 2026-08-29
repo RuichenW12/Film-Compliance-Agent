@@ -20,6 +20,672 @@ Conventions:
 
 ---
 
+## 2026-08-29
+
+### A — a raw-identifier sweep across every screen
+
+Walked each page in the browser with a regex for snake_case identifiers, bare
+class codes and record ids, and fixed what it found:
+
+- **The Facts card** listed `episode_count`, `investment_amount_rmb`,
+  `applicant_entity` and a `pending_institution` status. Facts are now named by
+  the same labels the filing form uses, and the status reads "the filing company
+  supplies this".
+- **The upload dropdown** offered `final_film`, `subtitle_sheet` and
+  `supporting_document` as choices.
+- **The reviewer's screen** showed `inst_demo` beside a decision, with the
+  registry holding that company's name two cards above it — and rendered the
+  decision itself as `pending`.
+- Collection, wizard, institution and dashboard now return nothing to that
+  regex. The one identifier deliberately left is the project reference on the
+  result card, which exists so a creator can quote it when reporting a problem.
+
+This is the fourth time this defect has appeared on a new surface (D-040 on the
+result card, then material cards, then gate gaps, now these), so the fixes keep
+the same shape: the key is a lookup, and a missing label falls back to the key
+so the gap stays visible rather than rendering blank.
+
+### A — a crash waiting on a rare path, and more dead copy
+
+- **`_write_alert_finding` read `intent_profile.logline`, a field that no longer
+  exists.** Python's `or` short-circuits, so it was only reached when an alert
+  carried no matched-rule quote — which no test produced. On that path a
+  creator would have got an `AttributeError` instead of the boundary-subject
+  decision the alert exists to offer. Now reads the synopsis, and a test covers
+  it (confirmed by reintroducing the bug and watching it fail).
+- **`.env.example` pointed at `seed-snapshot-v1.yaml`** while the code defaults
+  to v2. Anyone copying it ran on the older snapshot, whose thresholds are
+  unpublished, and got a provisional class on every project with no clue why.
+- **Fifteen dead copy keys removed** — the `budget_band` field (gone in D-036),
+  the reviewer-side submit card (moved in D-047), the "where will it be
+  distributed" question you asked me to drop, and two gate strings nothing ever
+  rendered.
+
+**Found and left alone, deliberately:** `alert.*` copy has no renderer. The
+backend writes alert findings with options — modify the scenes, keep them and
+accept co-review, escalate — and no screen shows them, so a creator with a
+boundary-subject project never sees the choice. That is a missing feature rather
+than dead copy, and it is the largest remaining hole on the creator's side.
+Recorded as Q-5.
+
+### A — a copy sweep for our vocabulary and one stale lie
+
+- **Deleted copy for a field that no longer exists.** `help.budget_band` and
+  `wizard.budget_band.hint` both told a creator to look at "the exact amount
+  above". That field was replaced in D-036 and moved off intake entirely in
+  D-038, so the help was describing a screen nobody sees.
+- **`help.investment_amount_rmb` was telling creators the wrong thing.** It said
+  "this is the field that decides your tier, and only an exact figure gives a
+  settled answer". Both halves stopped being true at D-038: the range decides
+  the class, and the figure is what the filing form asks for.
+- **Notifications spoke in internal terms.** "Snapshot v3 was published. Review
+  the project before the pre-shoot gate." now reads "A policy update was
+  published after this project was classified. Open it and work the answer out
+  again before you go further" — matching the card that offers to do it.
+- **Raw class codes reached the dashboard.** A recalculation notice renders
+  "moved this project from {previous_tier} to {tier}", and the parameters are
+  raw domain values, so it read "from T2 to T3" while every other screen said
+  "Class 2". The API still sends keys and parameters rather than prose, which is
+  right; the dashboard now maps the tier-shaped ones at the point it turns a
+  notification into a sentence.
+- **Also plainer:** "The pre-shoot gate is blocked" → "Some things are still
+  needed before the form can be locked"; the collection page no longer says
+  "C1-a" at a creator.
+- Verified: `python -m pytest` (583 passed, 3 skipped), `npx tsc --noEmit`
+  clean, and the dashboard read back in the browser.
+
+### Shared — fixes found by looking at the running product
+
+- **The stale notice named the wrong snapshot.** The dashboard read "Snapshot
+  v2 was published" at the moment v3 was published — the adapter passed the
+  project's *current* pinned version rather than the event's. A notice naming
+  the version the creator already had is news about nothing. The consumer now
+  passes `event.snapshot_version` through, and a test pins it.
+- **Policy events are delivered before they are acknowledged.** The wiring
+  marked the outbox row sent and handed the event to the consumer afterwards;
+  since only `PENDING` rows are ever selected, a crash in between lost the rule
+  change outright with nothing left to retry. `InlineOutboxDelivery` reverses
+  the order. [D-052](docs/decisions.md#d-052) also corrects D-049, which
+  described the risk backwards as double-handling.
+- **The whole policy loop is verified through the UI**, not just the API: as
+  Admin, *Run fixture crawl* → *Review proposal* → *Publish*, and a waiting
+  creator's project moved `v2` → `v3`, class `T3` → `T2`, with `policy.stale`
+  and `classification.recalculated` in its timeline and a notice in the inbox.
+- Verified: `python -m pytest` (583 passed, 3 skipped); `python
+  scripts/e2e_check.py --base http://localhost:8000` on a fresh process **ALL
+  CHECKS PASSED**.
+
+### A — a stale project can be worked out again
+
+- **New `POST /v1/projects/{id}/reclassify`**, and a card on `/collection` that
+  offers it: "The rules behind this answer have changed" → *Work it out again*.
+  See [D-051](docs/decisions.md#d-051).
+- **This was a real dead end.** Automatic recalculation covers a provisional
+  tier only. A settled tier is left alone on purpose (D-031) and a subject-rule
+  change is not auto-recalculated at all (D-050) — so those creators were told
+  their answer was out of date and given no way to get a new one.
+- **Three guards, each load-bearing:** it refuses when the project is not stale
+  (the flag is the evidence that a different answer is even likely); it refuses
+  once the form has been locked and sent (its class is part of what the filing
+  company is holding); and it never moves the state, so materials, roadmap and
+  uploads survive — re-deciding is not starting over.
+- **Fixed a flaw in the card I had just written.** Re-running clears the stale
+  flag, and the card hid on that alone — so it vanished at the exact moment it
+  had something to say. A creator pressed the button and the whole thing
+  disappeared without telling them what happened. It now stays to report the
+  result, and says whether the class actually moved. Found in the browser, not
+  by the API test that passed.
+
+- **The dashboard badge stopped speaking our vocabulary:** "policy update
+  pending review" is now "rules changed — needs redoing".
+- **`e2e_check.py` section 23 is now re-runnable.** The demo policy source is
+  swapped from its v1 to its v2 fixture once at process start, so a second crawl
+  in the same server finds nothing changed. The section detects that and skips
+  itself with a reason rather than reporting a failure that says nothing about
+  the code.
+- **New `docs/QUESTIONS-FOR-MAXINE.md`** — four things I could not decide alone,
+  each with what I did in the meantime so nothing is blocked waiting on an
+  answer. Q-1 is why Firestore is still unwritten: no Java, no Docker, no
+  `gcloud` on this shell and no client library, so it could be written and never
+  once executed.
+- Verified: `python -m pytest` (578 passed, 3 skipped) including 9 new
+  reclassify tests; `python scripts/e2e_check.py --base http://localhost:8000`
+  on a fresh process **ALL CHECKS PASSED** with a new section 24 walking
+  settled → stale → re-decided → refused again.
+
+## 2026-08-28
+
+### Shared — the policy loop reaches real projects
+
+- **A publish now flags the projects it affects.** Crawl, propose and publish
+  all worked already; the fan-out ran against a fake project store, so a
+  snapshot could be published and no creator was ever told. New
+  `workers/policy/adapters/live_projects.py` points the consumer at the
+  product's real projects. See [D-049](docs/decisions.md#d-049).
+- **The boundary holds in ownership, not transport.** The adapters call exactly
+  the two `WorkflowService` methods `/v1/internal/*` calls, live under
+  `workers/policy/`, and change no product code. Writes go through the service,
+  so a stale flag produces its transition, timeline entry, audit line and
+  notification just as the hand-called route does.
+- **New `D1b` impact node**, closing the last gap the loop could not express: a
+  change to the subject-trigger vocabulary now marks affected projects stale.
+  **It deliberately does not recalculate** — `recalc_tier` redoes the amount
+  stage, and answering a subject question with money would assert a conclusion
+  the evidence does not support. See [D-050](docs/decisions.md#d-050).
+- **`PENDING_STEPS` is now empty.** Every step in contract section 7 is walked
+  by the e2e. What remains is infrastructure, not steps: the Firestore adapter
+  and the Veo teaser behind its flag.
+- **Two of my own assertions were wrong and were fixed, not worked around.** The
+  first wiring overrode a dispatcher a test had deliberately pointed at a
+  failing publisher; live wiring now only happens on the default path. And the
+  first version of the new e2e section used a settled-tier fixture and then
+  demanded a recalculation — which D-031 forbids on purpose.
+- Verified: `python -m pytest` (569 passed, 3 skipped) including 5 new D1b
+  tests; `python scripts/e2e_check.py --base http://localhost:8000` **ALL CHECKS
+  PASSED** with a new section 23 walking crawl → proposal → publish → stale →
+  notified → recalculated, the project moving `v2` → `v3`.
+
+### A — the creator can send the form, and a returned one can come back
+
+- **The submit card moved from `/institution` to `/collection`**, beneath the
+  form it sends. `submit_to_institution` calls `_assert_owner`, so it was always
+  the creator's act; it only worked on the reviewer's page because demo auth
+  gives every role the same `user_id`. `resume` moved with it. See
+  [D-047](docs/decisions.md#d-047).
+- **The reviewer's comments are quoted verbatim** rather than paraphrased. They
+  are usually Chinese, which is not a D-039 violation: that rule governs our own
+  copy, not text a human typed.
+- **Found and fixed a dead end.** A returned project could be resumed and its
+  gate re-passed but **never resubmitted** — `form_draft` returns a frozen draft
+  unchanged and `freeze_form` early-returns one, so the state never reached
+  `FORM_FROZEN` again and submit answered 409 forever. `resume_after_return` now
+  starts a successor draft with the frozen one as its `parent_draft`, a field
+  that had never been set since it was written. See
+  [D-048](docs/decisions.md#d-048).
+- **Corrected my own copy and my own test.** The resume hint promised the form
+  "reopens for editing", which is not what happens and should not be — the sent
+  form stays locked as the record. And the first e2e assertion demanded a new
+  hash after re-freezing an *unchanged* form, which a content hash must not
+  give; it now corrects a field first.
+- Verified: `python -m pytest` (564 passed, 3 skipped); `python
+  scripts/e2e_check.py --base http://localhost:8000` **ALL CHECKS PASSED** with
+  a new section 22 walking submit → returned → resume → correct → re-lock →
+  resend; and in Chrome: the send card appeared after locking, sending moved it
+  to "the filing company is reviewing it now", a return showed the reviewer's
+  words quoted, and "Take it back and fix it" reopened the loop.
+
+### A — the reviewer can find work
+
+- **New `GET /v1/institution/queue`**, institution role only, listing what is
+  waiting: projects needing a decision and accepted projects still needing a
+  registration number. See [D-046](docs/decisions.md#d-046).
+- **The console had every route and no inbox.** Submit, licence check, accept,
+  return, resume and filing all worked — by hand a project reached `FILED`
+  with a registration number — but the page could only open a project whose id
+  somebody pasted in. `ProjectStore.list_all` had been a port method that
+  **nothing called** since it was written; the queue is what it was for.
+- **An accepted project stays listed** until its registration number is
+  recorded, because that is the institution's act too. A returned project
+  leaves, being the creator's work again.
+- **Nothing is invented in a row:** an unnamed project renders "untitled", and
+  there is no synthesised licence verdict — the row carries the actual reasons,
+  empty meaning passed.
+- **The paste-an-id form stays as a fallback**, same shape as D-041: remove the
+  need, not the option.
+- **Fixed while testing:** a failed queue load left the card on "Loading…"
+  forever, which reads as a hang rather than the 403 it usually is.
+- Verified: `python -m pytest` (563 passed, 3 skipped) including 9 new queue
+  tests; `python scripts/e2e_check.py --base http://localhost:8000` **ALL CHECKS
+  PASSED** with a new section 21 walking submit → queue → accept → file → queue
+  empties; and in Chrome as the institution role: the queue listed the project,
+  *Open* loaded it in one click, *Accept* moved the row to "a registration
+  number", and recording the filing emptied the queue.
+
+### A — projects survive a restart
+
+- **New `store/sqlite.py` behind the existing ports**, selected with
+  `STORE_BACKEND=sqlite` (`SQLITE_PATH` sets the file, default
+  `var/film-compliance.db`). The default stays `memory`, and an unknown value
+  raises rather than silently running in memory. See
+  [D-045](docs/decisions.md#d-045).
+- **SQLite, not Firestore, and the reason is verification.** Firestore is the
+  stack's target but is not enabled and Docker is not installed, so that
+  adapter could have been written and never run. It still slots in behind the
+  same ports later.
+- **`tests/test_store_conformance.py` is the part that matters.** Fourteen
+  ports had exactly one implementation, which means their guarantees had never
+  been tested as guarantees. 26 assertions now run against **both** backends:
+  list order, last-write-wins on facts, first-writer-wins on idempotency keys,
+  a ticket spendable once, a newest-first inbox, and an updated form draft that
+  must not become the latest. **Shared: a future Firestore adapter passes this
+  file or it is not finished.**
+- **`AppContext.stores` is now typed as the `Stores` port**, not
+  `InMemoryStores`.
+- **New confusion this introduces, stated plainly:** with `sqlite`, restarting
+  the API no longer resets anything. A second e2e run on the same file fails
+  section 17 exactly as a long-lived memory server did — verified, not
+  predicted. Resetting means deleting the file; the e2e docstring and
+  `.env.example` both say so now.
+- Verified: `python -m pytest` (554 passed, 3 skipped) including 52 conformance
+  cases across both backends; `python scripts/e2e_check.py --base
+  http://localhost:8000` against `STORE_BACKEND=sqlite` **ALL CHECKS PASSED**;
+  and a real restart test — a project classified before the API was killed came
+  back afterwards with its state, tier, title, four facts, sixteen timeline
+  events and the uploaded script intact, then went on to a frozen form
+  (`hash bfe64e668a5bf65d`).
+
+### A — the waive reason is asked in the page, not in a browser dialog
+
+- **`window.prompt` is gone from `app/collection/page.tsx`.** Waive now opens a
+  small box inside the card: a labelled input, *Waive it*, *Cancel*, and a line
+  saying the reason is recorded against the project.
+- **Correcting an overstatement in the previous entry.** That entry said the
+  prompt "will bite in a live demo". For a person clicking by hand it worked
+  — the cancel path was handled and no data was at risk. What it actually
+  cost was narrower and worth naming precisely: a native dialog is frequently
+  absent from a shared *browser tab*, so an audience sees a frozen page while
+  the presenter types into a box they cannot see; and once Chrome offers
+  "prevent this page from creating additional dialogs", `prompt` returns null
+  and Waive becomes a button that silently does nothing. It also blocks
+  automated browser checks, which is how it was found — it froze the tab twice
+  during the previous change.
+- **Confirm is disabled until a reason is typed**, so the silent no-op is not
+  reproduced in the replacement. Escape and *Cancel* both close the box.
+- Verified in Chrome on the case that previously froze the tab: the box opens
+  and the tab stays alive, the confirm button is disabled while the reason is
+  empty, waiving with a reason marks the card `waived` and drops it out of the
+  gate's gaps, and both Escape and Cancel close without waiving. Plus
+  `python -m pytest` (502 passed, 3 skipped) and `npx tsc --noEmit` clean.
+
+### A — the filing form is on screen, and the journey reaches a lock
+
+- **New "The filing form" card on `/collection`.** Shows every field the 备案
+  asks for, what we have, and what is still missing — with a *Save* box per
+  unanswered field and an *I don't have one* button on the fields the filing
+  company supplies. Ends with *Lock the form*.
+- **The gate is stated, not discovered.** The gaps are listed in plain language
+  above the button, and the button is disabled until they clear, so a creator
+  reads why they cannot finish instead of pressing something and getting a 409.
+- **The lock is explained.** "Locking takes a fingerprint of the exact
+  contents, so the version reviewed later is provably the one you approved."
+  — the hash is a promise to the creator, not a database detail.
+- **My own no-Chinese guard caught me.** The first draft of this copy carried
+  待补充, 备案 and 广播电视节目制作经营许可证 in the English bundle;
+  `test_result_copy.py` failed and they are now English. The guard added in
+  D-039 paid for itself within a day.
+- **Fixed a raw key that reappeared on a second surface.** Gate gaps rendered
+  `material.mat_synopsis` because the gate returns `mat_synopsis` while the
+  bundle keys are `material.synopsis`. This is the D-040 defect showing up again
+  the moment another screen rendered the same data; `nameGapItem` now handles
+  both shapes.
+- Verified: `python -m pytest` (502 passed, 3 skipped), `npx tsc --noEmit`
+  clean, and a full Chrome walk — classify, hand off, declare no filing
+  company, answer title and amount, watch the gaps clear, lock the form, and
+  read back `Locked. Fingerprint 2cd1ff12133e…` with the filing company still
+  showing as to be supplied.
+
+**Known, not fixed:** `app/collection/page.tsx:389` waives a material through
+`window.prompt`, which blocks the page and froze the browser during this work.
+It is pre-existing and on a part of the page this change did not touch, so it is
+reported rather than rewritten — but it will bite in a live demo.
+
+### A — an individual creator can reach a frozen form
+
+- **`applicant_entity` can be declared blank instead of invented.** A 备案 is
+  filed by a company holding the 广播电视节目制作经营许可证, which an individual
+  creator does not have. New `POST /v1/projects/{id}/form/fields/{key}/defer`
+  records a fact with no value and `PENDING_INSTITUTION` status. See
+  [D-044](docs/decisions.md#d-044).
+- **The gap stays visible.** The field renders 待补充, the hash covers field
+  status so a deferred field and a filled one hash differently, `deferred_keys`
+  lists it on the frozen form, and the freeze event records which fields were
+  left open. A confirmed value outranks a later deferral.
+- **Most of this already existed and was unreachable.** `evaluate_gate_d3`
+  accepted `PENDING_INSTITUTION` and `FieldStatus` had the member, but nothing
+  produced it and `pending_keys` blocked anything not `FILLED`.
+- **e2e section 20** walks an individual creator with no company from intent to
+  a frozen form: eight checks, including that an *unanswered* entity still
+  blocks and that the frozen form is not quietly complete.
+- **This closes D-038's loop.** Intake takes a budget range; the freeze stage is
+  where `investment_amount_rmb` is actually collected, and the walk confirms it.
+- Verified: `python -m pytest` (502 passed, 3 skipped), `python
+  scripts/e2e_check.py --base http://localhost:8000` on a fresh process **ALL
+  CHECKS PASSED**.
+
+### A — the frontier was three stages further along than we thought
+
+- **Correction, and the reason it matters.** Planning the work after
+  classification, both the 2026-08-24 status doc and `e2e_check.py`'s
+  `PENDING_STEPS` said T-A3 to T-A6 were unbuilt. Both were stale. Every route
+  exists, and a live walk took a project through roadmap confirm, material
+  cards, an upload ticket, fact extraction and the C1-a pre-check into a
+  correctly blocked gate. See [D-042](docs/decisions.md#d-042).
+- **The e2e now walks steps 5 to 11** in a new section 19, sixteen assertions,
+  instead of printing them as pending. `PENDING_STEPS` keeps only the
+  policy-loop items that really have no route. **Workstream B: your line is the
+  only one left in that list.**
+- **The status doc opens with a stale banner** naming `openapi.json` and the
+  e2e output as the sources to trust instead.
+- **The wizard hands off.** The result card ends with *Continue to your filing
+  checklist*, opening `/collection?project=<id>`, which now auto-loads. Before
+  this the two screens were joined by copying an opaque id between them. See
+  [D-041](docs/decisions.md#d-041).
+- **The result card's "what happens next" was wrong** and is corrected: it said
+  the next stage was unbuilt when roadmap, materials, facts and the pre-check
+  all run. It now names what actually comes next, and keeps the honest caveat
+  that freeze and institution submission are unfinished.
+- **Fixed a latent bug that no test could see.** `core/extract.py` used a union
+  `"type": ["string","number","null"]`, which Vertex rejects — every live
+  extraction would have failed while the suite passed. Same defect as the one
+  already fixed in `core/intake_help.py`. New `tests/test_response_schemas.py`
+  discovers every `*SCHEMA` under `core/` and bans list-valued `type`; five
+  schemas covered. See [D-043](docs/decisions.md#d-043).
+- **Material cards cite clauses by name**, matching D-040, instead of printing
+  `nrta-order-16-article-14`.
+- Verified: `python -m pytest` (491 passed, 3 skipped), `npx tsc --noEmit`
+  clean, `python scripts/e2e_check.py --base http://localhost:8000` on a fresh
+  process **ALL CHECKS PASSED** including the sixteen new checks against real
+  Vertex, and a Chrome run following the handoff from a classification into a
+  loaded collection page.
+
+### A — English only, and the result cites policies by name
+
+- **Every Chinese gloss is gone from the UI.** "Class 3 (三类)" is now "Class 3",
+  "micro-drama (微短剧)" is "micro-drama". `CLAUDE.md`'s stack line said the UI
+  was "English with Chinese legal terms glossed" and has been corrected —
+  **both workstreams read that line**, so check it before adding UI copy. See
+  [D-039](docs/decisions.md#d-039), which supersedes the gloss half of D-032.
+- **What that gives up:** a creator told "Class 3" will meet 三类 on the real
+  filing form and nothing in the product now bridges the two. Accepted
+  deliberately, and recorded as the thing to revisit when the materials and
+  filing-form stages ship.
+- **Clause ids render as names.** "How we reached this" showed
+  `tier-ai-generated-2026`; it now shows "Investment thresholds for AI-generated
+  micro-dramas", followed by the instrument and its effective date, and a
+  sentence explaining what a pinned policy version means. See
+  [D-040](docs/decisions.md#d-040).
+- **The technical disclosure is deleted.** `proj_… CLASSIFIED T3_4steps` plus a
+  raw flag list told a creator nothing and repeated, as keys, warnings already
+  given as sentences. The project id survives as a support reference on the
+  disclaimer line.
+- **Two new guards.** `tests/test_result_copy.py` now fails if any value in
+  `web/locales/en.json` contains a CJK character, and if any `clause_id` or
+  `clause_ref` in `policy/*.yaml` has no English name. The second caught
+  `nrta-order-16-article-54` in the v1 snapshot, which would have rendered as an
+  empty bullet. **Workstream B: adding a clause to a snapshot now requires an
+  English name in the bundle.**
+- Verified: `python -m pytest` (485 passed, 3 skipped), `npx tsc --noEmit`
+  clean, `python scripts/e2e_check.py --base http://localhost:8000` on a fresh
+  process **ALL CHECKS PASSED**, and a Chrome run showing the card end to end
+  with no Chinese and the provenance reading as prose.
+
+### A — the exact investment amount comes off the intake form
+
+- **Intake no longer asks for the figure.** Since [D-036](docs/decisions.md#d-036)
+  a threshold-aligned bracket settles the tier, which left the amount field on
+  the form contributing nothing to the answer while asking an idea-stage creator
+  for a number they would have to invent. See [D-038](docs/decisions.md#d-038).
+- **Nothing moves in the contract.** `IntentProfile.investment_amount_rmb`, the
+  DTO field, the POST body key and the per-field help entry all stay — the
+  form-freeze stage (T-A5) is where the figure is actually needed and where it
+  will be collected.
+- **What it gives up, stated plainly:** a budget sitting *exactly* on a
+  threshold is the one case the figure decides and the bracket cannot. With an
+  amount that project is reported provisional with `threshold_boundary_disputed`
+  ([D-033](docs/decisions.md#d-033)); with `at_or_above_upper` alone the
+  inclusive reading is taken and the tier reads settled. The detection code is
+  untouched and still fires whenever the API receives an amount.
+- Verified: `python -m pytest` (483 passed, 3 skipped), `npx tsc --noEmit`
+  clean, `python scripts/e2e_check.py --base http://localhost:8000` on a fresh
+  process **ALL CHECKS PASSED**, and a Chrome run confirming the form now has
+  two number inputs (episodes, minutes) and a bracket-only project still
+  settles at Class 3.
+
+### A — the classification result says what to do, in words
+
+- **The result card was a debug view and now reads as an answer.** A creator ran
+  a classification and got back `micro_drama`, `Tier T3`, a clause id, a
+  `script_verify` chip, `T3_4steps`, and their project's internal state — with
+  the filing route, the only actionable part, at the bottom. The verdict is now
+  a sentence, the filing route is a numbered "What this means you have to do" at
+  the top, and flags read as sentences. See [D-037](docs/decisions.md#d-037).
+- **Nothing was deleted.** The matched quotes, clause ids and snapshot version
+  moved into a "How we reached this" disclosure; the project id, state and
+  roadmap template into "Technical detail". `evidence_refs` still reach the page
+  — one click away rather than as the headline.
+- **The card now says the trail ends here**, naming the script pre-check as the
+  next stage and stating plainly that it is not built.
+- **New guard, and it found things.** `t()` falls back to the key when copy is
+  missing, which is how raw identifiers reached a creator. `tests/test_result_copy.py`
+  walks `FormType`, `Tier`, every `filing_route` value in `policy/*.yaml` and
+  every flag literal in `core/classify/`, failing when one has no copy. It
+  caught seven flags that would have rendered as keys — `amount_required`,
+  `amount_official`, `budget_unknown`, `generation_mode_required`,
+  `thresholds_unavailable`, `threshold_boundary_disputed`, `human_review`.
+- Verified: `python -m pytest` (483 passed, 3 skipped), `npx tsc --noEmit`
+  clean, `python scripts/e2e_check.py --base http://localhost:8000` **ALL CHECKS
+  PASSED**, and a T3 run in Chrome reading end to end as English with the
+  evidence intact behind the disclosure.
+- **`e2e_check.py` needs a freshly started API, and now says so.** Section 17
+  asserts the demo creator has exactly one `policy_stale` notice; each run adds
+  one more to the same inbox, so a server left running from an earlier run
+  reports two failures that say nothing about the code. Confirmed by running the
+  same script on stock `HEAD` (identical failures) and on a fresh process (all
+  green). The product logic is right — `mark_policy_stale` already guards
+  redelivery with `already_stale`. Only the script's docstring changed.
+- **Unrelated environment note for anyone verifying in a browser:** Chrome
+  serves every Next.js chunk as 403 on `http://127.0.0.1:3000`, so the page
+  renders but never hydrates and the form falls back to a native GET submit.
+  The same server on `http://localhost:3000` is fine, and `curl` gets 200 on
+  both. Use `localhost`.
+
+### A — one story field, suggested genres, and an order that follows the logic
+
+- **`logline` is gone; `synopsis` is the one story field.** Two free-text boxes
+  for the same thing was redundant the moment the synopsis landed, and of the
+  two only the synopsis has standing — 剧情梗概 is the material the filing form
+  asks for. D1a's edge-phrase check and D1b's subject match both read it now.
+  `core.teaser` keeps calling its input a logline, which is the right word for
+  what a teaser is written from; it is fed the synopsis.
+- **One consequence worth watching:** D1a's edge-phrase detection used to run on
+  one sentence and now runs on a paragraph, so more text means more chances to
+  trip a phrase and land in `NEEDS_HUMAN_FORMTYPE`. That errs toward caution,
+  but it will be noisier.
+- **Genre keywords move up under the title and gain suggestions.** Twelve common
+  ones as chips; the box stays open for anything else. Nothing downstream treats
+  a chosen word differently from a typed one — the subject check reads the text
+  and has to quote it either way — so the list can be incomplete without making
+  an answer wrong.
+- **Reordered so each field can be answered when it is asked.** AI generated now
+  sits *above* the budget range, because it decides which ranges the dropdown
+  shows. The exact figure moves below the range: the range settles the tier, and
+  the figure is for the filing form.
+- Verified: `python -m pytest` (461 passed, 3 skipped), `npx tsc --noEmit`
+  clean, `scripts/e2e_check.py` **ALL CHECKS PASSED**, and in Chrome — picking
+  two chips fills the box as `悬疑,科幻`, and a synopsis-only subject hit still
+  returns `T1` quoting the creator's own sentence.
+
+### Shared — a budget range now settles a tier, because the ranges are the thresholds
+
+- **`BudgetBand` becomes `AmountBracket`**: `below_lower` / `between` /
+  `at_or_above_upper` / `unknown`, replacing `band_a/b/c`. A bracket produces a
+  **settled** tier whenever the thresholds behind it are usable, where a band
+  could only ever be provisional.
+- The difference is not cosmetic. D-003 marked band-derived tiers provisional
+  because the bands were invented before any threshold was published. These are
+  defined *by* the published figures, so "under the lower line" says exactly what
+  a number under 1,000,000 says — and reporting that as provisional understated
+  what the creator had told us. Answering honestly ("I don't know the exact
+  figure") used to cost them a settled result. See
+  [D-036](docs/decisions.md#d-036), superseding that half of D-003.
+- **The brackets are relative, not numeric**, because the figures differ by
+  production mode — 1,000,000 / 3,000,000 live action, 300,000 / 800,000 AI.
+  One enum resolved against whichever set applies; the interface fills in the
+  numbers from the AI checkbox, so the same dropdown reads "Under ¥1,000,000" or
+  "Under ¥300,000". Verified in Chrome: ticking AI changes all three options.
+- **The exact amount stays.** The freeze gate lists `investment_amount_rmb`
+  among its required facts, so `amount_required` still appears on a
+  bracket-derived classification — it has stopped being a reason to hedge the
+  tier, not stopped being wanted.
+- `e2e_check.py` had an assertion locking the old semantics — "tier marked
+  provisional" on a bracket-only romance fixture. It now asserts the opposite,
+  plus that `amount_required` still appears, plus a new case: an **unanswered**
+  budget is still provisional and says `budget_unknown`, so "settled from a
+  range" has not quietly become "settled from nothing".
+- Verified: `python -m pytest` (461 passed, 3 skipped), `npx tsc --noEmit`
+  clean, and in Chrome with the amount left blank and only a range chosen:
+  `Tier T3`, **no provisional marker**, citing `tier-live-action-2026`, with
+  `amount_required` still listed.
+- **Known duplication:** `web/lib/enums.ts` carries the figures so the dropdown
+  can name them. The tier is computed server-side from the pinned snapshot and
+  stays correct if the two drift; the labels would not.
+
+### A — ask what a creator can answer, and what actually decides something
+
+Five changes to what intake asks, from reviewing the form question by question.
+
+- **A working title.** `required_facts` has always included `title`, and the
+  wizard sent `title_working: null` — so every project reached the freeze gate
+  with a fact it could never have supplied. Asked now.
+- **A synopsis, read by the subject stage alongside the logline.** One sentence
+  is thin evidence for a special-subject match. Verified end to end: a logline
+  of 「两个老朋友在小城重逢」 with the operation described only in the synopsis
+  now returns `T1`, quoting the synopsis — and would have read as three-class
+  before. The verbatim rule is unchanged; there is simply more of the creator's
+  own text for a quote to be found in.
+- **`has_finished_film` becomes `production_stage`** (idea / script written /
+  shooting / finished). The bool could not say whether shooting had *started*,
+  which is the line article 12 draws, and nothing read it. **A one-class project
+  already shooting now carries `filing_due_before_shooting`** — the tier does not
+  move and no state changes, but a roadmap opening with a step they have passed
+  would read as advice when it is a problem.
+- **The distribution question is gone.** Nothing in `core/` read
+  `domestic_platforms`; asking a first-time creator where they will publish, and
+  then ignoring the answer, was the worst of both.
+- **The two Circular 35 conditions fold into a disclosure.** Neither is
+  answerable at intake — platform promotion is settled after the film exists —
+  but deleting them would let a platform-featured 500,000 project read as
+  three-class when Circular 35 makes it a key micro-drama. Out of the first
+  screen, not out of the model.
+- Verified: `python -m pytest` (459 passed, 3 skipped — 3 new), `npx tsc
+  --noEmit` clean, and the whole path driven in Chrome with a synopsis-only
+  subject hit while already shooting.
+
+### A — the help panel closes when you click away
+
+- Clicking anywhere outside an open `?` panel closes it, and so does Escape.
+  Previously the only way out was finding the same `?` again, and with nine of
+  them on the page that is worse than having opened it.
+- Clicks **inside** the panel do not close it, so the question box can be
+  focused and typed into. The listener exists only while a panel is open.
+- Verified in Chrome: opening, clicking the question box (stays open, takes
+  focus), clicking the page background (closes). `npx tsc --noEmit` clean,
+  `python -m pytest` unchanged at 456 passed, 3 skipped.
+
+### A — field help: explain the question instead of reading the answer
+
+- Every intake field gains a `?`: hover the label for a hint, open it for the
+  hint plus a worked example, and ask a question answered from the clauses
+  behind that field, with clause ids and the snapshot version shown.
+- **The two conversational-extraction commits earlier today are reverted.**
+  `core/intake_chat.py`, its endpoint and its twenty tests are deleted;
+  `POST /v1/intake/turn` becomes `POST /v1/intake/explain`. Reading a creator's
+  answer accepts their confusion and copes with it. Explaining the question
+  removes it, and leaves them understanding the form they are signing. See
+  [D-035](docs/decisions.md#d-035).
+- The risk goes with it. The reply schema is `{answer, clause_refs}` — **no
+  value field** — so nothing a question says can reach the form, and the
+  traceability guard the previous design needed is replaced by the shape of the
+  reply. `test_the_reply_has_nowhere_to_put_a_value` holds that line.
+- Two disciplines kept: answers come from clause text passed as trusted context,
+  and a clause the model names but the snapshot does not carry is dropped; the
+  model may say what the tiers are and never which one a project is in.
+- The first two layers need no backend at all. Offline the `?` still shows its
+  hint and example, and says only the question layer is unavailable.
+- **Three defects found by driving it in Chrome, none of which the tests could
+  have caught:**
+  - The ask box was a `<form>` **nested inside the wizard's form**. React lets
+    that into the DOM, the browser warns, and the inner submit reaches the outer
+    form: the page reloaded and wiped the answer between the 200 coming back and
+    anything rendering it. The request had succeeded every time. Now a `div`
+    with a button and an Enter handler.
+  - The first answers named the field by its key and rendered 联调门槛 as "joint
+    adjustment thresholds", with no figures — correct, sourced, and less use than
+    the static hint above it. The form's own label is now sent with the question,
+    and the prompt asks for the figure where a clause carries one. The same
+    question now answers with 800,000 and 300,000.
+  - `platform_promoted` and `voluntary_key_declaration` were mapped to Order 16
+    articles 5 and 17, which do not mention sponsor promotion — so the model
+    answered that the clauses did not explain the field, which reads as a failure
+    rather than as the hint being the whole answer. Both now map to nothing, and
+    a field with no clauses **does not reach the model at all**: asking anyway
+    invites a paraphrase of half-remembered regulation, which is the one thing
+    this must not produce. The panel says so, and names 广电办发〔2024〕35号 as
+    the document the snapshot cannot cite yet.
+- Verified: `python -m pytest` (456 passed, 3 skipped — 26 extraction tests
+  removed, 13 added), `npx tsc --noEmit` clean, and all three paths driven in
+  Chrome: a field with clauses answering with figures and a citation, a field
+  without them showing the hint-only message, and the static layer with no
+  network at all.
+
+### A — the intake turn endpoint, which cannot write
+
+- `POST /v1/intake/turn` takes one sentence and returns proposals: the value,
+  the words it was read from, and whether it was quoted or inferred. Creator or
+  admin only.
+- **Stateless and project-free on purpose.** It does not take a project id, does
+  not store, and does not classify. Storing stays
+  `POST /v1/projects/{id}/intent`, after a person has looked. As long as this
+  endpoint cannot write, no prompt that reaches it can make the product believe
+  anything — and there is a test asserting exactly that, because the tempting
+  next commit is always "and then apply the patch".
+- An empty turn and an oversized one are both refused **before** the model is
+  called, and the tests assert the backend recorded no call rather than just
+  checking the status code.
+- Verified: `python -m pytest` (469 passed, 3 skipped — 6 new), including that a
+  scripted backend offering a `tier` has it dropped before the response, and
+  that with no backend the endpoint still answers with `intake_chat_pending`
+  rather than an empty proposal list that reads as "nothing found".
+
+### A — conversational intake, step 1: reading a turn without believing it
+
+- New `core/intake_chat.py`. One turn in, proposed intake answers out, nothing
+  stored and nothing classified. No UI yet, which is the point: every safety
+  property lives here and can be attacked before anything is visible.
+- Three rules, in order. **Traceable or discarded** — a proposal must quote a
+  span of what the person actually typed, and a value with no sentence behind it
+  is dropped, because there is nothing to show them for checking. **Verbatim or
+  inferred, both kept** — "around a million" becomes 1,000,000 flagged as
+  inferred and carrying the words it came from, rather than being thrown away.
+  **Intake fields only** — `PROPOSABLE_KEYS` is derived from `IntentProfile`, so
+  a tier or a form type cannot be proposed however the model phrases it.
+- This deliberately differs from `core/extract.py`, which keeps discarding
+  anything not literal. That module reads a document nobody is watching; here the
+  person is on the other side of the screen with their own sentence beside the
+  field. Same requirement, different response to failing it.
+- **Four defects the 20 scripted tests could not have found, all from running it
+  against Vertex:**
+  - `RESPONSE_SCHEMA` used a union type (`["string","number","boolean","null"]`).
+    Vertex rejects a list there, so every scripted test passed while no real call
+    could have succeeded. Values now arrive as text and the schema does the
+    typing, which it was doing anyway. **`core/extract.py` has the same latent
+    bug**, unhit only because fact extraction is not wired up yet.
+  - `episode_minutes` is a float, so a creator typing `3` produced `3.0`, whose
+    string is absent from "3 minutes each" — flagged as inferred and sent back to
+    be checked. `_renderings` now knows an integral float was written without the
+    decimal, and that 900000 may have been written 900,000.
+  - A single genre offered for `genre_keywords` failed to coerce, because the
+    field is a list. A scalar for a list field is now wrapped: that changes the
+    shape, not the content.
+  - A live model emits **one proposal per keyword**, so two genres in one turn
+    produced two entries for the same key and `as_patch()` silently kept the
+    last. List fields now merge; a second value for a scalar is set aside as
+    `already_answered_in_this_turn` rather than overwriting an answer nobody saw.
+- Verified: `python -m pytest` (463 passed, 3 skipped — 20 new) and five turns
+  against a live Vertex-backed Gemini, including 「投资九十万，AI 生成的科幻短剧」
+  → amount, AI flag and genres all read and flagged, and two injection attempts
+  in both languages producing an empty patch.
+
 ## 2026-08-28
 
 ### Shared — two decisions were sharing an id, and the wizard looked frozen

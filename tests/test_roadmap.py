@@ -25,10 +25,10 @@ OTHER = {"X-Mock-Role": "creator", "X-User-Id": "u_other"}
 ROMANCE_INTENT = {
     "form_type_claimed": "micro_drama",
     "genre_keywords": ["甜宠"],
-    "logline": "总裁与实习生在职场相遇，逐渐走到一起的爱情故事。",
+    "synopsis": "总裁与实习生在职场相遇，逐渐走到一起的爱情故事。",
     "episode_count": 30,
     "episode_minutes": 2,
-    "budget_band": "band_c",
+    "amount_bracket": "below_lower",
     "is_ai_generated": False,
 }
 

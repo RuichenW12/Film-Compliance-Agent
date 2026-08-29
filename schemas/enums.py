@@ -70,10 +70,40 @@ class Tier(StrEnum):
     UNDETERMINED = "undetermined"
 
 
-class BudgetBand(StrEnum):
-    BAND_A = "band_a"
-    BAND_B = "band_b"
-    BAND_C = "band_c"
+class ProductionStage(StrEnum):
+    """How far along the work is.
+
+    Not idle curiosity: 总局令第16号 article 12 requires a one-class filing
+    *before* shooting starts. Someone who has already shot a one-class project
+    is not early — they are late, and the product should say so rather than
+    hand them a roadmap that begins with a step they have passed.
+    """
+
+    IDEA = "idea"
+    SCRIPT_READY = "script_ready"
+    SHOOTING = "shooting"
+    FINISHED = "finished"
+    UNKNOWN = "unknown"
+
+
+class AmountBracket(StrEnum):
+    """Where the budget sits relative to the tier thresholds.
+
+    Replaces `BudgetBand`, whose `band_a/b/c` were invented before any threshold
+    was published and could only ever produce a provisional tier (D-003). These
+    are defined *by* the thresholds, so answering one is enough to settle a tier
+    without naming a figure: "under the lower line" decides three-class as
+    surely as a number would.
+
+    Deliberately threshold-relative rather than numeric, because the numbers
+    differ by production mode -- 1,000,000 and 3,000,000 for live action,
+    300,000 and 800,000 for AI. One enum, resolved against whichever set applies;
+    the interface shows the figures.
+    """
+
+    BELOW_LOWER = "below_lower"
+    BETWEEN = "between"
+    AT_OR_ABOVE_UPPER = "at_or_above_upper"
     UNKNOWN = "unknown"
 
 

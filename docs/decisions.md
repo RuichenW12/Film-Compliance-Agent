@@ -1169,3 +1169,685 @@ Revisit when the Chinese bundle is written, or if a user testing the English UI
 cannot find on a government site the thing the product told them about — that is
 the failure mode this trades away, and it is worth watching for.
 
+## D-035
+
+**Intake help explains the question rather than reading the answer** · Area: A · Status: Accepted · 2026-08-28 · Replaces the conversational extraction built earlier the same day
+
+Testing the wizard in a browser found three fields a first-time creator cannot
+answer, all of the same shape: `budget_band` rendering raw enum values and
+defaulting to one, `domestic_platforms` prefilled with platforms nobody named,
+and two 广电办发〔2024〕35号 conditions with no hint that leaving both off is
+normal. Better labels fixed the symptom. The disease is that **a form cannot
+answer a question back**.
+
+The first attempt at the cure was conversational intake: the creator describes
+the project, a model reads their sentence, and proposed values appear in the
+form for confirmation. It was built and it worked — `core/intake_chat.py`, a
+traceability guard, twenty tests, an endpoint that could not write. It is
+deleted.
+
+**Why it went.** Reading someone's answer accepts their confusion and works
+around it. Explaining the question removes it. Both help a creator who does not
+know what 招商主推 means; only one of them leaves them understanding the form
+they are signing. And the extraction route carried a permanent cost for that
+weaker outcome: every value it proposed was a value a model had chosen, so the
+whole apparatus of quotes, inferred flags and confirmation existed to make that
+survivable.
+
+The replacement has no such apparatus because it has nothing to guard. The
+reply schema is `{answer, clause_refs}` — **there is no value field**, so no
+phrasing of a question and no instruction buried in one can reach the form. A
+test asserts that shape directly, because if a value field ever reappears the
+guard has to come back with it.
+
+**What survived the change**, because neither was about extraction:
+
+- Explanations are drawn from clause text passed as trusted context, and a
+  clause id the model names but the pinned snapshot does not carry is dropped.
+  A reference nobody can follow is worse than none — and this domain has already
+  burned us once, with thresholds sourced from a republished municipal page.
+- The model may say what the tiers are. It may not say which one a project is
+  in. That answer comes from the chain, with evidence; a conversational guess
+  would carry none and be believed anyway.
+
+**What was given up.** Someone who types a paragraph describing their whole
+project still fills the form field by field. That is a real cost, and the reason
+to accept it is that the paragraph was never the hard part — understanding what
+was being asked was.
+
+Revisit if field help lands and people still abandon the form, which would mean
+the problem was typing after all.
+
+
+## D-036
+
+**A threshold-aligned bracket settles a tier; an invented band never could** · Area: Shared · Status: Accepted · 2026-08-28 · Supersedes the band half of [D-003](#d-003)
+
+D-003 mapped `band_a/b/c` to T1/T2/T3 and marked every such tier provisional.
+That was right at the time and for the reason it gave: the thresholds were not
+published, so the bands were a placeholder and a tier from one was a guess
+dressed as an answer.
+
+The thresholds are published now — 1,000,000 and 3,000,000 for live action,
+300,000 and 800,000 for AI — and that changes what a range can mean. `band_c`
+was a label somebody chose. `below_lower` is defined *by* the published figures,
+so answering it says exactly what a number under 1,000,000 would say. Continuing
+to report that as provisional understated what the creator had told us, and made
+the honest answer — "I don't know the exact figure yet" — cost them a settled
+result they were entitled to.
+
+So `BudgetBand` becomes `AmountBracket`, and a bracket produces a **settled**
+tier whenever the thresholds behind it are usable. It stays provisional when
+they are not — no published set, or no production mode to choose a set with —
+because then there is nothing for the bracket to be relative to.
+
+**Why relative rather than numeric.** The brackets are not `under_1m` and
+`under_300k`; they are `below_lower`, `between`, `at_or_above_upper`. The figures
+differ by production mode, and encoding either set into the enum would have put
+policy data into a type. One enum, resolved against whichever set applies, and
+the interface fills in the numbers — which it does from the AI checkbox, so the
+same dropdown reads "Under ¥1,000,000" or "Under ¥300,000" depending.
+
+**What this does not change.** The exact amount is still wanted: the freeze gate
+lists `investment_amount_rmb` among its required facts, so `amount_required`
+still appears on a bracket-derived classification. It has simply stopped being a
+reason to hedge a tier the bracket already decided.
+
+**The boundary.** `at_or_above_upper` includes the threshold itself, and
+[D-033](#d-033) records that one source states that boundary two ways. The pack
+may still flag a disputed boundary and nothing in the seed does, so the inclusive
+reading stands and the bracket is settled. Revisit if a snapshot ever populates
+`disputed_boundaries`: the most-chosen option becoming provisional would be a
+poor trade, and the better answer would then be to ask for the figure instead.
+
+**The one duplication.** `web/lib/enums.ts` carries the figures so the dropdown
+can show them, which is a second copy of policy data. The tier is still computed
+server-side from the pinned snapshot and stays correct if the two drift; the
+labels would not. Accepted because a range with no numbers is a question nobody
+can answer, and recorded here so the staleness is findable.
+
+---
+
+## D-037
+
+**The result card speaks; the identifiers stay, folded away** · Area: A · Status: Accepted · 2026-08-28
+
+A creator ran a classification and read this back: `micro_drama`, `Tier T3`,
+"Clause `tier-ai-generated-2026` (snapshot v2)", a bare `script_verify` chip,
+"Roadmap template: `T3_4steps`", and "Project `proj_01m14mer...` is now in state
+`CLASSIFIED`". Their verdict was that it was unreadable, and they were right.
+Every line was true, and not one of them answered "so what do I do?" — while
+the filing route, the one part that did, sat at the bottom of the card.
+
+The card had grown as an integration view. It showed what the chain produced, in
+the order the chain produced it, which is the right display for the person
+debugging the chain and the wrong one for the person the chain is for.
+
+**What changed.** The verdict is a sentence built from copy, not a pair of enum
+chips. The filing route moves to the top under "What this means you have to do",
+as a numbered list. Pending flags render as sentences or not at all. The clause
+ids, the matched quotes and the snapshot version move into a "How we reached
+this" disclosure, and the project id, state and roadmap template into a
+"Technical detail" one.
+
+**Why fold rather than delete.** Ground rule 2 says a conclusion asserting
+compliance carries its `evidence_refs`, and that stays literally true — the
+evidence is on the page, one click away, with the quote it matched. What the
+rule does not say is that the evidence must be the first thing a creator reads.
+The identifiers are equally kept: they are how we reproduce a complaint, and
+deleting them to tidy the card would cost more than it saved.
+
+**The class names.** `T1`/`T2`/`T3` render as "Class 1 (一类)" and so on, following
+the stack rule that the UI is English with Chinese legal terms glossed. The
+per-class explanation describes the classification scheme, which 总局令第16号
+defines; it does not describe consequences, which come from `filing_route` in
+the snapshot and are rendered from that data.
+
+**Saying that the trail ends here.** "What happens next" states that the script
+pre-check is the next stage and that it is not built. Silence would have implied
+classification was the whole product; a step listed with no way to reach it
+would have been worse.
+
+**The guard.** `t()` falls back to the key when a bundle has no entry, which is
+how a raw identifier reached a creator in the first place. The fallback is
+right — a missing string should not blank a page — so `tests/test_result_copy.py`
+now walks `FormType`, `Tier`, every `filing_route` value in `policy/*.yaml`, and
+every flag literal in `core/classify/`, and fails when one has no copy. A new
+flag must be given words or listed as deliberately silent. Writing it caught
+seven flags the card would have shown as keys: `amount_required`,
+`amount_official`, `budget_unknown`, `generation_mode_required`,
+`thresholds_unavailable`, `threshold_boundary_disputed`, `human_review`.
+
+**Revisit when** the script pre-check ships, because "What happens next" then
+describes a step the creator can actually take and should link to it.
+
+---
+
+## D-038
+
+**The exact investment amount leaves intake; it belongs on the filing form** · Area: A · Status: Accepted · 2026-08-28 · Builds on [D-036](#d-036)
+
+D-036 made a threshold-aligned bracket settle a tier. That left the exact figure
+on the intake form doing nothing for the answer: given a bracket, `judge_tier`
+consults the amount for one purpose only, and the creator is asked for a number
+they frequently do not have at the idea stage.
+
+So the field comes off the intake form. `IntentProfile.investment_amount_rmb`
+and the DTO field both stay, the wizard keeps sending the key, and the per-field
+help entry survives — the form-freeze stage (T-A5) lists the figure among its
+required facts and is where it will actually be collected. Nothing in the API
+contract moves; only the question stops being asked at the wrong moment.
+
+**What this gives up, precisely.** The amount does one thing a bracket cannot:
+`on_threshold_boundary` detects a budget sitting *exactly* on a threshold, where
+[D-033](#d-033) records the source stating the boundary two ways. With a figure,
+such a project is reported provisional with `threshold_boundary_disputed`. With
+`at_or_above_upper` alone, the inclusive reading is taken and the tier is
+settled. That warning is therefore unreachable from intake until the freeze
+stage collects a figure.
+
+**Why that is the right trade for now.** The detection code is untouched and
+still fires whenever the API receives an amount, so this is a gap in one entry
+path, not a lost capability. Against it: every creator at the idea stage was
+being asked for a number they would have to invent, and inventing amounts is the
+one thing this repository's ground rules forbid outright. A field that invites a
+guess is worse than a warning that arrives one stage later.
+
+**Revisit when** the freeze stage ships, or sooner if a real project is observed
+budgeting exactly to a threshold — the cheap fix is a follow-up question shown
+only when `at_or_above_upper` is chosen, which asks for the figure at the one
+moment it can change the answer.
+
+---
+
+## D-039
+
+**English only, glosses included** · Area: A · Status: Accepted · 2026-08-28 · Supersedes the gloss half of [D-032](#d-032)
+
+D-032 settled that the UI is English with Chinese legal terms glossed, and
+[D-037](#d-037) followed it: `T3` rendered as "Class 3 (三类)", `micro_drama` as
+"micro-drama (微短剧)". The owner has now asked twice for no Chinese in this
+build, so the glosses come out and `CLAUDE.md`'s stack line is corrected to
+match.
+
+**What this gives up, stated plainly.** The gloss was a bridge, not decoration.
+A creator told "Class 3" here will meet 三类 on the actual filing form and on
+every provincial page they read next, and nothing in the product now connects
+the two for them. That cost is real and it is accepted, not overlooked.
+
+**Why it is still defensible.** The classification result is a pre-check
+reference, not the filing form. Its job is to say what the creator has to do,
+and mixed-script parentheses in the first sentence of an answer were noise
+against that job. If the bridge is wanted back it belongs where the terms are
+actually met — the materials list and the filing form itself — rather than in
+the headline of every result.
+
+**Enforced, not just done.** `tests/test_result_copy.py` fails if any value in
+`web/locales/en.json` contains a CJK character. A removal like this otherwise
+erodes one copy edit at a time.
+
+**The zh bundle is untouched.** It still mirrors every key, so the locale switch
+D-032 preserved remains possible; this decision is about what the English build
+shows, not about dropping the translation path.
+
+**Revisit when** the materials or filing-form stages ship, since those are the
+screens where a creator has to recognise the Chinese term on a real document.
+
+---
+
+## D-040
+
+**The result cites policies by name, not by clause id** · Area: A · Status: Accepted · 2026-08-28 · Extends [D-037](#d-037)
+
+D-037 folded the identifiers into disclosures but left them as identifiers:
+opening "How we reached this" showed `tier-ai-generated-2026`, and "Technical
+detail" showed `proj_01m14… CLASSIFIED T3_4steps script_verifyamount_required`.
+Folding the raw keys away made the card readable; it did not make the evidence
+readable, which is what the evidence is for.
+
+**What changed.** Each `evidence_refs` clause id now renders through a
+`clause.<id>` copy key — "Investment thresholds for AI-generated micro-dramas",
+"Order 16, Article 17 — review and the document you receive" — followed by one
+line naming the instrument and its effective date. The snapshot version is a
+sentence explaining what pinning means rather than a bare `v2`. The technical
+disclosure is deleted outright: the roadmap template and state name told a
+creator nothing, and the raw flag list repeated, as keys, warnings already given
+as sentences above it. The project id survives as a support reference on the
+disclaimer line, which is the one identifier a creator has any use for.
+
+**Why the names live in the bundle.** The snapshot's own clause `title` is
+Chinese (`第十七条`), which [D-039](#d-039) rules out of this build. The English
+reading is UI copy — a rendering of an identifier the snapshot already fixes —
+not a second source of policy. No amount, threshold or duty is restated here;
+those still come from the snapshot through `filing_route`.
+
+**The guard.** `tests/test_result_copy.py` walks every `clause_id`/`clause_ref`
+in `policy/*.yaml` and fails when one has no English name. Without it a clause
+added to a future snapshot renders as an empty bullet — worse than the id it
+replaced, because an empty bullet says nothing at all.
+
+**Revisit when** a snapshot carries an English title of its own, at which point
+the bundle copy should defer to the data rather than duplicate it.
+
+---
+
+## D-041
+
+**The wizard hands the project to collection; no id is copied by hand** · Area: A · Status: Accepted · 2026-08-28
+
+`/collection` asked the creator to paste a project id into a text box. The
+wizard, one screen earlier, had just created that project and knew the id. The
+two stages were one journey joined by a clipboard.
+
+The result card now ends with a link to `/collection?project=<id>`, and the
+collection page reads the query parameter once on mount and loads. Typing an id
+by hand still works: this removes the need, not the option.
+
+**Why a link and not a redirect.** Classification is an answer a creator may
+want to sit with, screenshot or show someone before doing anything. Bouncing
+them onward would treat the answer as a step rather than a result.
+
+## D-042
+
+**The status doc and the e2e both claimed a frontier three stages behind the code** · Area: Shared · Status: Accepted · 2026-08-28
+
+Planning the work after classification, two sources agreed that T-A3 through
+T-A6 were unbuilt: `docs/technical/implementation-status-2026-08-24.md` marked
+roadmap confirm as "no route", and `scripts/e2e_check.py` printed steps 5 to 14
+as `PENDING` from a hard-coded list. Both were stale. `openapi.json` already
+served every one of those routes, and driving them against a live server took a
+project from intent through roadmap confirm, material cards, an upload ticket,
+fact extraction, the C1-a pre-check, and into a correctly blocked gate.
+
+The cost was a full planning pass spent designing work that existed, and an
+answer to the owner that understated the product by six stages.
+
+**What changed.** `PENDING_STEPS` now holds only the policy-loop items that
+genuinely have no route, and a new section 19 walks steps 5 to 11 with sixteen
+assertions -- including that a kept fact quotes the uploaded file, and that a
+form freeze is refused while the gate is blocked. The status doc keeps its
+table for history but opens with a banner naming itself stale and pointing at
+`openapi.json` and the e2e output instead.
+
+**The rule this suggests.** A hard-coded list of what is unbuilt rots silently,
+because nothing fails when the code catches up. A check that walks the route and
+passes cannot rot the same way: it either exercises the feature or breaks. When
+those disagree, believe the one that made a request.
+
+## D-043
+
+**A union type in a response schema is invisible to every fake-LLM test** · Area: A · Status: Accepted · 2026-08-28
+
+`core/extract.py` declared `"value": {"type": ["string", "number", "null"]}`.
+Vertex's `responseSchema` is an OpenAPI 3.0 subset where `type` is a single
+string, so every live extraction call would have failed while the suite stayed
+green -- the same defect already fixed once in `core/intake_help.py`.
+
+The union also bought nothing. `_survives` requires `str(value)` to appear
+verbatim inside the quote, which must appear verbatim in the document, so a
+value that is not literal document text is discarded regardless, and a null
+value is rejected outright. The schema is now `{"type": "string"}`.
+
+**The guard.** `tests/test_response_schemas.py` walks every module-level
+`*SCHEMA` dict under `core/` and fails on any list-valued `type`. It discovers
+the schemas rather than listing them, so a new one is covered when it is
+written, and it asserts that it found some -- otherwise a rename would leave it
+passing by checking nothing. Five schemas are currently covered.
+
+**Revisit if** a backend is added whose schema dialect does accept unions, at
+which point the check should key off the configured backend rather than ban the
+construct outright.
+
+---
+
+## D-044
+
+**A field can be left blank on the record, and that is not the same as unanswered** · Area: A · Status: Accepted · 2026-08-28
+
+`applicant_entity` is required before a form freezes, because a 备案 is filed by
+a company holding the 广播电视节目制作经营许可证. An individual creator has no
+such company, and the licensed company that files on their behalf supplies its
+own details. So the field is one an individual creator is not merely unable to
+answer — it is one they should not answer.
+
+Before this the reachable outcomes were three, and all bad: invent a company
+name, which [the ground rules](../CLAUDE.md) forbid outright; leave the field
+pending, which holds the form shut forever; or abandon the filing.
+`confirm_form_field` even refuses an empty value with "leave it pending
+instead", which named the trap without offering a way out.
+
+**The fourth option.** `POST /v1/projects/{id}/form/fields/{key}/defer` records
+a fact with **no value** and `PENDING_INSTITUTION` status, against the creator
+who declared it. The field renders 待补充 exactly as an unanswered one does, and
+`deferred_keys` lists it on the frozen form, so the gap stays visible to
+everyone downstream.
+
+**Why this needed almost no new machinery.** `evaluate_gate_d3` already accepted
+`PENDING_INSTITUTION` alongside `CONFIRMED`, and `FieldStatus` already had the
+member. Nothing produced it and `pending_keys` blocked anything not `FILLED`,
+so the design's own answer was unreachable. This connects two halves that were
+already there.
+
+**What keeps it honest.** The value stays `None`, so nothing is invented. The
+hash covers field *status*, so a deferred field and a filled one produce
+different hashes and a frozen form cannot pass as complete. A confirmed value
+outranks a later deferral, so answering then deferring never discards the
+answer. The freeze event records `deferred` so the timeline says which kind of
+document was frozen. Nine tests in `tests/test_deferred_fields.py` pin these,
+including a parametrised one over `FactStatus` so a new member cannot fall
+through to a silent `PENDING`.
+
+**Scope.** Deferral is general rather than special-cased to `applicant_entity`,
+because the status means "the filing institution supplies this" and that is a
+true statement about more than one field. It is not a waiver: an institution
+reading the frozen form sees an explicit gap it is expected to fill.
+
+**Revisit when** the institution console ships, since that is where a deferred
+field should become a required input for the reviewer rather than a note.
+
+---
+
+## D-045
+
+**A durable store, and it is SQLite rather than Firestore** · Area: A · Status: Accepted · 2026-08-28
+
+Every project vanished when the API stopped. That made the product impossible
+to show twice — a demo had to be rebuilt live each time — and it is why an e2e
+run against a long-lived server told a different story from one against a fresh
+process ([D-042](#d-042)).
+
+**Why not Firestore, which `CLAUDE.md` names as the stack.** It is not enabled
+on the project and Docker is not installed, so the emulator is unavailable. A
+Firestore adapter could have been written here and never once executed, and an
+adapter that has never run is not a verified adapter — it is a plausible one.
+Writing code whose only evidence is that it type-checks is the failure this
+repository's verification rule exists to prevent.
+
+**What was built instead.** `store/sqlite.py`, behind the identical ports, in
+the standard library. One `documents` table of JSON keyed by
+`(collection, doc_key)`, a `parent` column for the owning project, and a
+monotonic `ordinal`. The ordinal is the interesting part: every `list()` in the
+memory store returns insertion order because dicts and lists give that away
+free, and a dozen callers depend on it — `latest()` on forms and reviews, the
+timeline, `get_by_key` taking the last write. Storage does not preserve
+insertion order by accident, so the ordinal is what keeps a promise that was
+previously implicit.
+
+**Firestore is not blocked by this.** It slots in behind the same ports and
+passes the same conformance file, which is now easier to write than it was
+before, not harder.
+
+**The conformance suite is the real deliverable.** `core/repositories.py`
+declared fourteen ports and exactly one thing implemented them. A port with a
+single implementation is an interface nobody has tested the shape of.
+`tests/test_store_conformance.py` runs 26 assertions against both backends —
+list order, last-write-wins on facts, first-writer-wins on idempotency keys, a
+ticket that cannot be spent twice, an inbox that is newest-first, an updated
+form draft that does not become the latest one. A Firestore adapter passes that
+file or it is not finished.
+
+**The default stays `memory`,** so tests and throwaway runs keep their clean
+slate, and an unknown `STORE_BACKEND` raises rather than falling back — running
+in memory when someone asked for durability is exactly the surprise this
+removes.
+
+**The consequence worth stating plainly.** With `sqlite`, restarting the API no
+longer resets anything, which is the whole point and also a new way to be
+confused. Section 17 of the e2e asserts one `policy_stale` notice and a second
+run on the same file fails — verified, not predicted. Resetting now means
+deleting the file. The e2e docstring and `.env.example` both say so.
+
+**Revisit when** Firestore is enabled, or when concurrent writers appear: one
+connection under a lock is right for a single-process demo and is not a
+statement about what a deployed service should do.
+
+---
+
+## D-046
+
+**The reviewer had a console but no inbox** · Area: A · Status: Accepted · 2026-08-28
+
+Every institution route worked: submit, the mock licence check, accept, return,
+resume, and filing. Driven by hand a project went from intent to `FILED` with a
+registration number. And yet the reviewer side felt unbuilt, because the console
+could open a project only when somebody handed over its id and it was pasted
+into a box. That is a lookup tool, not an inbox — a reviewer had no way to
+discover that work existed.
+
+`ProjectStore.list_all` had been declared as a port method from the start and
+**nothing ever called it**. The queue is what it was for.
+
+**Which states belong to a reviewer.** `INSTITUTION_REVIEW` needs a decision.
+`READY_FOR_EXTERNAL_FILING` has been accepted and still needs its registration
+number, which is also the institution's act — dropping a project at acceptance
+would let it fall off the screen with the last step undone, and "accepted" is
+not "filed". A returned project leaves the queue, because it is the creator's
+work again.
+
+**What a row says, and does not.** Title, class, what it is waiting for, and the
+licence reasons. `title_working` stays null when a creator never named the
+project rather than borrowing one from anywhere — the queue renders "untitled"
+and does not invent. There is no `ok` field on the licence check and the row
+does not synthesise one: an empty `reasons` is what passing means, and when it
+fails the reasons are what the reviewer needs.
+
+**Institution role only.** The queue spans every creator's projects, so it is
+not a creator's route. A creator reading it would see everyone else's work.
+
+**The paste-an-id form stays.** It is now a fallback rather than the only way
+in, which is the same shape as [D-041](#d-041)'s handoff: remove the need, not
+the option.
+
+**Revisit when** a real identity provider replaces the demo header, at which
+point `institution_id` should come from the principal rather than a query
+parameter, and the unfiltered listing should stop being reachable at all.
+
+---
+
+## D-047
+
+**Submitting is the creator's act, so it lives on the creator's page** · Area: A · Status: Accepted · 2026-08-28
+
+The submit card sat on `/institution`. That was wrong twice over.
+`submit_to_institution` calls `_assert_owner`, so it is the creator's act by
+contract — it only worked from that page because the demo auth gives every
+role the same `user_id`. And it stranded the creator at the lock, with the next
+step of their own journey on a page belonging to someone else.
+
+It now sits on `/collection` beneath the form it sends, along with `resume`,
+which is the creator answering the reviewer rather than the reviewer acting
+again. The card shows what came back: under review, returned with the
+reviewer's comments **quoted verbatim**, accepted, or filed. A paraphrase of an
+instruction the creator has to act on is a chance to get it subtly wrong.
+
+**Chinese in a quoted comment is not a violation of [D-039](#d-039).** That
+decision governs the product's own copy, not text a human typed. The
+`test_result_copy` guard checks `locales/en.json` and nothing else, which is the
+right boundary.
+
+**The demo option moved with it.** The reviewer's picker had "an institution not
+in the registry (see what happens)", which is how the failing licence path is
+demonstrated. It now sits on the creator's picker, labelled as a demo entry
+rather than offered as a real choice.
+
+## D-048
+
+**A returned project could never be sent again** · Area: A · Status: Accepted · 2026-08-28 · Found while implementing [D-047](#d-047)
+
+Building the creator's send card surfaced a dead end. `form_draft` returns a
+frozen draft unchanged, and `freeze_form` early-returns one without
+transitioning. So a returned project could be resumed and its gate re-passed,
+and then: the state never reached `FORM_FROZEN` again, and every resubmission
+answered 409 forever. A creator could read the reviewer's comments and had no
+way whatever to act on them.
+
+Both short-circuits are individually right. `form_draft` must not rebuild a
+frozen form, and freezing twice in a row must be idempotent. What was missing
+was the transition between them.
+
+**The fix.** `resume_after_return` now starts a **successor draft** whose
+`parent_draft` is the frozen one — a field that has been on `FormDraft` since it
+was written and was never once set to a new value. The reviewed version is not
+reopened: it is the record of what was sent, and resuming must not rewrite
+history. The successor rebuilds from facts on the next read, so corrections
+appear and re-freezing produces a genuinely different hash.
+
+**A wrong assertion caught in passing.** The first version of the e2e check
+asserted that re-freezing yields a new hash. It does not, and should not, when
+nothing changed — that is what a content hash means. The check now corrects a
+field first, which is the only version of the assertion that says anything.
+
+**The copy was wrong too, and was fixed rather than kept.** "This reopens the
+form for editing" described behaviour the product does not have and should not:
+the sent form stays locked. It now says a fresh copy is started.
+
+**Revisit when** a reviewer needs to compare a resubmission against what they
+first saw. The lineage is recorded, and nothing reads it yet.
+
+---
+
+## D-049
+
+**The policy loop published to nobody** · Area: Shared · Status: Accepted · 2026-08-28
+
+Driving workstream B by hand, every part worked: a crawl produced a proposal, a
+human published it, the snapshot became `v3`, and `/healthz` reported the new
+version. Then a project pinned to `v2` stayed pinned, was never flagged, and its
+creator was never told. The loop ran to completion and reached nothing.
+
+`PolicyUpdatedConsumer` was fully written the whole time — idempotency
+receipts, impact filtering, the recalc rules. It was wired to
+`InMemoryProjectRepository`, a fake holding no projects, and `FakeRecalcClient`.
+Every test passed because every test used those fakes. This is the same shape as
+[D-042](#d-042): a component that looks finished because nothing ever asked it
+to touch reality.
+
+**What was added.** `workers/policy/adapters/live_projects.py`:
+`LiveProjectRepository` projects the product's real `Project` rows into the
+`ProjectPolicyState` the consumer expects, and `LiveRecalcClient` calls
+`recalc_tier`. `ConsumerEventPublisher` delivers in-process what Pub/Sub would
+deliver over the wire.
+
+**The boundary is respected in ownership, not in transport.** `CLAUDE.md` says B
+reaches the product only through `/v1/internal/*`. These adapters call exactly
+the two `WorkflowService` methods those routes call — `mark_policy_stale` and
+`recalc_tier` — and live under `workers/policy/`, so B still owns its side and
+no product code changed. Making a process issue HTTP requests to itself would
+satisfy the letter of the rule and nothing else.
+
+**Writes go through the service, never the projection.** The repository is
+read-only in the direction that matters, so staleness and recalculation produce
+the state transition, the timeline entry, the audit line and the creator's
+notification exactly as a hand-called internal route does.
+
+**Dispatch and delivery stay separate.** `OutboxDispatcher.dispatch` marks a row
+sent; `drain` hands it to the consumer. "Sent" and "handled" are different facts
+and the outbox records only the first, so collapsing them would lose the
+distinction that makes redelivery reasonable.
+
+**A paragraph here was wrong, and is corrected by [D-052](#d-052).** It said
+receipts living in memory risked handling an event *twice* after a restart. The
+real risk ran the other way: the original wiring marked the outbox row sent
+before the consumer had touched it, and a row marked sent is never selected
+again, so a crash in between lost the rule change outright. Losing one silently
+is far worse than applying one twice, and the ordering is now reversed.
+
+**A caller's own state is not overridden.** The first version of this wiring
+replaced the dispatcher unconditionally and broke a test that had deliberately
+pointed one at a failing publisher. Live wiring now happens only on the default
+path.
+
+## D-050
+
+**A subject-rule change had no way to reach anyone** · Area: Shared · Status: Accepted · 2026-08-28
+
+`ImpactNode` carried `D1c` and `C1-a`. The subject match — D1b, the stage that
+decides whether a project is a special subject — had no node at all, so a
+snapshot could change the trigger vocabulary, publish, and mark nobody stale.
+This was recorded as an open gap well before today and is the last one the loop
+could not express.
+
+**Marking stale is the whole of the fix, and that is deliberate.** A D1b change
+flags every classified project and tells its creator. It does **not**
+recalculate. `recalc_tier` re-runs the amount stage only, so pointing it at a
+subject question would answer with money — and re-deciding a subject match
+needs the full chain, the verbatim-quote guard, and a human reading the result.
+An automatic answer here would be a compliance conclusion asserted without the
+evidence path that justifies it.
+
+**Revisit when** there is a re-classification entry point that runs D1a→D1b→D1c
+under human review. Until then the honest output is "your classification rests
+on rules that have moved", which is exactly what a stale flag says.
+
+---
+
+## D-051
+
+**A stale project needed a way back** · Area: A · Status: Accepted · 2026-08-29 · Answers the revisit condition on [D-050](#d-050)
+
+A policy change marks a project stale and tells its creator. Two of the three
+cases then had somewhere to go and one did not. A provisional tier is
+recalculated automatically. A settled tier is deliberately left alone
+([D-031](#d-031)), and a subject-rule change is deliberately not
+auto-recalculated at all ([D-050](#d-050)) — both correct, and together they
+left a creator holding a notice that their answer rested on rules that had
+moved, with no way whatever to get a new one.
+
+`POST /v1/projects/{id}/reclassify` re-runs D1a→D1b→D1c against the current
+snapshot, at the creator's request, and clears the flag.
+
+**Why not reuse `/classify`.** `run_classification` transitions toward
+`CLASSIFIED`, so calling it on a project halfway through collecting materials
+would drag the state backwards. Re-deciding is not starting over: the materials,
+roadmap and uploads all stay, and only the classification is replaced. This
+method never moves the state.
+
+**Why it refuses on a locked form.** From `FORM_FROZEN` onward the class is part
+of what the filing company is reviewing. Changing it underneath them would make
+the locked document they hold describe a different project than the one it
+names. Such a project goes round the revision loop instead, which both sides can
+see.
+
+**Why the stale flag is the permission.** Re-deciding is refused when a project
+is not stale. Without that, "re-run it" becomes a button that silently rerolls a
+classification whenever someone is unhappy with it, and the flag is the only
+evidence that there is a real reason to expect a different answer.
+
+**Why the creator asks rather than the system deciding.** Recorded as Q-4 for
+Maxine. My reading: a classification that changes under someone without their
+asking is the silent movement the evidence rules exist to prevent. But an unread
+notification is also a way to be surprised, so it is her call.
+
+---
+
+## D-052
+
+**Deliver first, acknowledge second** · Area: Shared · Status: Accepted · 2026-08-29 · Corrects [D-049](#d-049)
+
+The wiring in D-049 published each event to a queue, marked the outbox row sent,
+and handed it to the consumer afterwards. `list_pending_outbox` selects only
+`PENDING` rows, so once a row is marked sent it is never offered again. A
+process that died between the mark and the handoff left an outbox claiming the
+event was delivered and projects that were never flagged — with nothing left to
+notice or retry.
+
+D-049 described this risk as handling an event twice. That was backwards, and
+the direction matters: applying a rule change twice is absorbed by the
+consumer's own guards, while losing one means a creator is never told their
+classification rests on rules that have moved. Silence is the worse failure, and
+it is the one the code actually had.
+
+**`InlineOutboxDelivery` replaces `ConsumerEventPublisher`.** It hands the event
+to the consumer and marks the row sent only if that returns. A failure leaves it
+`PENDING` for the next publish to pick up, and the receipt guard makes the retry
+a no-op if it had in fact succeeded. At-least-once with an idempotent handler,
+rather than at-most-once with none.
+
+**The dispatcher is still used** on the path where a caller supplies their own
+`policy_state`, so a test that points one at a failing publisher keeps testing
+what it set up.
+
+**Revisit when** delivery stops being in-process. With real Pub/Sub the
+acknowledgement is the subscriber's, and this class is replaced rather than
+adapted — but the ordering it encodes is the same one that transport requires.
+

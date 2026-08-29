@@ -1,4 +1,4 @@
-"""D1a FormTypeJudge (TDD 4.3). Pure rules; the LLM only reads the logline for
+"""D1a FormTypeJudge (TDD 4.3). Pure rules; the LLM only reads the synopsis for
 edge phrases and a continuity claim, and only ever returns quotes."""
 
 from __future__ import annotations
@@ -38,7 +38,7 @@ EDGE_SCHEMA = {
 }
 
 INSTRUCTION = (
-    "Decide two things about the logline. (1) Does it contain any of the listed "
+    "Decide two things about the synopsis. (1) Does it contain any of the listed "
     "edge phrases whose format is unsettled? Quote them verbatim. (2) Does it "
     "claim a continuous plot across episodes? Do not infer legal conclusions."
 )
@@ -74,27 +74,27 @@ def judge_form_type(
     llm: LLMClient | None = None,
 ) -> FormTypeDecision:
     max_minutes, min_episodes = _pack_limits(pack1)
-    logline = intent.logline or ""
+    synopsis = intent.synopsis or ""
 
     missing = intent.missing_fields()
     if "episode_count" in missing or "episode_minutes" in missing:
         return FormTypeDecision(
             form_type=FormType.UNDETERMINED,
             outcome="ask_back",
-            missing=[key for key in missing if key != "logline"],
+            missing=[key for key in missing if key != "synopsis"],
             reasons=["intent.missing_required_fields"],
         )
 
-    edge_hits = _detect_edge_phrases(logline)
+    edge_hits = _detect_edge_phrases(synopsis)
     pending_flags: list[str] = []
-    if llm is not None and llm.available() and logline:
+    if llm is not None and llm.available() and synopsis:
         try:
             reply = llm.structured(
                 LLMRequest(
                     prompt_id=PROMPT_ID,
                     prompt_version=PROMPT_VERSION,
                     instruction=INSTRUCTION,
-                    document=logline,
+                    document=synopsis,
                     response_schema=EDGE_SCHEMA,
                     temperature=0.2,
                     context={"edge_phrases": list(EDGE_PHRASES)},
@@ -106,7 +106,7 @@ def judge_form_type(
             for hit in reply.get("edge_phrases", []):
                 quote = str(hit.get("quote", ""))
                 # Anti-hallucination: the model may only report text that exists.
-                if quote and quote in logline:
+                if quote and quote in synopsis:
                     edge_hits.append(
                         {
                             "phrase": str(hit.get("phrase", quote)),
@@ -114,7 +114,7 @@ def judge_form_type(
                             "stage": "semantic",
                         }
                     )
-    elif logline:
+    elif synopsis:
         pending_flags.append("edge_phrase_check_pending")
 
     if edge_hits:

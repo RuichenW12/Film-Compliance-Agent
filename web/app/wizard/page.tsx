@@ -2,13 +2,20 @@
 
 import { useEffect, useRef, useState } from "react";
 
+import { FieldHelp } from "../../components/field-help";
+import { ClassificationCard } from "../../components/classification-card";
+import { GenrePicker } from "../../components/genre-picker";
 import { PolicyVerificationBanner } from "../../components/policy-verification-banner";
 import {
   ApiError,
   apiFetch,
   type PolicyVerificationStatus,
 } from "../../lib/api";
-import { BudgetBand } from "../../lib/enums";
+import {
+  AMOUNT_BRACKETS,
+  BRACKET_LABELS,
+  type AmountBracket,
+} from "../../lib/enums";
 import { t } from "../../lib/i18n";
 
 interface ClassifyResponse {
@@ -38,27 +45,40 @@ interface ClassifyResponse {
   state: string;
 }
 
-const BANDS: BudgetBand[] = ["band_a", "band_b", "band_c", "unknown"];
+
+
+type ProductionStage = "idea" | "script_ready" | "shooting" | "finished" | "unknown";
+const STAGES: ProductionStage[] = [
+  "unknown",
+  "idea",
+  "script_ready",
+  "shooting",
+  "finished"
+];
 
 export default function WizardPage() {
-  const [logline, setLogline] = useState("");
+  const [title, setTitle] = useState("");
+  const [synopsis, setSynopsis] = useState("");
+  const [stage, setStage] = useState<ProductionStage>("unknown");
   const [genres, setGenres] = useState("");
   const [episodeCount, setEpisodeCount] = useState("24");
   const [episodeMinutes, setEpisodeMinutes] = useState("3");
-  // Not "band_b". A creator who never opened this dropdown has not told us their
-// budget is medium, and defaulting to one invents the fact the tier rests on.
-// "unknown" is handled properly downstream: it assumes the stricter tier, flags
-// budget_unknown, and returns a three-tier comparison card.
-  const [budgetBand, setBudgetBand] = useState<BudgetBand>("unknown");
-  const [investmentAmount, setInvestmentAmount] = useState("");
+  // "unknown", not a range. A creator who never opened this dropdown has not
+  // told us anything about their budget, and picking one for them would invent
+  // the fact the tier rests on. Handled properly downstream: the stricter tier
+  // is assumed, `budget_unknown` is flagged, and a three-tier comparison card
+  // comes back.
+  const [amountBracket, setAmountBracket] = useState<AmountBracket>("unknown");
+  // The exact figure is no longer asked for at intake: the bracket settles the
+  // tier on its own, and the filing form is where the number is actually
+  // needed. The state stays so the POST body keeps the field -- the API
+  // contract is unchanged, and the form-freeze stage will supply it. See D-038.
+  const [investmentAmount] = useState("");
   const [isAiGenerated, setIsAiGenerated] = useState(true);
   // 广电办发〔2024〕35号: platform promotion and voluntary declaration each make
   // a project 重点微短剧 on their own, whatever the investment amount says.
   const [platformPromoted, setPlatformPromoted] = useState(false);
   const [voluntaryKey, setVoluntaryKey] = useState(false);
-  // Empty, not "hongguo,douyin". Prefilling names a distribution plan the
-  // creator never stated, and a first-time creator often does not have one yet.
-  const [platforms, setPlatforms] = useState("");
 
   const [busy, setBusy] = useState(false);
   const resultRef = useRef<HTMLElement | null>(null);
@@ -79,7 +99,7 @@ export default function WizardPage() {
     try {
       const created = await apiFetch<{ project_id: string }>("/v1/projects", {
         method: "POST",
-        body: JSON.stringify({ title_working: null })
+        body: JSON.stringify({ title_working: title.trim() || null })
       });
       setProjectId(created.project_id);
 
@@ -91,10 +111,11 @@ export default function WizardPage() {
             .split(",")
             .map((value) => value.trim())
             .filter(Boolean),
-          logline,
+          synopsis: synopsis.trim() || null,
+          production_stage: stage,
           episode_count: Number(episodeCount),
           episode_minutes: Number(episodeMinutes),
-          budget_band: budgetBand,
+          amount_bracket: amountBracket,
           ...(investmentAmount === ""
             ? {}
             : { investment_amount_rmb: Number(investmentAmount) }),
@@ -104,16 +125,6 @@ export default function WizardPage() {
         })
       });
 
-      await apiFetch(`/v1/projects/${created.project_id}/channels`, {
-        method: "POST",
-        body: JSON.stringify({
-          domestic_platforms: platforms
-            .split(",")
-            .map((value) => value.trim())
-            .filter(Boolean),
-          overseas: []
-        })
-      });
 
       const classified = await apiFetch<ClassifyResponse>(
         `/v1/projects/${created.project_id}/classify`,
@@ -136,24 +147,79 @@ export default function WizardPage() {
       <h1>{t("wizard.intent.title")}</h1>
       <form onSubmit={onSubmit} className="card">
         <label>
-          <span>Logline</span>
+          <span>{t("wizard.title")}</span>
+          <FieldHelp field="title" label="Title" />
           <input
-            value={logline}
-            onChange={(event) => setLogline(event.target.value)}
-            size={60}
-            required
-          />
-        </label>
-        <label>
-          <span>Genre keywords (comma separated)</span>
-          <input
-            value={genres}
-            onChange={(event) => setGenres(event.target.value)}
+            value={title}
+            onChange={(event) => setTitle(event.target.value)}
             size={40}
           />
         </label>
         <label>
+          <span>Genre keywords (comma separated)</span>
+          <FieldHelp field="genre_keywords" label="Genre keywords" />
+          <GenrePicker value={genres} onChange={setGenres} />
+        </label>
+        <label>
+          <span>{t("wizard.synopsis")}</span>
+          <FieldHelp field="synopsis" label="Synopsis" />
+          <textarea
+            value={synopsis}
+            onChange={(event) => setSynopsis(event.target.value)}
+            rows={4}
+          />
+        </label>
+        <label>
+          <span>{t("wizard.production_stage")}</span>
+          <FieldHelp field="production_stage" label="How far along it is" />
+          <select
+            value={stage}
+            onChange={(event) => setStage(event.target.value as ProductionStage)}
+          >
+            {STAGES.map((value) => (
+              <option key={value} value={value}>
+                {t(`production_stage.${value}`)}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          <span>AI generated content</span>
+          <FieldHelp field="is_ai_generated" label="AI generated content" />
+          <input
+            type="checkbox"
+            checked={isAiGenerated}
+            onChange={(event) => setIsAiGenerated(event.target.checked)}
+          />
+        </label>
+        <label>
+          <span>{t("wizard.amount_bracket")}</span>
+          <FieldHelp field="amount_bracket" label="Budget range" />
+          <select
+            value={amountBracket}
+            onChange={(event) =>
+              setAmountBracket(event.target.value as AmountBracket)
+            }
+          >
+            {AMOUNT_BRACKETS.map((bracket) => (
+              <option key={bracket} value={bracket}>
+                {bracket === "unknown"
+                  ? t("amount_bracket.unknown")
+                  : /* The figures follow the AI checkbox: the same range means
+                       a different tier, and showing live-action numbers to
+                       someone making an AI drama would be worse than showing
+                       none. */
+                    BRACKET_LABELS[isAiGenerated ? "ai" : "live_action"][
+                      bracket
+                    ]}
+              </option>
+            ))}
+          </select>
+        </label>
+        <p className="muted">{t("wizard.amount_bracket.hint")}</p>
+        <label>
           <span>Episodes</span>
+          <FieldHelp field="episode_count" label="Episodes" />
           <input
             type="number"
             min={1}
@@ -163,6 +229,7 @@ export default function WizardPage() {
         </label>
         <label>
           <span>Minutes per episode</span>
+          <FieldHelp field="episode_minutes" label="Minutes per episode" />
           <input
             type="number"
             min={0.5}
@@ -171,40 +238,16 @@ export default function WizardPage() {
             onChange={(event) => setEpisodeMinutes(event.target.value)}
           />
         </label>
-        <label>
-          <span>{t("wizard.investment_amount_rmb")}</span>
-          <input
-            type="number"
-            min={0}
-            step={1}
-            value={investmentAmount}
-            onChange={(event) => setInvestmentAmount(event.target.value)}
-          />
-        </label>
-        <label>
-          <span>{t("wizard.budget_band")}</span>
-          <select
-            value={budgetBand}
-            onChange={(event) => setBudgetBand(event.target.value as BudgetBand)}
-          >
-            {BANDS.map((band) => (
-              <option key={band} value={band}>
-                {t(`budget_band.${band}`)}
-              </option>
-            ))}
-          </select>
-        </label>
-        <p className="muted">{t("wizard.budget_band.hint")}</p>
-        <label>
-          <span>AI generated content</span>
-          <input
-            type="checkbox"
-            checked={isAiGenerated}
-            onChange={(event) => setIsAiGenerated(event.target.checked)}
-          />
-        </label>
+        {/* Neither is answerable at intake: platform promotion is settled
+            after the film exists, and declaring voluntarily is a strategic
+            choice. Kept, because deleting them would let a platform-featured
+            500,000 project read as three-class when Circular 35 makes it one
+            — but out of the first screen, where they were noise. */}
+        <details className="more-conditions">
+          <summary>{t("wizard.more_conditions")}</summary>
         <label>
           <span>{t("wizard.platform_promoted")}</span>
+          <FieldHelp field="platform_promoted" label="Platform will feature it" />
           <input
             type="checkbox"
             checked={platformPromoted}
@@ -213,6 +256,7 @@ export default function WizardPage() {
         </label>
         <label>
           <span>{t("wizard.voluntary_key")}</span>
+          <FieldHelp field="voluntary_key_declaration" label="Declaring it voluntarily as a key micro-drama" />
           <input
             type="checkbox"
             checked={voluntaryKey}
@@ -221,16 +265,7 @@ export default function WizardPage() {
         </label>
         <p className="muted">{t("wizard.key_conditions_note")}</p>
         <p className="muted">{t("wizard.key_conditions_guidance")}</p>
-        <h2>{t("wizard.channels.title")}</h2>
-        <label>
-          <span>{t("wizard.domestic_platforms")}</span>
-          <input
-            value={platforms}
-            onChange={(event) => setPlatforms(event.target.value)}
-            size={40}
-          />
-        </label>
-        <p className="muted">{t("wizard.domestic_platforms.hint")}</p>
+        </details>
         <button type="submit" disabled={busy}>
           {busy ? "Running…" : t("wizard.classify")}
         </button>
@@ -249,108 +284,11 @@ export default function WizardPage() {
       ) : null}
 
       {result ? (
-        <section className="card" ref={resultRef}>
-          <h2>Classification</h2>
-          <PolicyVerificationBanner
-            status={result.classification?.policy_verification_status}
-          />
-          {result.exit ? (
-            <p>{t(result.exit.card_key)}</p>
-          ) : (
-            <>
-              <p>
-                <span className="badge">{result.classification?.form_type}</span>
-                <span className="badge">
-                  {t("classification.tier")} {result.classification?.tier}
-                </span>
-                {result.classification?.tier_provisional ? (
-                  <span className="badge">
-                    {t("classification.provisional")}
-                  </span>
-                ) : null}
-                {result.classification?.co_review_required ? (
-                  <span className="badge">{t("classification.co_review")}</span>
-                ) : null}
-              </p>
-              <h3>Why</h3>
-              <ul>
-                {result.classification?.matched_rules.map((rule) => (
-                  <li key={rule.rule_id}>
-                    <code>{rule.rule_id}</code>: “{rule.quote}”
-                  </li>
-                ))}
-                {result.classification?.evidence_refs.map((ref) => (
-                  <li key={ref.clause_id}>
-                    Clause <code>{ref.clause_id}</code> (snapshot{" "}
-                    {ref.snapshot_version})
-                  </li>
-                ))}
-              </ul>
-              {result.classification?.pending_flags.length ? (
-                <p>
-                  {result.classification.pending_flags.map((flag) => (
-                    <span className="badge" key={flag}>
-                      {flag}
-                    </span>
-                  ))}
-                </p>
-              ) : null}
-              {result.classification?.pending_flags.includes(
-                "clause_not_yet_in_force"
-              ) ? (
-                <p className="alert warning-alert">
-                  {t("flag.clause_not_yet_in_force")}
-                </p>
-              ) : null}
-              {result.classification?.filing_route ? (
-                <>
-                  <h3>{t("filing.heading")}</h3>
-                  <ul>
-                    <li>
-                      {t("filing.authority")}:{" "}
-                      <strong>
-                        {t(
-                          `filing.authority.${result.classification.filing_route.authority}`
-                        )}
-                      </strong>
-                    </li>
-                    <li>
-                      {t("filing.pre_shoot")}:{" "}
-                      {t(
-                        `filing.pre_shoot.${result.classification.filing_route.pre_shoot_filing}`
-                      )}
-                    </li>
-                    <li>
-                      {t("filing.result_document")}:{" "}
-                      {t(
-                        `filing.document.${result.classification.filing_route.result_document}`
-                      )}
-                    </li>
-                  </ul>
-                  {/* The one line that changes what a creator does next. */}
-                  <p
-                    className={
-                      result.classification.filing_route
-                        .blocks_release_until_granted
-                        ? "alert warning-alert"
-                        : "alert"
-                    }
-                  >
-                    {result.classification.filing_route
-                      .blocks_release_until_granted
-                      ? t("filing.blocks_release")
-                      : t("filing.no_block")}
-                  </p>
-                </>
-              ) : null}
-              <p>Roadmap template: {result.roadmap_preview?.template ?? "—"}</p>
-            </>
-          )}
-          <p>
-            Project <code>{projectId}</code> is now in state{" "}
-            <code>{result.state}</code>.
-          </p>
-        </section>
+        <ClassificationCard
+          result={result}
+          projectId={projectId}
+          sectionRef={resultRef}
+        />
       ) : null}
     </section>
   );

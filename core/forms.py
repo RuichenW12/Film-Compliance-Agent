@@ -61,6 +61,18 @@ def build_fields(
             )
             continue
 
+        # A fact the creator has deliberately left for the filing institution.
+        # It renders 待补充 exactly like an unanswered field -- the difference is
+        # that somebody said so on the record, which is why it carries the
+        # answer's SourceRef and does not hold the form shut.
+        deferred = [f for f in candidates if f.status is FactStatus.PENDING_INSTITUTION]
+        if deferred:
+            fields[key] = FormField(
+                source_ref=deferred[-1].source_ref,
+                status=FieldStatus.PENDING_INSTITUTION,
+            )
+            continue
+
         fields[key] = FormField(status=FieldStatus.PENDING)
 
     return fields, conflicts
@@ -98,8 +110,29 @@ def _source_key(source: SourceRef | None) -> dict | None:
 
 
 def pending_keys(draft: FormDraft) -> list[str]:
+    """Fields that still hold the form shut.
+
+    `PENDING_INSTITUTION` is not among them. It means a human said this value
+    comes from the institution that files the project rather than from the
+    creator -- the commonest case being `applicant_entity`, which an individual
+    creator does not have because the licensed company supplies its own. The
+    field still renders 待补充 and still hashes as unfilled, so nothing is
+    invented and the gap stays visible on the frozen form; it simply stops
+    being a reason the creator can never finish.
+    """
+
     return sorted(
         key
         for key, field in draft.fields.items()
-        if field.status is not FieldStatus.FILLED
+        if field.status not in (FieldStatus.FILLED, FieldStatus.PENDING_INSTITUTION)
+    )
+
+
+def deferred_keys(draft: FormDraft) -> list[str]:
+    """Fields frozen as 待补充 on purpose, for whoever reads the form later."""
+
+    return sorted(
+        key
+        for key, field in draft.fields.items()
+        if field.status is FieldStatus.PENDING_INSTITUTION
     )

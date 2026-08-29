@@ -16,7 +16,7 @@ from schemas.forms import FormDraft
 
 from ..deps.demo_auth import Principal, get_principal
 from ..deps.services import get_workflow
-from ..dto import ConfirmFieldRequest, GatePassResponse
+from ..dto import ConfirmFieldRequest, DeferFieldRequest, GatePassResponse
 
 router = APIRouter(prefix="/v1/projects/{project_id}", tags=["forms"])
 
@@ -71,3 +71,23 @@ def freeze_form(
 ) -> FormDraft:
     _assert_owner(principal, workflow.get_project(project_id).owner_uid)
     return workflow.freeze_form(project_id)
+
+
+@router.post("/form/fields/{key}/defer", response_model=FormDraft)
+def defer_field(
+    project_id: str,
+    key: str,
+    body: DeferFieldRequest,
+    principal: Principal = Depends(get_principal),
+    workflow: WorkflowService = Depends(get_workflow),
+) -> FormDraft:
+    """The creator states this value comes from the institution that files.
+
+    `applicant_entity` is the case this exists for: an individual creator has
+    no licence, so the company filing on their behalf supplies its own details.
+    The field stays 待补充 on the frozen form -- this records who said so, not
+    a value.
+    """
+
+    _assert_owner(principal, workflow.get_project(project_id).owner_uid)
+    return workflow.defer_form_field(project_id, key, body.reason)

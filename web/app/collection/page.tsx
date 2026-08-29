@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import {
   ApiError,
@@ -8,6 +8,8 @@ import {
   ExtractResult,
   FactRecord,
   Finding,
+  FormDraft,
+  GateResult,
   MaterialCard,
   PolicyVerificationStatus,
   RoadmapView,
@@ -15,6 +17,8 @@ import {
   attachMaterial,
   confirmRoadmap,
   extractFacts,
+  getForm,
+  getGate,
   getProject,
   getRoadmap,
   listAssets,
@@ -27,6 +31,9 @@ import {
   validateMaterial,
   waiveMaterial
 } from "../../lib/api";
+import { FilingForm } from "../../components/filing-form";
+import { FilingSubmission } from "../../components/filing-submission";
+import { PolicyStaleNotice } from "../../components/policy-stale-notice";
 import { PolicyVerificationBanner } from "../../components/policy-verification-banner";
 import { latestAssetOfKind } from "../../lib/assets";
 import { t } from "../../lib/i18n";
@@ -61,6 +68,16 @@ function Flags({ flags }: { flags: string[] }) {
   );
 }
 
+/** Name a fact by the label the form uses, or fall back to its own key.
+ *
+ *  Falling back is deliberate: a fact key with no label is a gap in the copy,
+ *  and showing the key makes that visible rather than rendering an empty
+ *  strong tag that looks like a rendering bug. */
+function readableKey(key: string): string {
+  const named = t(`field.${key}`);
+  return named === `field.${key}` ? key : named;
+}
+
 export default function CollectionPage() {
   const [projectId, setProjectId] = useState("");
   const [loaded, setLoaded] = useState(false);
@@ -72,10 +89,24 @@ export default function CollectionPage() {
   const [facts, setFacts] = useState<FactRecord[]>([]);
   const [findings, setFindings] = useState<Finding[]>([]);
   const [roadmap, setRoadmap] = useState<RoadmapView | null>(null);
+  /* Which material card is asking for a waive reason, and what has been
+     typed. This replaces a window.prompt: a native dialog blocks the page,
+     does not appear in a shared browser tab, and silently returns null once
+     Chrome offers "prevent additional dialogs" -- which turns Waive into a
+     button that does nothing without saying so. */
+  const [waiving, setWaiving] = useState<string | null>(null);
+  const [waiveReason, setWaiveReason] = useState("");
+  const [form, setForm] = useState<FormDraft | null>(null);
+  const [gate, setGate] = useState<GateResult | null>(null);
   const [extraction, setExtraction] = useState<ExtractResult | null>(null);
   const [review, setReview] = useState<ReviewResult | null>(null);
   const [verificationStatus, setVerificationStatus] =
     useState<PolicyVerificationStatus | null>(null);
+  /* The project's own state drives what the send card offers: under review,
+     returned with comments, accepted, or filed. */
+  const [projectState, setProjectState] = useState<string | null>(null);
+  const [policyStale, setPolicyStale] = useState(false);
+  const [tier, setTier] = useState<string | null>(null);
 
   const [kind, setKind] = useState("script");
   const [file, setFile] = useState<File | null>(null);
@@ -87,7 +118,9 @@ export default function CollectionPage() {
       nextFacts,
       nextFindings,
       nextRoadmap,
-      nextProject
+      nextProject,
+      nextForm,
+      nextGate
     ] =
       await Promise.all([
         listAssets(id),
@@ -95,16 +128,23 @@ export default function CollectionPage() {
         listFacts(id),
         listFindings(id),
         getRoadmap(id),
-        getProject(id)
+        getProject(id),
+        getForm(id),
+        getGate(id)
       ]);
     setAssets(nextAssets);
     setMaterials(nextMaterials);
     setFacts(nextFacts);
     setFindings(nextFindings);
     setRoadmap(nextRoadmap);
+    setForm(nextForm);
+    setGate(nextGate);
     setVerificationStatus(
       nextProject.project.classification?.policy_verification_status ?? null
     );
+    setProjectState(nextProject.project.state ?? null);
+    setPolicyStale(nextProject.project.policy_stale ?? false);
+    setTier(nextProject.project.classification?.tier ?? null);
     setLoaded(true);
   }, []);
 
@@ -144,6 +184,23 @@ export default function CollectionPage() {
     });
   }
 
+  /* The wizard sends a creator here with ?project=<id> once it has classified
+     their work. Asking them to copy an opaque id out of one screen and paste it
+     into the next was the seam between two stages that are meant to be one
+     journey. Typing an id by hand still works -- this only removes the need. */
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const handed = new URLSearchParams(window.location.search).get("project");
+    if (!handed || loaded || busy !== null) return;
+    setProjectId(handed);
+    void guard("load", async () => {
+      await refresh(handed);
+    });
+    // `guard` and `refresh` are stable for the life of the page; re-running on
+    // every render would refetch in a loop.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const latestScript = assets.filter((asset) => asset.kind === "script").pop();
 
   return (
@@ -175,6 +232,14 @@ export default function CollectionPage() {
       {!loaded ? null : (
         <>
           <PolicyVerificationBanner status={verificationStatus} />
+          <PolicyStaleNotice
+            projectId={projectId}
+            stale={policyStale}
+            state={projectState}
+            currentTier={tier}
+            onChange={() => void refresh(projectId)}
+            onError={setError}
+          />
           <section className="card">
             <h2>{t("collection.upload")}</h2>
             <form onSubmit={upload}>
@@ -183,7 +248,7 @@ export default function CollectionPage() {
                 <select value={kind} onChange={(event) => setKind(event.target.value)}>
                   {KINDS.map((option) => (
                     <option key={option} value={option}>
-                      {option}
+                      {t(`asset_kind.${option}`)}
                     </option>
                   ))}
                 </select>
@@ -277,8 +342,12 @@ export default function CollectionPage() {
               <ul>
                 {facts.map((fact) => (
                   <li key={fact.fact_id}>
-                    <strong>{fact.key}</strong>: {String(fact.value ?? t("field.pending"))}{" "}
-                    <span className="chip">{fact.status}</span>
+                    {/* A fact key and a status are storage vocabulary. The
+                        form already names most of these fields; the rest are
+                        named alongside them rather than shown raw. */}
+                    <strong>{readableKey(fact.key)}</strong>:{" "}
+                    {String(fact.value ?? t("field.pending"))}{" "}
+                    <span className="chip">{t(`fact_status.${fact.status}`)}</span>
                     {fact.source_ref.locator ? (
                       <div className="muted">
                         {t("collection.quoted")}: “{fact.source_ref.locator}”
@@ -306,7 +375,13 @@ export default function CollectionPage() {
                         <span className="chip">{t("collection.optional")}</span>
                       )}
                       {card.why_clause ? (
-                        <span className="muted"> · {card.why_clause.clause_id}</span>
+                        <span className="muted">
+                          {" · "}
+                          {/* The clause by name, as D-040 settled for the
+                              result card. A raw id here would be the same
+                              defect in a second place. */}
+                          {t(`clause.${card.why_clause.clause_id}`)}
+                        </span>
                       ) : (
                         <span className="muted"> · {t("collection.no_clause")}</span>
                       )}
@@ -348,20 +423,62 @@ export default function CollectionPage() {
                         type="button"
                         className="secondary-button"
                         disabled={busy !== null}
-                        onClick={() =>
-                          guard("waive", async () => {
-                            const reason = window.prompt(t("collection.waive_reason"));
-                            if (!reason) {
-                              return;
-                            }
-                            await waiveMaterial(projectId, card.material_id, reason);
-                            await refresh(projectId);
-                          })
-                        }
+                        onClick={() => {
+                          setWaiving(
+                            waiving === card.material_id ? null : card.material_id
+                          );
+                          setWaiveReason("");
+                        }}
                       >
                         {t("collection.waive")}
                       </button>
                       </div>
+                      {waiving === card.material_id ? (
+                        <div className="waive-box">
+                          <label>
+                            <span>{t("collection.waive_reason")}</span>
+                            <input
+                              autoFocus
+                              value={waiveReason}
+                              placeholder={t("collection.waive_reason_placeholder")}
+                              onChange={(event) =>
+                                setWaiveReason(event.target.value)
+                              }
+                              onKeyDown={(event) => {
+                                if (event.key === "Escape") setWaiving(null);
+                              }}
+                              size={40}
+                            />
+                          </label>
+                          <button
+                            type="button"
+                            className="secondary-button"
+                            disabled={busy !== null || !waiveReason.trim()}
+                            onClick={() =>
+                              guard("waive", async () => {
+                                await waiveMaterial(
+                                  projectId,
+                                  card.material_id,
+                                  waiveReason.trim()
+                                );
+                                setWaiving(null);
+                                setWaiveReason("");
+                                await refresh(projectId);
+                              })
+                            }
+                          >
+                            {t("collection.waive_confirm")}
+                          </button>
+                          <button
+                            type="button"
+                            className="secondary-button"
+                            onClick={() => setWaiving(null)}
+                          >
+                            {t("collection.cancel")}
+                          </button>
+                          <p className="muted">{t("collection.waive_hint")}</p>
+                        </div>
+                      ) : null}
                     </li>
                   );
                 })}
@@ -478,6 +595,23 @@ export default function CollectionPage() {
           </section>
 
           <p className="disclaimer">{t("app.disclaimer")}</p>
+          <FilingForm
+            projectId={projectId}
+            form={form}
+            gate={gate}
+            onChange={(nextForm, nextGate) => {
+              setForm(nextForm);
+              setGate(nextGate);
+            }}
+            onError={setError}
+          />
+          <FilingSubmission
+            projectId={projectId}
+            frozen={form?.frozen ?? false}
+            state={projectState}
+            onChange={() => void refresh(projectId)}
+            onError={setError}
+          />
         </>
       )}
     </section>

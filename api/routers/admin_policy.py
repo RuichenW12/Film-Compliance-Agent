@@ -159,7 +159,7 @@ def get_proposal(
     status_code=201,
     response_model=PublishResponse,
 )
-def publish_proposal(
+async def publish_proposal(
     proposal_id: str,
     state: Annotated[PolicyApiState, Depends(get_policy_state)],
 ) -> PublishResponse:
@@ -171,11 +171,22 @@ def publish_proposal(
         )
     except PolicyPublishError as exc:
         raise _publish_error(exc) from exc
+    # Delivering marks the outbox row sent only after the consumer has handled
+    # it, so a failure here leaves the row PENDING and the next publish retries
+    # it. The older order -- dispatch, mark sent, then hand to the consumer --
+    # lost events outright: a row marked sent is never selected again.
+    #
+    # Best-effort either way: a publication that succeeded must not be reported
+    # as failed because the fan-out stumbled, and the snapshot is durable
+    # regardless. The failure is logged, not swallowed.
     try:
-        state.dispatcher.dispatch()
+        if state.delivery is not None:
+            await state.delivery.deliver()
+        else:
+            state.dispatcher.dispatch()
     except Exception:
         _LOGGER.exception(
-            "best-effort policy outbox dispatch failed after publish"
+            "policy fan-out failed after publishing %s", result.snapshot_version
         )
     return PublishResponse(snapshot_version=result.snapshot_version)
 

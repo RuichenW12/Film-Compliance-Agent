@@ -11,9 +11,9 @@ import {
   listInstitutions,
   loadInstitutions,
   readReview,
-  recordFiling,
-  submitToInstitution
+  recordFiling
 } from "../../lib/api";
+import { InstitutionQueue } from "../../components/institution-queue";
 import { getRole } from "../../lib/demoAuth";
 import { t } from "../../lib/i18n";
 
@@ -70,9 +70,11 @@ function LicenceVerdict({ review }: { review: InstitutionReview }) {
 
 export default function InstitutionPage() {
   const [projectId, setProjectId] = useState("");
+  /* Bumped whenever a decision lands, so the queue reloads and the row just
+     acted on disappears rather than lingering as a stale entry. */
+  const [queueVersion, setQueueVersion] = useState(0);
   const [role, setRole] = useState("creator");
   const [institutions, setInstitutions] = useState<Institution[]>([]);
-  const [chosen, setChosen] = useState("");
   const [review, setReview] = useState<InstitutionReview | null>(null);
   const [state, setState] = useState<string | null>(null);
   const [agreement, setAgreement] = useState("blob://demo-agreement");
@@ -89,7 +91,6 @@ export default function InstitutionPage() {
     try {
       const listed = await listInstitutions();
       setInstitutions(listed);
-      setChosen((current) => current || listed[0]?.institution_id || "");
     } catch {
       setInstitutions([]);
     }
@@ -166,6 +167,17 @@ export default function InstitutionPage() {
         )}
       </section>
 
+      <InstitutionQueue
+        reloadKey={queueVersion}
+        onError={setError}
+        onOpen={(id) => {
+          setProjectId(id);
+          void guard("load_project", async () => {
+            await refreshProject(id);
+          });
+        }}
+      />
+
       <form
         className="card"
         onSubmit={(event) => {
@@ -202,46 +214,26 @@ export default function InstitutionPage() {
 
       {state ? (
         <>
-          <section className="card">
-            <h2>{t("institution.submit")}</h2>
-            <p className="muted">{t("institution.submit_note")}</p>
-            <label>
-              <span>{t("institution.choose")}</span>
-              <select value={chosen} onChange={(event) => setChosen(event.target.value)}>
-                <option value="">{t("institution.choose_placeholder")}</option>
-                {institutions.map((entry) => (
-                  <option key={entry.institution_id} value={entry.institution_id}>
-                    {entry.name}
-                  </option>
-                ))}
-                <option value="inst_not_in_registry">
-                  {t("institution.unknown_option")}
-                </option>
-              </select>
-            </label>
-            <button
-              type="button"
-              className="primary-button"
-              disabled={!chosen || busy !== null}
-              onClick={() =>
-                guard("submit", async () => {
-                  const result = await submitToInstitution(projectId, chosen);
-                  setReview(result.review);
-                  setState(result.state);
-                })
-              }
-            >
-              {t("institution.submit")}
-            </button>
-          </section>
+          {/* The submit card used to live here. It is the creator's act --
+              `submit_to_institution` calls `_assert_owner` -- and keeping it on
+              the reviewer's page stranded the creator at the lock with the next
+              step on someone else's screen. It now sits on `/collection`, next
+              to the form being sent. See D-047. */}
 
           {review ? (
             <section className="card">
               <h2>{t("institution.review")}</h2>
               <p>
-                <span className="chip">{review.decision}</span>
+                <span className="chip">{t(`decision.${review.decision}`)}</span>
                 {review.institution_id ? (
-                  <span className="muted"> · {review.institution_id}</span>
+                  <span className="muted">
+                    {" · "}
+                    {/* The company's name, not its id. The registry is right
+                        here, so there is no reason to show the key instead. */}
+                    {institutions.find(
+                      (entry) => entry.institution_id === review.institution_id
+                    )?.name ?? review.institution_id}
+                  </span>
                 ) : null}
               </p>
               <LicenceVerdict review={review} />
@@ -281,6 +273,9 @@ export default function InstitutionPage() {
                           });
                           setReview(result.review);
                           setState(result.state);
+                          // A decision changes what is waiting, so the queue
+                          // must not keep showing the row just acted on.
+                          setQueueVersion((version) => version + 1);
                         })
                       }
                     >
@@ -298,6 +293,9 @@ export default function InstitutionPage() {
                           });
                           setReview(result.review);
                           setState(result.state);
+                          // A decision changes what is waiting, so the queue
+                          // must not keep showing the row just acted on.
+                          setQueueVersion((version) => version + 1);
                         })
                       }
                     >
@@ -325,6 +323,7 @@ export default function InstitutionPage() {
                         const result = await recordFiling(projectId, registration);
                         setState(result.state);
                         await refreshProject(projectId);
+                        setQueueVersion((version) => version + 1);
                       })
                     }
                   >

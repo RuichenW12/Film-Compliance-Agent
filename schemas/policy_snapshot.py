@@ -37,6 +37,11 @@ class PackName(StrEnum):
 
 
 class ImpactNode(StrEnum):
+    # D1b is the subject match: the trigger vocabulary a snapshot carries.
+    # It had no node, so a change to that vocabulary could be published and
+    # no project was ever marked stale by it -- the one impact the loop could
+    # not express. See D-050.
+    D1B = "D1b"
     D1C = "D1c"
     C1A = "C1-a"
 

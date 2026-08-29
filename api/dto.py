@@ -4,7 +4,14 @@ from __future__ import annotations
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from schemas.enums import AssetKind, BudgetBand, ClaimedFormType, ExitKind, ProjectState
+from schemas.enums import (
+    AssetKind,
+    AmountBracket,
+    ClaimedFormType,
+    ExitKind,
+    ProductionStage,
+    ProjectState,
+)
 from schemas.common import Fact
 from schemas.findings import Finding
 from schemas.workflow import InstitutionReview, WorkflowTask
@@ -29,18 +36,42 @@ class IntentRequest(ApiModel):
 
     form_type_claimed: ClaimedFormType | None = None
     genre_keywords: list[str] | None = None
-    logline: str | None = None
+    synopsis: str | None = None
+    synopsis: str | None = None
     episode_count: int | None = Field(default=None, ge=1)
     episode_minutes: float | None = Field(default=None, gt=0)
-    budget_band: BudgetBand | None = None
+    amount_bracket: AmountBracket | None = None
     investment_amount_rmb: int | None = Field(default=None, ge=0)
     is_ai_generated: bool | None = None
-    has_finished_film: bool | None = None
+    production_stage: ProductionStage | None = None
     # 广电办发〔2024〕35号 makes 重点微短剧 any one of four conditions. These are
     # the two that have nothing to do with money, and they must be accepted here
     # or the wizard's whole submission is rejected: ApiModel forbids extras.
     platform_promoted: bool | None = None
     voluntary_key_declaration: bool | None = None
+
+
+class FieldHelpRequest(ApiModel):
+    """A question about one intake field. Not a project, not an answer to it."""
+
+    field: str
+    question: str = ""
+    # What the form calls this field. Sent by the UI so the answer talks about
+    # "AI generated content" rather than `is_ai_generated`.
+    label: str = ""
+
+
+class FieldHelpResponse(ApiModel):
+    """Prose, and the clauses it was drawn from.
+
+    There is no value here. The reply cannot fill the field it explains, which
+    is why the extraction guard this replaced is no longer needed.
+    """
+
+    answer: str = ""
+    clause_refs: list[str] = Field(default_factory=list)
+    snapshot_version: str = ""
+    pending_flags: list[str] = Field(default_factory=list)
 
 
 class IntentResponse(ApiModel):
@@ -78,7 +109,7 @@ class ClassifyResponse(ApiModel):
 
 
 class TierChoiceRequest(ApiModel):
-    budget_band: BudgetBand
+    amount_bracket: AmountBracket
 
 
 class GateResponse(ApiModel):
@@ -163,6 +194,12 @@ class ConfirmFieldRequest(ApiModel):
     """A value the documents did not supply, given by the creator."""
 
     value: str | int | float
+    reason: str | None = None
+
+
+class DeferFieldRequest(ApiModel):
+    """A field the creator states the filing institution will supply."""
+
     reason: str | None = None
 
 

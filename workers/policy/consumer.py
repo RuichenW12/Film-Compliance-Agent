@@ -74,7 +74,12 @@ class PolicyUpdatedConsumer:
             if not self._is_affected(project, event):
                 continue
 
-            self._repository.mark_policy_stale(project.project_id)
+            # The event's version, not the project's. The notice is news
+            # about what was just published; naming the version the project is
+            # already pinned to tells the creator nothing.
+            self._repository.mark_policy_stale(
+                project.project_id, event.snapshot_version
+            )
             self._upsert_effect(event, project.project_id, "policy_stale")
             stale_marked += 1
 
@@ -107,6 +112,17 @@ class PolicyUpdatedConsumer:
     def _is_affected(
         project: ProjectPolicyState, event: PolicyUpdatedEvent
     ) -> bool:
+        # A subject-rule change reaches every classified project: the match
+        # was decided against a vocabulary that has now moved. It is marked
+        # stale and the creator is told, and deliberately *not* recalculated --
+        # `recalc_tier` re-runs the amount stage only, so using it here would
+        # answer a subject question with a money answer. Re-deciding a subject
+        # needs the full chain and a human looking at it.
+        d1b = (
+            ImpactNode.D1B in event.impact
+            and ImpactNode.D1B in project.impact_nodes
+            and project.has_classification
+        )
         d1c = (
             ImpactNode.D1C in event.impact
             and ImpactNode.D1C in project.impact_nodes
@@ -117,7 +133,7 @@ class PolicyUpdatedConsumer:
             and ImpactNode.C1A in project.impact_nodes
             and project.has_review
         )
-        return d1c or c1a
+        return d1b or d1c or c1a
 
     def _upsert_effect(
         self,
