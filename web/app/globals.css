@@ -888,3 +888,35 @@ main label span {
   border-left: 2px solid var(--border);
   color: var(--muted);
 }
+
+/* Episode length, adjusted rather than typed. The slider exists so the
+   twenty-minute boundary can be seen before it is crossed. */
+.length-picker {
+  margin: 0.75rem 0;
+}
+
+.length-picker label {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.5rem;
+}
+
+.length-picker label span {
+  min-width: 11rem;
+}
+
+.length-picker input[type="range"] {
+  flex: 1;
+  max-width: 22rem;
+}
+
+.length-picker output {
+  min-width: 6rem;
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
+}
+
+.length-picker .alert {
+  margin: 0.5rem 0;
+}

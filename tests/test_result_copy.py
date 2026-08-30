@@ -183,3 +183,29 @@ def test_the_english_bundle_has_no_chinese() -> None:
     cjk = re.compile(r"[\u4e00-\u9fff]")
     offenders = sorted(k for k, v in bundle.items() if isinstance(v, str) and cjk.search(v))
     assert not offenders, f"English bundle carries Chinese text: {offenders}"
+
+
+def test_every_obligation_the_exit_card_can_list_has_copy() -> None:
+    """An exit card lists what still applies, and it rendered them as keys.
+
+    `obligation.ai_labeling` and `obligation.platform_rules` showed verbatim on
+    the web-film exit -- the one screen a creator reaches by discovering their
+    project is not what they thought, which is a bad moment to hand them our
+    identifiers.
+    """
+
+    import re
+
+    bundle = _en()
+    source = (
+        Path(__file__).resolve().parent.parent / "core" / "classify" / "chain.py"
+    ).read_text(encoding="utf-8")
+
+    found: set[str] = set()
+    for line in source.splitlines():
+        if "obligations" in line and ("append" in line or "= [" in line):
+            found.update(re.findall(r'"([a-z_]{3,})"', line))
+
+    assert found, "no obligations found in chain.py -- has the shape moved?"
+    missing = sorted(f"obligation.{name}" for name in found if f"obligation.{name}" not in bundle)
+    assert not missing, f"obligations with no copy: {missing}"

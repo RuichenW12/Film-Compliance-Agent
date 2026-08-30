@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { FieldHelp } from "../../components/field-help";
 import { ClassificationCard } from "../../components/classification-card";
 import { GenrePicker } from "../../components/genre-picker";
+import { LengthPicker } from "../../components/length-picker";
 import { PolicyVerificationBanner } from "../../components/policy-verification-banner";
 import {
   ApiError,
@@ -156,37 +157,18 @@ export default function WizardPage() {
     }
   }
 
-  /* Length stays on the form at every stage, and an estimate is fine.
-     Article 2 defines a micro-drama *by* episode length -- under twenty
-     minutes -- so without these the chain cannot tell a micro-drama from a web
-     film at all. Folding them away would not spare the creator the question;
-     it would just submit the defaults on their behalf without showing them,
-     which is inventing two facts rather than asking for them. */
+  /* Length, adjusted rather than typed. Article 2 defines a micro-drama by
+     episode length, so these cannot be skipped -- but a number box asks a
+     creator at the idea stage to commit to a figure they have not decided,
+     and folding it away just submitted the default invisibly. A suggestion
+     that shows its consequence as you move it is neither. */
   const lengthFields = (
-    <>
-      <label>
-        <span>{t("wizard.episode_count")}</span>
-        <FieldHelp field="episode_count" label="Episodes" />
-        <input
-          type="number"
-          min={1}
-          value={episodeCount}
-          onChange={(event) => setEpisodeCount(event.target.value)}
-        />
-      </label>
-      <label>
-        <span>{t("wizard.episode_minutes")}</span>
-        <FieldHelp field="episode_minutes" label="Minutes per episode" />
-        <input
-          type="number"
-          min={0.5}
-          step={0.5}
-          value={episodeMinutes}
-          onChange={(event) => setEpisodeMinutes(event.target.value)}
-        />
-      </label>
-      <p className="muted">{t("wizard.length.hint")}</p>
-    </>
+    <LengthPicker
+      episodeCount={episodeCount}
+      episodeMinutes={episodeMinutes}
+      onCountChange={setEpisodeCount}
+      onMinutesChange={setEpisodeMinutes}
+    />
   );
 
   /* The budget genuinely has no answer at the idea stage, and unlike length

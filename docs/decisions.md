@@ -1956,3 +1956,43 @@ a conclusion from evidence we do not have.
 video-frame non-goal in `CLAUDE.md`, and a vision model. Recorded in
 `QUESTIONS-FOR-MAXINE.md` rather than half-built.
 
+---
+
+## D-057
+
+**Length is adjusted and watched, not typed** · Area: A · Status: Accepted · 2026-08-29 · Refines [D-054](#d-054)
+
+D-054 kept the episode count and running time on the form as number boxes,
+because article 2 defines a micro-drama by episode length and the chain cannot
+work without them. The owner pushed back with a better answer than either of
+mine: do not ask the creator to type a figure they have not decided — suggest
+one, let them move it and see what changes, and let the moving be the answer.
+
+That resolves the objection I had raised rather than overriding it. My concern
+was inventing facts, and the invention was never the presence of a default: it
+was that a folded field submitted its default where nobody could see it. **A
+value someone looks at and adjusts is their answer. A value hidden from them is
+ours.**
+
+So episode length is a slider with a live verdict beneath it. Below twenty
+minutes it says this is a micro-drama; at twenty it says the work becomes a web
+film, a different set of rules and not the ones this tool checks. The boundary
+is visible before it is crossed, which a number box cannot do.
+
+**Two figures, two different standings, and the interface separates them.**
+Twenty minutes is article 2 and lives in the snapshot as
+`episode_max_minutes_exclusive`. The three-episode minimum is **not** in the
+regulation — article 2 says 剧集, a series, without giving a number — and is a
+fallback in `core/classify/d1a.py`. The copy says so rather than presenting our
+reading as law.
+
+**The classification is still made server-side.** The slider draws the line for
+the creator; it does not decide anything, and the twenty in the component is
+there to render a boundary rather than to apply one.
+
+**Found while testing:** the web-film exit card listed `obligation.ai_labeling`
+and `obligation.platform_rules` as raw keys — on the one screen a creator
+reaches by discovering their project is not what they thought. Copy added, and
+`test_result_copy.py` now walks the obligations in `chain.py` so a new one
+cannot ship without words.
+
