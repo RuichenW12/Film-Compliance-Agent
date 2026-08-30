@@ -222,6 +222,7 @@ class ReviewFacade:
                 "review details can only be confirmed at the confirmation step",
                 {"state": session.state.value},
             )
+        self._require_synchronous_script_review(session)
         stage = self._stores.stage_review_analysis(
             session.review_id, session.project_id
         )
@@ -265,6 +266,7 @@ class ReviewFacade:
                 "only a completed review can be reanalyzed",
                 {"state": session.state.value},
             )
+        self._require_synchronous_script_review(session)
         stage = self._stores.stage_review_analysis(
             session.review_id, session.project_id
         )
@@ -282,14 +284,6 @@ class ReviewFacade:
             )
         if session.confirmed == details:
             return self._view(session)
-        if (
-            session.mode is ReviewMode.SCRIPT
-            and not self._workflow.supports_synchronous_review_analysis
-        ):
-            raise StateInvalidError(
-                "review reanalysis requires a synchronous job runner"
-            )
-
         analyzing = self._updated(
             session,
             state=ReviewState.ANALYZING,
@@ -313,6 +307,15 @@ class ReviewFacade:
             force_script_review=True,
             stage=stage,
         )
+
+    def _require_synchronous_script_review(self, session: ReviewSession) -> None:
+        if (
+            session.mode is ReviewMode.SCRIPT
+            and not self._workflow.supports_synchronous_review_analysis
+        ):
+            raise StateInvalidError(
+                "review analysis requires a synchronous job runner"
+            )
 
     def _analyze_claimed(
         self,

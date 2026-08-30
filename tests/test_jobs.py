@@ -7,6 +7,9 @@ their project does not change.
 
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor, wait
+import threading
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -15,7 +18,10 @@ from api.main import create_app
 from api.settings import Settings
 from core.jobs import InlineRunner, QueuedRunner, RecordingPublisher, idempotency_key
 from core.llm import UnavailableLLM
+from core.workflow_service import WorkflowService
 from schemas.enums import TaskType
+from store.memory import InMemoryStores
+from store.sqlite import SqliteStores
 from workers.jobs import JobWorker
 
 OWNER = {"X-Mock-Role": "creator", "X-User-Id": "u_owner"}
@@ -26,13 +32,13 @@ SCRIPT = (
 REVISED = "第一集 场景一：码头。两个老友深夜叙旧。\n"
 
 
-def make_client(stores, snapshots, clock, runner) -> TestClient:
+def make_client(stores, snapshots, clock, runner, llm=None) -> TestClient:
     context = AppContext(
         settings=Settings(),
         stores=stores,
         snapshots=snapshots,
         clock=clock,
-        llm=UnavailableLLM(),
+        llm=llm or UnavailableLLM(),
         jobs=runner,
     )
     return TestClient(create_app(context=context))
@@ -219,6 +225,79 @@ def test_the_worker_ignores_a_redelivered_finished_task(queued_client, publisher
         f"/v1/projects/{project_id}/findings", headers=OWNER
     ).json()
     assert len(findings) == 2
+
+
+@pytest.mark.parametrize("backend", ["memory", "sqlite"])
+def test_concurrent_worker_redelivery_claims_and_executes_once(
+    tmp_path, snapshots, clock, backend
+) -> None:
+    primary = (
+        InMemoryStores()
+        if backend == "memory"
+        else SqliteStores.at(tmp_path / "worker-claim.sqlite3")
+    )
+    concurrent = (
+        primary
+        if backend == "memory"
+        else SqliteStores.at(tmp_path / "worker-claim.sqlite3")
+    )
+    entered = threading.Event()
+    release = threading.Event()
+
+    class BlockingLLM:
+        name = "blocking"
+
+        def __init__(self) -> None:
+            self.calls = 0
+            self._lock = threading.Lock()
+
+        def available(self) -> bool:
+            return True
+
+        def structured(self, _request):
+            with self._lock:
+                self.calls += 1
+            entered.set()
+            assert release.wait(timeout=5)
+            return {"hits": []}
+
+    llm = BlockingLLM()
+    publisher = RecordingPublisher()
+    client = make_client(
+        primary, snapshots, clock, QueuedRunner(publisher), llm=llm
+    )
+    project_id, _ = project_with_script(client)
+    response = client.post(f"/v1/projects/{project_id}/review", headers=OWNER)
+    assert response.status_code == 200
+    task = publisher.published[0]
+    first_worker = JobWorker(client.app.state.context.workflow, primary)
+    second_workflow = WorkflowService(concurrent, snapshots, clock, llm)
+    second_worker = JobWorker(second_workflow, concurrent)
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        first = pool.submit(first_worker.handle, task)
+        assert entered.wait(timeout=5)
+        second = pool.submit(second_worker.handle, task)
+        completed, _ = wait([second], timeout=0.5)
+        release.set()
+        first_result = first.result(timeout=5)
+        second_result = second.result(timeout=5)
+
+    assert second in completed
+    assert first_result.ran is True
+    assert second_result.ran is False
+    assert second_result.reason == "already_claimed"
+    assert llm.calls == 1
+    stored = primary.tasks.get(task.task_id)
+    assert stored.status.value == "succeeded"
+    assert stored.result["finding_count"] == 2
+    assert len(primary.findings.list(project_id)) == 2
+    assert len(
+        [event for event in primary.timeline.list(project_id) if event.event == "job.completed"]
+    ) == 1
+    if backend == "sqlite":
+        concurrent.db.close()
+        primary.db.close()
 
 
 def test_the_worker_finishes_a_queued_extraction(queued_client, publisher, stores):

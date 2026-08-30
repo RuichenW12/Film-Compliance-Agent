@@ -269,6 +269,15 @@ def test_reanalysis_rejects_a_queued_runner_before_claim_or_publish(
     stores, review_snapshots, clock
 ) -> None:
     publisher = RecordingPublisher()
+    inline_context = AppContext(
+        settings=Settings(),
+        stores=stores,
+        snapshots=review_snapshots,
+        clock=clock,
+        llm=ScriptedLLM({SCRIPT_INTAKE_PROMPT_ID: INTAKE_REPLY}),
+    )
+    inline_client = TestClient(create_app(context=inline_context))
+    review_id, _ = complete_review(inline_client)
     context = AppContext(
         settings=Settings(),
         stores=stores,
@@ -278,7 +287,6 @@ def test_reanalysis_rejects_a_queued_runner_before_claim_or_publish(
         jobs=QueuedRunner(publisher),
     )
     queued_client = TestClient(create_app(context=context))
-    review_id, _ = complete_review(queued_client)
     before_session = stores.review_sessions.get(review_id)
     assert before_session.semantic_status is SemanticStatus.PENDING
     before_project = stores.projects.get(before_session.project_id)
@@ -296,6 +304,49 @@ def test_reanalysis_rejects_a_queued_runner_before_claim_or_publish(
     assert stores.projects.get(before_session.project_id) == before_project
     assert stores.tasks.list(before_session.project_id) == before_tasks
     assert publisher.published == before_published
+
+
+def test_initial_confirmation_rejects_a_queued_runner_before_any_write(
+    stores, review_snapshots, clock
+) -> None:
+    publisher = RecordingPublisher()
+    context = AppContext(
+        settings=Settings(),
+        stores=stores,
+        snapshots=review_snapshots,
+        clock=clock,
+        llm=ScriptedLLM({SCRIPT_INTAKE_PROMPT_ID: INTAKE_REPLY}),
+        jobs=QueuedRunner(publisher),
+    )
+    queued_client = TestClient(create_app(context=context))
+    review_id = upload_review(queued_client).json()["review_id"]
+    before_session = stores.review_sessions.get(review_id)
+    project_id = before_session.project_id
+    before = {
+        "project": stores.projects.get(project_id),
+        "facts": stores.facts.list(project_id),
+        "findings": stores.findings.list(project_id),
+        "forms": stores.forms.list(project_id),
+        "tasks": stores.tasks.list(project_id),
+        "timeline": stores.timeline.list(project_id),
+        "audit": stores.audit.list(project_id),
+    }
+
+    response = queued_client.post(
+        f"/v1/reviews/{review_id}/confirm", json=CONFIRMED
+    )
+
+    assert response.status_code == 409
+    assert response.json()["error"]["code"] == "STATE_INVALID"
+    assert stores.review_sessions.get(review_id) == before_session
+    assert stores.projects.get(project_id) == before["project"]
+    assert stores.facts.list(project_id) == before["facts"]
+    assert stores.findings.list(project_id) == before["findings"]
+    assert stores.forms.list(project_id) == before["forms"]
+    assert stores.tasks.list(project_id) == before["tasks"]
+    assert stores.timeline.list(project_id) == before["timeline"]
+    assert stores.audit.list(project_id) == before["audit"]
+    assert publisher.published == []
 
 
 def test_retry_intake_route_preserves_confirmation_step(

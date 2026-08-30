@@ -1111,12 +1111,8 @@ class WorkflowService:
         version = latest.version_id if latest else "intent_profile"
         key = f"{project_id}:{TaskType.TEASER.value}:{version}"
 
-        existing = self._stores.tasks.find_by_idempotency_key(key)
-        if existing is not None:
-            return existing
-
         now = self._clock.now()
-        task = WorkflowTask(
+        candidate = WorkflowTask(
             task_id=new_id("task"),
             project_id=project_id,
             type=TaskType.TEASER,
@@ -1130,7 +1126,11 @@ class WorkflowService:
             created_at=now,
             updated_at=now,
         )
-        self._stores.tasks.add(task)
+        task, created = self._stores.tasks.get_or_create_by_idempotency_key(
+            candidate
+        )
+        if not created:
+            return task
 
         if self._video is None or not self._video.available():
             # No backend is a pending flag, never a placeholder video.
@@ -1668,23 +1668,22 @@ class WorkflowService:
         """
 
         key = idempotency_key(project_id, task_type, asset_version)
-        existing = self._stores.tasks.find_by_idempotency_key(key)
-        if existing is not None:
-            return existing, None, True
-
         now = self._clock.now()
-        task = self._stores.tasks.add(
-            WorkflowTask(
-                task_id=new_id("task"),
-                project_id=project_id,
-                type=task_type,
-                status=TaskStatus.QUEUED,
-                idempotency_key=key,
-                payload=payload or {},
-                created_at=now,
-                updated_at=now,
-            )
+        candidate = WorkflowTask(
+            task_id=new_id("task"),
+            project_id=project_id,
+            type=task_type,
+            status=TaskStatus.QUEUED,
+            idempotency_key=key,
+            payload=payload or {},
+            created_at=now,
+            updated_at=now,
         )
+        task, created = self._stores.tasks.get_or_create_by_idempotency_key(
+            candidate
+        )
+        if not created:
+            return task, None, True
 
         task, outcome = self._jobs.run(task, work)
         task = self._stores.tasks.save(
@@ -1703,7 +1702,7 @@ class WorkflowService:
         )
         return task, outcome, False
 
-    def execute_task(self, task: WorkflowTask) -> WorkflowTask:
+    def execute_task(self, task: WorkflowTask) -> tuple[WorkflowTask, bool]:
         """Run a queued task's work and record the outcome on it.
 
         The API's `_run_job` refuses to start a job whose key already has a
@@ -1713,22 +1712,25 @@ class WorkflowService:
         only the trigger differs.
         """
 
-        work = {
-            TaskType.FACT_EXTRACT: lambda: self._extract_outcome(task),
-            TaskType.REVIEW_FULL: lambda: self._review_outcome(task),
-            TaskType.REVIEW_INCREMENTAL: lambda: self._review_outcome(task),
-        }.get(task.type)
-
-        if work is None:
+        if task.type not in {
+            TaskType.FACT_EXTRACT,
+            TaskType.REVIEW_FULL,
+            TaskType.REVIEW_INCREMENTAL,
+        }:
             raise ValidationFailedError(
                 f"no worker handles {task.type.value}", {"type": task.type.value}
             )
 
-        running = self._stores.tasks.save(
-            task.model_copy(
-                update={"status": TaskStatus.RUNNING, "updated_at": self._clock.now()}
-            )
+        running = self._stores.tasks.claim_queued_task(
+            task.task_id, self._clock.now()
         )
+        if running is None:
+            return self._stores.tasks.get(task.task_id) or task, False
+        work = {
+            TaskType.FACT_EXTRACT: lambda: self._extract_outcome(running),
+            TaskType.REVIEW_FULL: lambda: self._review_outcome(running),
+            TaskType.REVIEW_INCREMENTAL: lambda: self._review_outcome(running),
+        }[running.type]
         outcome = work()
         finished = running.model_copy(
             update={
@@ -1750,7 +1752,7 @@ class WorkflowService:
                 "error": finished.error,
             },
         )
-        return finished
+        return finished, True
 
     def _extract_outcome(self, task: WorkflowTask) -> JobOutcome:
         version = str(task.payload.get("asset_version"))

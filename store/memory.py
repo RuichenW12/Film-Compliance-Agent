@@ -19,6 +19,7 @@ from core.repositories import (
 
 from schemas.assets import AssetVersion, MaterialCard, UploadTicket
 from schemas.common import AuditEntry, Fact, TimelineEvent
+from schemas.enums import TaskStatus
 from schemas.findings import Finding
 from schemas.forms import FormDraft
 from schemas.project import Project
@@ -175,6 +176,27 @@ class InMemoryTaskStore:
     def find_by_idempotency_key(self, key: str) -> WorkflowTask | None:
         task_id = self._by_key.get(key)
         return self._items.get(task_id) if task_id else None
+
+    def get_or_create_by_idempotency_key(
+        self, task: WorkflowTask
+    ) -> tuple[WorkflowTask, bool]:
+        existing = self.find_by_idempotency_key(task.idempotency_key)
+        if existing is not None:
+            return existing, False
+        self.add(task)
+        return task, True
+
+    def claim_queued_task(
+        self, task_id: str, updated_at: datetime
+    ) -> WorkflowTask | None:
+        task = self._items.get(task_id)
+        if task is None or task.status is not TaskStatus.QUEUED:
+            return None
+        running = task.model_copy(
+            update={"status": TaskStatus.RUNNING, "updated_at": updated_at}
+        )
+        self._items[task_id] = running
+        return running
 
 
 class InMemoryTimelineStore:

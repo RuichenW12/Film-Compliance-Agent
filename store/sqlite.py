@@ -39,6 +39,7 @@ from core.repositories import (
 )
 from schemas.assets import AssetVersion, MaterialCard, UploadTicket
 from schemas.common import AuditEntry, Fact, TimelineEvent
+from schemas.enums import TaskStatus
 from schemas.findings import Finding
 from schemas.forms import FormDraft
 from schemas.project import Project
@@ -377,6 +378,59 @@ class SqliteTaskStore:
             if task.idempotency_key == key:
                 return task
         return None
+
+    def get_or_create_by_idempotency_key(
+        self, task: WorkflowTask
+    ) -> tuple[WorkflowTask, bool]:
+        connection = self._c.db._connection
+        with self._c.db._lock:
+            connection.execute("BEGIN IMMEDIATE")
+            try:
+                rows = connection.execute(
+                    "SELECT payload FROM documents "
+                    "WHERE collection = ? ORDER BY ordinal",
+                    ("tasks",),
+                ).fetchall()
+                for row in rows:
+                    existing = WorkflowTask.model_validate_json(row["payload"])
+                    if existing.idempotency_key == task.idempotency_key:
+                        connection.execute("COMMIT")
+                        return existing, False
+                self._c.put("", task.task_id, task)
+                connection.execute("COMMIT")
+                return task, True
+            except Exception:
+                connection.execute("ROLLBACK")
+                raise
+
+    def claim_queued_task(
+        self, task_id: str, updated_at: datetime
+    ) -> WorkflowTask | None:
+        connection = self._c.db._connection
+        with self._c.db._lock:
+            connection.execute("BEGIN IMMEDIATE")
+            try:
+                row = connection.execute(
+                    "SELECT payload FROM documents "
+                    "WHERE collection = ? AND doc_key = ?",
+                    ("tasks", task_id),
+                ).fetchone()
+                if row is None:
+                    connection.execute("ROLLBACK")
+                    return None
+                task = WorkflowTask.model_validate_json(row["payload"])
+                if task.status is not TaskStatus.QUEUED:
+                    connection.execute("ROLLBACK")
+                    return None
+                running = task.model_copy(
+                    update={"status": TaskStatus.RUNNING, "updated_at": updated_at}
+                )
+                self._c.put("", task_id, running)
+                connection.execute("COMMIT")
+                return running
+            except Exception:
+                connection.execute("ROLLBACK")
+                raise
 
 
 class SqliteTimelineStore:

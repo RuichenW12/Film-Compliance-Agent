@@ -7,6 +7,7 @@ used by tests and the Firestore store used on Cloud Run stay interchangeable.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Any, Protocol
 
 from schemas.assets import AssetVersion, MaterialCard, UploadTicket
@@ -165,6 +166,14 @@ class TaskStore(Protocol):
     def get(self, task_id: str) -> WorkflowTask | None: ...
 
     def find_by_idempotency_key(self, key: str) -> WorkflowTask | None: ...
+
+    def get_or_create_by_idempotency_key(
+        self, task: WorkflowTask
+    ) -> tuple[WorkflowTask, bool]: ...
+
+    def claim_queued_task(
+        self, task_id: str, updated_at: datetime
+    ) -> WorkflowTask | None: ...
 
 
 class TimelineStore(Protocol):

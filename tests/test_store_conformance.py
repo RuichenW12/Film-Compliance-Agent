@@ -16,6 +16,7 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 from concurrent.futures import ThreadPoolExecutor
+import threading
 
 import pytest
 
@@ -307,6 +308,72 @@ def test_saving_a_task_does_not_create_a_second_one(stores) -> None:
     stores.tasks.save(task.model_copy(update={"status": TaskStatus.SUCCEEDED}))
     assert len(stores.tasks.list("proj_1")) == 1
     assert stores.tasks.get("task_1").status is TaskStatus.SUCCEEDED
+
+
+def _concurrent_task_store_contract(first, second) -> None:
+    barrier = threading.Barrier(2)
+    candidates = [
+        WorkflowTask(
+            task_id=f"task_{index}",
+            project_id="proj_1",
+            type=TaskType.REVIEW_FULL,
+            idempotency_key="proj_1:review_full:asset_1",
+        )
+        for index in (1, 2)
+    ]
+
+    def create(store, candidate):
+        barrier.wait(timeout=5)
+        return store.tasks.get_or_create_by_idempotency_key(candidate)
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        results = [
+            future.result(timeout=5)
+            for future in (
+                pool.submit(create, first, candidates[0]),
+                pool.submit(create, second, candidates[1]),
+            )
+        ]
+
+    assert len({task.task_id for task, _ in results}) == 1
+    assert sorted(created for _, created in results) == [False, True]
+    stored = first.tasks.list("proj_1")
+    assert len(stored) == 1
+
+    claim_barrier = threading.Barrier(2)
+
+    def claim(store):
+        claim_barrier.wait(timeout=5)
+        return store.tasks.claim_queued_task(stored[0].task_id, NOW)
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        claims = [
+            future.result(timeout=5)
+            for future in (
+                pool.submit(claim, first),
+                pool.submit(claim, second),
+            )
+        ]
+
+    assert sum(item is not None for item in claims) == 1
+    assert first.tasks.get(stored[0].task_id).status is TaskStatus.RUNNING
+
+
+def test_task_creation_and_queued_claim_are_atomic(stores) -> None:
+    _concurrent_task_store_contract(stores, stores)
+
+
+def test_sqlite_task_creation_and_claim_are_atomic_across_connections(
+    tmp_path,
+) -> None:
+    path = tmp_path / "task-atomicity.sqlite3"
+    first = SqliteStores.at(path)
+    second = SqliteStores.at(path)
+    try:
+        _concurrent_task_store_contract(first, second)
+    finally:
+        first.db.close()
+        second.db.close()
 
 
 # ------------------------------------------------------- timeline and audit
