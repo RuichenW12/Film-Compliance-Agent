@@ -277,12 +277,22 @@ def test_concurrent_worker_redelivery_claims_and_executes_once(
     with ThreadPoolExecutor(max_workers=2) as pool:
         first = pool.submit(first_worker.handle, task)
         assert entered.wait(timeout=5)
+        running_replay = client.post(
+            f"/v1/projects/{project_id}/review", headers=OWNER
+        )
         second = pool.submit(second_worker.handle, task)
         completed, _ = wait([second], timeout=0.5)
         release.set()
         first_result = first.result(timeout=5)
         second_result = second.result(timeout=5)
 
+    assert running_replay.status_code == 200
+    assert running_replay.json()["backend"] == "queued"
+    assert running_replay.json()["pending_flags"] == [
+        "script_semantic_check_pending"
+    ]
+    assert len(primary.tasks.list(project_id)) == 1
+    assert len(publisher.published) == 1
     assert second in completed
     assert first_result.ran is True
     assert second_result.ran is False
@@ -295,6 +305,14 @@ def test_concurrent_worker_redelivery_claims_and_executes_once(
     assert len(
         [event for event in primary.timeline.list(project_id) if event.event == "job.completed"]
     ) == 1
+    terminal_replay = client.post(
+        f"/v1/projects/{project_id}/review", headers=OWNER
+    )
+    assert terminal_replay.status_code == 200
+    assert terminal_replay.json()["pending_flags"] == []
+    assert len(primary.tasks.list(project_id)) == 1
+    assert len(publisher.published) == 1
+    assert llm.calls == 1
     if backend == "sqlite":
         concurrent.db.close()
         primary.db.close()

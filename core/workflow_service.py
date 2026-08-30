@@ -718,7 +718,7 @@ class WorkflowService:
                 "script review analysis failed",
                 {"task_id": task.task_id},
             )
-        if task.status is TaskStatus.QUEUED:
+        if task.status in {TaskStatus.QUEUED, TaskStatus.RUNNING}:
             return (
                 self.get_project(project_id),
                 [],
