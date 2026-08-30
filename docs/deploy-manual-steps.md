@@ -6,7 +6,12 @@ Everything *not* in this file, I am doing myself.
 
 Written for Windows PowerShell. Updated 2026-08-30.
 
-Related: [the design overview](https://claude.ai/code/artifact/746a003c-f4ea-4e16-a5a9-34d8badaac30)
+**This file is only the steps a person has to take by hand.** For how the
+deployment actually works — topology, configuration, shipping a change, what
+behaves differently in the cloud — read [`deployment.md`](deployment.md).
+
+Related: [deployment reference](deployment.md)
+· [design overview](https://claude.ai/code/artifact/746a003c-f4ea-4e16-a5a9-34d8badaac30)
 · [manual test guide](manual-test-guide.md)
 
 ---

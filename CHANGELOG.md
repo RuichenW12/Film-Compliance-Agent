@@ -22,6 +22,38 @@ Conventions:
 
 ## 2026-08-30
 
+### Shared — a deployment reference the other workstream can act on
+
+**`docs/deployment.md`.** The deployment had been recorded as a personal
+checklist (`deploy-manual-steps.md`, "the parts that need you") and as commit
+messages. Neither answers the question the other workstream actually has:
+*what do I have to know before I change product code?*
+
+So the two files now split by audience. `deploy-manual-steps.md` keeps only
+what a person does by hand. `deployment.md` is the reference: topology and why
+the browser never calls the API directly, the exact environment of both
+services, build and deploy and rollback commands, storage backends and how to
+run the conformance suite against Firestore, how access works, troubleshooting,
+and an honest list of what is not built.
+
+The section that matters most to someone who did not build this is **§3, things
+that behave differently in the cloud** — every item is a *silent* failure:
+
+- `/healthz` is answered by Google's front end and never reaches the container;
+- `PORT` must be honoured or the revision never receives traffic;
+- uploads are capped at 700 KB until Cloud Storage lands;
+- console status is not evidence — IAP read *enabled* and *Ready* for hours
+  while the service returned 502;
+- there is no `web/public`, so the first static asset added will 404 silently.
+
+**§10 is four rules for product code**: call the API through `/v1/*` on the
+app's own origin, go through the ports in `core/repositories.py`, use `/health`,
+and keep secrets out of the repository. Nothing else about writing product code
+changes because it is deployed.
+
+`CLAUDE.md` now points at it, so an agent reading the working agreements finds
+the deployment constraints without being told they exist.
+
 ### A — Firestore, and a front end wired to the API
 
 **`store/firestore.py`** — the fourteen ports again, on Firestore. Cloud Run
