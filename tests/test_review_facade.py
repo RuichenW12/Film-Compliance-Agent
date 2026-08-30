@@ -766,8 +766,30 @@ def test_reanalysis_stays_pinned_to_its_review_source_when_a_newer_script_exists
     )
     source_b = uploader.complete_upload(
         ticket.ticket_id,
-        b"# Newer script B\n\nThis source must not be reviewed for session A.",
+        (
+            "# Newer script B\n\n"
+            "### Episode 1 Scene 1: Warehouse\n"
+            "B-only compliance line.\n"
+        ).encode(),
     )
+    llm._replies[SCRIPT_REVIEW_PROMPT_ID] = {
+        "hits": [
+            {
+                "category": "public_security",
+                "quote": "B-only compliance line.",
+                "reason": "B-FINDING-MARKER",
+            }
+        ]
+    }
+    _, b_findings, _ = uploader.run_script_review(
+        source_a.project_id,
+        asset_version=source_b.version_id,
+    )
+    assert len(b_findings) == 1
+    b_finding = b_findings[0]
+    assert b_finding.asset_version == source_b.version_id
+    assert b_finding.suggestion == "B-FINDING-MARKER"
+    llm._replies[SCRIPT_REVIEW_PROMPT_ID] = semantic_reply("A-FINDING-MARKER")
 
     rerun = service.reanalyze(
         started.review_id,
@@ -777,6 +799,9 @@ def test_reanalysis_stays_pinned_to_its_review_source_when_a_newer_script_exists
 
     after = stores.review_sessions.get(started.review_id)
     assert rerun.source_sha256 == first.source_sha256 == source_a.source_sha256
+    assert {finding.suggestion for finding in rerun.findings} == {
+        "A-FINDING-MARKER"
+    }
     assert after.asset_version == source_a.asset_version
     assert after.source_sha256 == source_a.source_sha256
     assert stores.assets.get(
@@ -792,10 +817,10 @@ def test_reanalysis_stays_pinned_to_its_review_source_when_a_newer_script_exists
         if finding.asset_version != "intent_profile" and finding.active
     ]
     assert active_script_findings
-    assert all(
-        finding.asset_version == source_a.asset_version
-        for finding in active_script_findings
-    )
+    assert {finding.asset_version for finding in active_script_findings} == {
+        source_a.asset_version,
+        source_b.version_id,
+    }
     review_tasks = [
         task
         for task in stores.tasks.list(source_a.project_id)
@@ -807,10 +832,26 @@ def test_reanalysis_stays_pinned_to_its_review_source_when_a_newer_script_exists
         review_tasks[-1].type,
         f"{source_a.asset_version}:analysis-generation:{after.generation}",
     )
-    assert all(
-        finding.asset_version != source_b.version_id
-        for finding in stores.findings.list(source_a.project_id)
-    )
+    assert stores.findings.get(source_a.project_id, b_finding.finding_id) == b_finding
+    view = service.get(started.review_id, "u_demo")
+    assert {finding.suggestion for finding in view.findings} == {
+        "A-FINDING-MARKER"
+    }
+    form = service.artifact(
+        started.review_id, "u_demo", ReviewArtifactType.FORM
+    ).content
+    summary = service.artifact(
+        started.review_id, "u_demo", ReviewArtifactType.SUMMARY
+    ).content
+    annotated = service.artifact(
+        started.review_id, "u_demo", ReviewArtifactType.ANNOTATED_SCRIPT
+    ).content
+    assert b"B-FINDING-MARKER" not in form
+    assert b"B-FINDING-MARKER" not in summary
+    assert b"B-FINDING-MARKER" not in annotated
+    assert b"A-FINDING-MARKER" in summary
+    assert b"A-FINDING-MARKER" in annotated
+    assert b"B-only compliance line." not in annotated
     if backend == "sqlite":
         stores.db.close()
 

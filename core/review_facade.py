@@ -615,6 +615,10 @@ class ReviewFacade:
                 finding
                 for finding in stores.findings.list(session.project_id)
                 if finding.active
+                and (
+                    finding.alert is not None
+                    or finding.asset_version == session.asset_version
+                )
             ),
             key=lambda item: (
                 item.locator.episode if item.locator.episode is not None else 10**9,
