@@ -8,6 +8,7 @@ import threading
 import pytest
 
 from core.errors import ForbiddenError, StateInvalidError, UpstreamLLMError
+from core.jobs import idempotency_key
 from core.llm import ScriptedLLM, UnavailableLLM
 from core.review import SCRIPT_REVIEW_PROMPT_ID
 from core.review_facade import ReviewFacade
@@ -17,6 +18,7 @@ from schemas.common import AuditEntry, Fact, SourceRef, TimelineEvent
 from schemas.enums import (
     Actor,
     AmountBracket,
+    AssetKind,
     FindingStatus,
     ProductionStage,
     ProjectState,
@@ -734,6 +736,83 @@ def test_same_asset_reanalysis_calls_semantic_review_again(
 
     assert rerun.semantic_status.value == "complete"
     assert sum(call.prompt_id == SCRIPT_REVIEW_PROMPT_ID for call in llm.calls) == 2
+
+
+@pytest.mark.parametrize("backend", ["memory", "sqlite"])
+def test_reanalysis_stays_pinned_to_its_review_source_when_a_newer_script_exists(
+    tmp_path, review_snapshots, clock, backend
+) -> None:
+    stores = (
+        InMemoryStores()
+        if backend == "memory"
+        else SqliteStores.at(tmp_path / "review-source-pin.sqlite3")
+    )
+    llm = ScriptedLLM(
+        {
+            SCRIPT_INTAKE_PROMPT_ID: INTAKE_REPLY,
+            SCRIPT_REVIEW_PROMPT_ID: semantic_reply("source A hit"),
+        }
+    )
+    service = facade(stores, review_snapshots, clock, llm)
+    started = start_semantic_script(service)
+    first = service.confirm(started.review_id, "u_demo", confirmed())
+    source_a = stores.review_sessions.get(started.review_id)
+    uploader = WorkflowService(stores, review_snapshots, clock, llm)
+    ticket = uploader.issue_upload_ticket(
+        source_a.project_id,
+        AssetKind.SCRIPT,
+        "u_demo",
+        "newer-script-b.md",
+    )
+    source_b = uploader.complete_upload(
+        ticket.ticket_id,
+        b"# Newer script B\n\nThis source must not be reviewed for session A.",
+    )
+
+    rerun = service.reanalyze(
+        started.review_id,
+        "u_demo",
+        confirmed(title="Reanalyze source A only"),
+    )
+
+    after = stores.review_sessions.get(started.review_id)
+    assert rerun.source_sha256 == first.source_sha256 == source_a.source_sha256
+    assert after.asset_version == source_a.asset_version
+    assert after.source_sha256 == source_a.source_sha256
+    assert stores.assets.get(
+        source_a.project_id, source_a.asset_version
+    ).sha256 == source_a.source_sha256
+    assert source_b.sha256 != source_a.source_sha256
+    assert llm.calls[-1].prompt_id == SCRIPT_REVIEW_PROMPT_ID
+    assert "顾客买水。" in llm.calls[-1].document
+    assert "Newer script B" not in llm.calls[-1].document
+    active_script_findings = [
+        finding
+        for finding in stores.findings.list(source_a.project_id)
+        if finding.asset_version != "intent_profile" and finding.active
+    ]
+    assert active_script_findings
+    assert all(
+        finding.asset_version == source_a.asset_version
+        for finding in active_script_findings
+    )
+    review_tasks = [
+        task
+        for task in stores.tasks.list(source_a.project_id)
+        if task.type.value.startswith("review_")
+    ]
+    assert review_tasks[-1].payload["asset_version"] == source_a.asset_version
+    assert review_tasks[-1].idempotency_key == idempotency_key(
+        source_a.project_id,
+        review_tasks[-1].type,
+        f"{source_a.asset_version}:analysis-generation:{after.generation}",
+    )
+    assert all(
+        finding.asset_version != source_b.version_id
+        for finding in stores.findings.list(source_a.project_id)
+    )
+    if backend == "sqlite":
+        stores.db.close()
 
 
 def test_reanalysis_hit_to_no_hit_hides_prior_script_finding(

@@ -637,19 +637,21 @@ class WorkflowService:
         self,
         project_id: str,
         *,
+        asset_version: str | None = None,
         analysis_generation: int | None = None,
         force: bool = False,
     ):
-        """C1-a over the latest script version, recorded as a review task.
+        """C1-a over a selected script version, recorded as a review task.
 
         The first review of a version is `review_full`; a later one is
         `review_incremental`, since prior findings carry forward. Normal retries
         are keyed on the asset version, while an explicit completed-review
         reanalysis adds its claimed generation to the key so the same source is
-        checked again without weakening ordinary redelivery idempotency.
+        checked again without weakening ordinary redelivery idempotency. Callers
+        that omit ``asset_version`` retain the latest-script behavior.
         """
 
-        asset = self._latest_script(project_id)
+        asset = self._script_asset(project_id, asset_version)
         if asset is None:
             raise NotFoundError(
                 "this project has no uploaded script to review",
@@ -673,6 +675,7 @@ class WorkflowService:
         def work() -> JobOutcome:
             project, written, result = self._review_now(
                 project_id,
+                asset_version=asset.version_id,
                 analysis_generation=analysis_generation,
             )
             holder.append((project, written, result))
@@ -739,11 +742,12 @@ class WorkflowService:
         self,
         project_id: str,
         *,
+        asset_version: str | None = None,
         analysis_generation: int | None = None,
     ):
 
         project = self.get_project(project_id)
-        asset = self._latest_script(project_id)
+        asset = self._script_asset(project_id, asset_version)
         if asset is None:
             raise NotFoundError(
                 "this project has no uploaded script to review",
@@ -753,7 +757,7 @@ class WorkflowService:
         data = self._stores.blobs.get(asset.storage_uri)
         if data is None:
             raise NotFoundError(
-                "the stored bytes are missing for the latest script",
+                "the stored bytes are missing for the selected script",
                 {"asset_version": asset.version_id},
             )
         document = data.decode("utf-8", errors="replace")
@@ -1560,6 +1564,19 @@ class WorkflowService:
         ]
         return scripts[-1] if scripts else None
 
+    def _script_asset(
+        self, project_id: str, asset_version: str | None
+    ) -> AssetVersion | None:
+        if asset_version is None:
+            return self._latest_script(project_id)
+        asset = self._stores.assets.get(project_id, asset_version)
+        if asset is None or asset.kind is not AssetKind.SCRIPT:
+            raise NotFoundError(
+                "script asset version not found",
+                {"project_id": project_id, "asset_version": asset_version},
+            )
+        return asset
+
     # --------------------------------------------------------------- roadmap
 
     def roadmap_preview(self, project_id: str) -> tuple[Roadmap | None, list[str]]:
@@ -1754,6 +1771,7 @@ class WorkflowService:
         generation = task.payload.get("analysis_generation")
         _, written, result = self._review_now(
             task.project_id,
+            asset_version=str(task.payload.get("asset_version")),
             analysis_generation=int(generation) if generation is not None else None,
         )
         return JobOutcome(

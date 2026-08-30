@@ -340,6 +340,7 @@ class ReviewFacade:
             if session.mode is ReviewMode.SCRIPT:
                 _, _, result = workflow.run_script_review(
                     session.project_id,
+                    asset_version=session.asset_version,
                     analysis_generation=session.generation,
                     force=force_script_review,
                 )
