@@ -2,18 +2,22 @@
 
 日期：2026-08-30
 
-状态：已实现；ScriptedLLM fixture 与真实浏览器验收通过，Vertex live smoke 未运行
+状态：已实现；本地内容感知 fixture 与真实浏览器验收通过；Vertex intake/risk live smoke 未运行
 
 ## 0. 实现状态（2026-08-30）
 
 本设计已在 `codex/demo-ui-simplification-design` 实现。当前边界如下：
 
-- 已实现：有界上传与 DOCX 解压防护、文本规范化、候选提取、显式可编辑确认闸门、确认后的原子分析占位、分类与场景风险分析、ReviewSession 的 Memory/SQLite 恢复、三个交付物和带认证的原始文件下载；
-- 已实现：英文三屏 Creator UI、idea-only 手填分支、只保存 review ID 的 URL 恢复、精简 Creator 导航，以及非交互式 `Beyond this demo`；
-- 已验证：Python `771 passed, 3 skipped, 1 warning`（`774 tests collected`）；Web `37 passed`；TypeScript 和 Next.js production build 通过；
-- 已验证：合成 fixture 通过 ScriptedLLM adapter 和运行中的 FastAPI + Next.js，在 Chrome 的 1440、1024、768、390 CSS px 下完成 `5 passed` 的真实浏览器验收；浏览器还校验了 4 个下载文件的文件名与内容标记；
-- 未验证：真实 Vertex/Gemini live smoke、云端部署、真实机构协作或政府备案；ScriptedLLM 结果不得表述为云端 LLM 已验证；
-- 保留但不进入 Demo：机构协作、备案、旧 collection/dashboard/admin/policy 页面均仍可通过直达路由访问。
+- 已实现：有界上传与 DOCX 解压防护、文本规范化、基于当前文档的候选提取、显式可编辑确认闸门、确认后的分类与场景风险分析、ReviewSession 的 Memory/SQLite 恢复、三个交付物和带认证的原始文件下载；
+- 已实现：英文三屏 Creator UI、idea-only 手填分支、已访问步骤的真实可访问标签切换、从最后确认值编辑并对同一 project/source 做原子 reanalysis、只保存 review ID 的 URL 恢复、精简 Creator 导航，以及非交互式 `Beyond this demo`；
+- 已验证（2026-08-30 fresh run）：Python `897 passed, 3 skipped, 1 warning`（`900 tests collected`）；Web `13 files / 49 tests passed`；TypeScript `tsc --noEmit` 和 Next.js production build 均以 exit 0 完成；
+- 已验证（2026-08-30 fresh run）：`local-content-aware-demo` 通过运行中的 FastAPI + Next.js，在 Chromium 的 1440、1024、768、390 CSS px 下完成 30 分钟英文 fixture 的上传、确认、标签切换、修改和 reanalysis；另验证 70 分钟英文 fixture 的差异化抽取与键盘标签导航，共 `6 passed`；
+- 本地 fallback 边界：`DemoIntakeLLM` 只按四个已登记中英文 fixture 的规范化文本 SHA-256 返回文档特定结果，并校验 prompt/version/schema；未知文档 fail closed。它是本地、凭据无关的确定性 Demo adapter，不是通用离线模型或云端验证；
+- Vertex 翻译来源：两个已提交英文 fixture 曾通过仓库现有 `VertexGeminiLLM`、`gemini-3.5-flash` 和当时已有 ADC，按 section/scene 分块由其对应中文合成 fixture 生成。该外部调用仅用于这两个已提交合成 fixture 的翻译，不是单独的 live demo intake/risk smoke；本轮最终验收未做任何外部调用；
+- fixture 证据边界：英文 fixture 是 synthetic、unreviewed 的测试草稿，没有独立双语专家复核，也不是合规黄金样例或法律建议；当前 governed seed 的确定性分类模式仍为中文语料边界，英文 subject 命中来自有界本地 semantic adapter 的精确引文并保持 `needs_human`；
+- 未验证：真实 Vertex/Gemini demo intake/risk live smoke、云端部署、真实机构协作或政府备案；本地 adapter 结果不得表述为云端 LLM 已验证；
+- 保留但不进入 Demo：机构协作、备案、旧 collection/dashboard/admin/policy 页面仍可通过直达路由访问，仅作 showcase；
+- 异步边界：当前同步 Demo 的任务 claim、generation CAS 与 aggregate publish 已覆盖并发一致性；`RUNNING` 任务没有 lease 或 worker crash 自动恢复，属于未来异步基础设施，不在本 Demo 的完成声明中。
 
 上位规格：[Upload-first Demo UI Simplification Design](../superpowers/specs/2026-08-30-upload-first-demo-ui-simplification-design.md)
 
@@ -796,17 +800,20 @@ ReviewFacade 通过现有 WorkflowService timeline 写入：
 
 ## 16. 验收命令
 
-实现完成时依次运行：
+2026-08-30 最终验收依次运行：
 
 ```bash
-python -m pytest -o addopts='' -q
-cd web && npm test
-cd web && npm run typecheck
-cd web && npm run build
-cd web && npx playwright test e2e/review-demo.spec.ts
+PYTHONPATH=$PWD /Users/ruichenwang/Documents/ChatGPT/AllAgentic/.venv/bin/pytest -q
+cd web
+npm test
+npm run typecheck
+npm run build
+E2E_PYTHON=/Users/ruichenwang/Documents/ChatGPT/AllAgentic/.venv/bin/python \
+PYTHONPATH=/Users/ruichenwang/Documents/ChatGPT/AllAgentic-demo-ui-design \
+npm run test:e2e
 ```
 
-真实浏览器验收必须使用运行中的 FastAPI 和 Next.js，不以 component test 代替。Vertex live smoke 是单独证据：没有配置真实 Vertex 时，测试 adapter 通过不能表述为云端 LLM 已验证。
+结果：Python `897 passed, 3 skipped`（共收集 900 项，另有 1 条现有 Starlette/httpx deprecation warning）；Vitest `13 files / 49 tests passed`；typecheck 和 build 均 exit 0；Playwright `6 passed`。真实浏览器验收使用运行中的 FastAPI 和 Next.js，不以 component test 代替。Vertex live smoke 是单独证据：本次未运行 live demo intake/risk 请求，本地 adapter 通过不能表述为云端 LLM 已验证。
 
 ## 17. 实现顺序
 

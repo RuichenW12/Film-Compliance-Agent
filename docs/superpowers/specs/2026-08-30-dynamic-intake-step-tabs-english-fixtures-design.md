@@ -2,7 +2,7 @@
 
 **Date:** 2026-08-30
 
-**Status:** Confirmed; written-spec review complete
+**Status:** Implemented and locally verified; Vertex demo intake/risk live smoke not run
 
 **Scope owner:** Upload-first creator demo
 
@@ -240,3 +240,50 @@ short browser timeout on full semantic analysis.
 - creating institution, filing, or policy-management steps;
 - treating synthetic English fixtures as expert-reviewed golden samples;
 - changing the source screenplay when a user edits Tags or Synopsis.
+
+## 9. Implemented and Verified Boundary (2026-08-30)
+
+The implemented manual demo selects the configured repository Vertex adapter
+when explicitly available, or the clearly named `local-content-aware-demo`
+fallback. The fallback is content-aware but fixture-bounded: it checks the
+normalized document SHA-256 plus prompt/version/schema, provides distinct
+intake and semantic responses for the four checked-in Chinese/English 30- and
+70-minute fixtures, and fails closed for an unknown document. It is not a
+general local model and its results are not evidence of Vertex behavior.
+
+Completed-review edits now reuse the same review, project, uploaded asset, and
+source checksum. Generation-aware compare-and-swap plus project-aggregate
+publication prevents an older concurrent reanalysis from replacing a newer
+result. Visited progress items are real keyboard-accessible tabs; tab switching
+alone has no backend side effect, and there is no separate Back button.
+
+Fresh final verification produced:
+
+- Python: 900 tests collected, 897 passed, 3 skipped, with one existing
+  Starlette/httpx deprecation warning;
+- Web unit/component tests: 13 files and 49 tests passed;
+- TypeScript (`tsc --noEmit`) and the Next.js production build: exit 0;
+- deterministic Playwright E2E: 6 tests passed, covering the English 30-minute
+  upload/confirm/results/reanalysis flow at 1440, 1024, 768, and 390 CSS pixels,
+  the English 70-minute differentiated intake, and keyboard tab navigation.
+
+The two checked-in English fixtures were generated in section/scene chunks
+from only their corresponding checked-in synthetic Chinese fixtures using the
+repository's existing `VertexGeminiLLM`, model `gemini-3.5-flash`, and the ADC
+available at generation time. That translation provenance is not a separate
+live demo intake or risk-analysis smoke. No external request was made during
+final verification, and a real Vertex demo intake/risk smoke remains unrun and
+unverified.
+
+Both English fixtures remain synthetic, externally unreviewed test drafts.
+They have not received independent bilingual expert review and are neither
+golden compliance samples nor legal guidance. The governed deterministic seed
+still has a Chinese-only classification pattern boundary; English subject
+evidence in deterministic E2E comes from the fixture-bounded semantic adapter,
+uses an exact source quote, and remains marked for human review.
+
+Institution collaboration, filing, and policy administration remain
+showcase-only and are not steps in this demo flow. The synchronous demo's task
+claim, generation CAS, and aggregate publication are covered, but `RUNNING`
+jobs have no lease or automatic worker-crash recovery; that remains future
+asynchronous infrastructure rather than a completed demo capability.
