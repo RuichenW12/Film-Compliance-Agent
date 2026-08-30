@@ -91,7 +91,9 @@ export function ResultsStep({ review, autoFocus = true }: { review: ReviewView; 
             ))}
           </div>
         ) : (
-          <p className={styles.emptyState}>No rule-based risks detected.</p>
+          <p className={styles.emptyState}>
+            No scene-level findings are currently shown under Policy Snapshot {result.snapshot_version}. This is not a clean-pass decision.
+          </p>
         )}
       </section>
 
