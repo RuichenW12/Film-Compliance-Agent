@@ -26,6 +26,9 @@ Planned document groups include:
 - [Policy loop Gate 5-a snapshot bridge design](superpowers/specs/2026-08-24-policy-loop-gate5a-snapshot-bridge-design.md)
 - [Implementation status by owner (2026-08-24)](technical/implementation-status-2026-08-24.md)
 - [Manual test guide](manual-test-guide.md)
+- [Deployment — the parts that need you](deploy-manual-steps.md) — the human
+  steps for the Google Cloud deployment: irreversible choices, interactive
+  logins, and secret values
 - [Illustrated walkthrough](walkthrough.html) — architecture, the classification
   mechanism, the lifecycle, the policy loop, current status, and a worked
   end-to-end run

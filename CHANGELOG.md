@@ -20,7 +20,41 @@ Conventions:
 
 ---
 
-## 2026-08-29
+## 2026-08-30
+
+### A — a runbook for the human half of the deployment
+
+`docs/deploy-manual-steps.md`. Deployment work is starting, and it splits into
+two piles: things an agent should do, and things it should not — an irreversible
+choice, an interactive login, a secret value. This file is only the second pile,
+so there is one place to look rather than a decision buried in chat scrollback.
+
+What it records, all verified on the machine today rather than assumed:
+
+- **The project already exists** — `film-compliance-agent`, number
+  `827776020662`, billing `01CE31-A7C20B-F215BA` (a free-credit account, not
+  the one the other projects use). It is empty: no database, no buckets, no
+  services.
+- **gcloud 582.0.0 was already installed** at `%LOCALAPPDATA%\Google\Cloud SDK`
+  and simply not on PATH, which is why it looked absent. Java is present, Docker
+  is not and is not needed.
+- Twelve APIs are enabled — eight of them enabled today: `firestore`, `run`,
+  `pubsub`, `cloudbuild`, `artifactregistry`, `secretmanager`, `cloudscheduler`,
+  `iamcredentials`.
+- `cloud-firestore-emulator` and `pubsub-emulator` installed, so phase 5a is
+  verifiable locally with no cloud resources. The install fails with exit 1
+  until `CLOUDSDK_PYTHON` points at gcloud's bundled interpreter; the workaround
+  is in the file.
+
+Two decisions are written down where the commands are, not just in chat:
+
+- **Creating the Firestore database is the only irreversible step**, because its
+  location is fixed forever. The file states the `us-east1` versus `nam5`
+  trade-off next to the command rather than presenting one as obvious.
+- A named gcloud configuration (`film`) is recommended, so working on this
+  project does not disturb the active config pointing at another one.
+
+Nothing here changes product behavior — no code, no schema, no contract.
 
 ### A — the illustrated walkthrough is in the repository
 
