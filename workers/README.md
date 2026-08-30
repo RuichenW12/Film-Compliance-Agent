@@ -1,10 +1,10 @@
 # Workers
 
-This directory is reserved for asynchronous jobs and event consumers.
+This directory contains the product job worker and policy refresh/event workers.
 
-Planned worker families:
+Worker families:
 
-- product workers for fact extraction, script review, and other long-running tasks;
+- product workers for fact extraction and script review;
 - policy workers under [`policy/`](policy/README.md);
 - notification and outbox dispatch where required by the shared event contracts.
 
@@ -13,8 +13,12 @@ Workers communicate through schemas and events defined in `schemas/`. At-least-o
 ## Current implementation
 
 - `hello.py` — Vertex AI wiring check (`python -m workers.hello`). It proves the ADC identity can reach Gemini and that structured output round-trips; it makes no compliance judgement.
+- `jobs.py` — idempotent fact-extraction and script-review task execution for a configured queue runner.
+- `policy/` — policy refresh, proposal, publication, outbox, and cloud-adapter boundaries documented in [`policy/README.md`](policy/README.md).
 
-Still to build: the fact extractor, the scene review worker, the notification consumer, and the push routes on port 8081.
+The current Cloud Run recording deployment does not run a separate worker
+service: review work runs inline. Durable queue delivery, leases/crash recovery,
+notification consumers, and a deployed push-worker route remain future work.
 
 ## Product jobs
 

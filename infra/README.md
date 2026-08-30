@@ -1,9 +1,13 @@
 # Infrastructure
 
-This directory is reserved for reproducible cloud and local-development configuration.
+This directory contains the container build definitions used by the current Cloud Run deployment, alongside the repository's local-development configuration.
 
-Planned coverage includes Cloud Run services and jobs, Pub/Sub topics and subscriptions, Firestore, Cloud Storage, Cloud Scheduler, service-account bindings, environment templates, and local emulators.
+Implemented here:
+
+- `api.Dockerfile` and `web.Dockerfile` for the two Cloud Run services;
+- `cloudbuild.api.yaml` and `cloudbuild.web.yaml` for Artifact Registry images built from the repository root;
+- the root `docker-compose.yml` for local Firestore and Pub/Sub emulators plus the API.
 
 Shared infrastructure is coordinated by both workstreams. Richard owns the definitions specific to the policy refresh job, policy event delivery, and policy administration deployment path.
 
-No deployment script or cloud resource definition exists in this scaffold.
+Cloud resources are currently created and updated with documented `gcloud` commands rather than Terraform or another declarative infrastructure stack. See [`docs/deployment.md`](../docs/deployment.md) for the live topology, build, deploy, rollback, access, and persistence boundaries. Cloud Scheduler, durable asynchronous review workers, and Cloud Storage-backed uploads remain future infrastructure work.

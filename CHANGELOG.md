@@ -20,7 +20,44 @@ Conventions:
 
 ---
 
+## 2026-08-31
+
+### A — Gemini 3.5 recording baseline and Maxine handoff
+
+- Production API revision `api-gemini35` now uses `gemini-3.5-flash` through
+  Vertex AI `global`; the Cloud Run service remains in `us-east1` and retains
+  `STORE_BACKEND=memory`.
+- The synthetic 30-minute public-security fixture passed a production creator
+  flow: complete Synopsis, Class 1/co-review, nine locatable findings, three
+  generated artifacts, and the unchanged source.
+- The recording design now describes the real Google GenAI SDK and synchronous
+  inline execution rather than ADK, Pub/Sub, Firestore, or durable background
+  jobs. A separate Maxine handoff records the current baseline, shot plan,
+  editable choices, acceptance gate, and failure plan.
+
+Verified: Vertex 3.5 structured smoke; Cloud Run Ready/Active/ContainerHealthy;
+production browser acceptance with no console warnings or errors.
+
 ## 2026-08-30
+
+### A — current upload-first demo status and Policy Snapshot empty-state boundary
+
+- The result screen no longer says `No rule-based risks detected`. An empty
+  list now says that no scene-level findings are currently shown under the
+  pinned Policy Snapshot and explicitly states that this is not a clean-pass
+  decision.
+- The root README now describes the implemented three-step creator demo,
+  editable confirmation and reanalysis, generated downloads, current Cloud Run
+  URL, local fixture/Vertex backend choices, and the live memory-storage
+  boundary instead of listing script review, form freeze, the institution
+  console, and cloud deployment as unbuilt.
+- The linked API, Web, infrastructure, worker, schema, documentation, sample,
+  and fixture READMEs now distinguish implemented behavior from retained legacy
+  routes and future work. The deployment reference records the actual
+  `STORE_BACKEND=memory` recording boundary instead of claiming Firestore-backed
+  ReviewSession persistence.
+
+Verified: `npm test` — 53 passed; `npm run typecheck`; `npm run build`.
 
 ### Shared — a deployment reference the other workstream can act on
 

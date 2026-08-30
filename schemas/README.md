@@ -1,8 +1,8 @@
 # Schemas
 
-This directory is the shared A/B contract boundary.
+This directory is the implemented shared A/B contract boundary.
 
-Planned contracts include:
+Current contracts include:
 
 - project, fact, finding, form, task, notification, and timeline models;
 - PolicySnapshot, PolicyProposal, and PolicyUpdatedEvent;
@@ -11,4 +11,8 @@ Planned contracts include:
 
 Contract changes that affect both workstreams require review from Maxine and Richard. Runtime-specific helper types should remain with their owning module instead of expanding the shared surface.
 
-Gate 1 implements the frozen policy handshake in `policy_snapshot.py` and the local YAML-backed `SnapshotService` in `snapshot.py`. Cloud adapters and non-policy shared schemas remain future work.
+`policy_snapshot.py` and `snapshot.py` implement the frozen policy handshake and
+local YAML-backed `SnapshotService`. The other modules define the current
+project, asset, review-session, finding, form, task, notification, timeline,
+and error-envelope contracts used by the API, workflow service, stores, and
+tests. Cloud adapters remain outside this package behind the same interfaces.

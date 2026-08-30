@@ -528,6 +528,22 @@ describe("upload-first review flow", () => {
     expect(within(beyond).queryAllByRole("button")).toHaveLength(0);
   });
 
+  it("describes an empty result as policy-snapshot review, not a rule-based pass", async () => {
+    vi.mocked(getReview).mockResolvedValue({
+      ...COMPLETE_VIEW,
+      findings: [],
+      semantic_status: "complete",
+    });
+    render(<ReviewFlow initialReviewId="review_001" />);
+
+    expect(
+      await screen.findByText(
+        "No scene-level findings are currently shown under Policy Snapshot v2. This is not a clean-pass decision."
+      )
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/rule-based risks/i)).not.toBeInTheDocument();
+  });
+
   it("shows real request progress and moves focus to results", async () => {
     vi.mocked(createScriptReview).mockResolvedValue(CONFIRM_VIEW);
     let finish: ((view: ReviewView) => void) | undefined;
