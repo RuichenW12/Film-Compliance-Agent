@@ -73,6 +73,7 @@ from .ids import new_id
 from .llm import LLMClient
 from .materials import build_material_cards
 from .review import (
+    PENDING_FLAG,
     SCRIPT_REVIEW_PROMPT_VERSION,
     ReviewResult,
     evidence_for,
@@ -146,6 +147,22 @@ class WorkflowService:
         self._llm = llm
         self._video = video
         self._jobs = jobs or InlineRunner()
+
+    @property
+    def supports_synchronous_review_analysis(self) -> bool:
+        return self._jobs.synchronous_results
+
+    def for_staged_stores(self, stores) -> WorkflowService:
+        """Reuse configured backends while isolating analysis writes."""
+
+        return WorkflowService(
+            stores,
+            self._snapshots,
+            self._clock,
+            self._llm,
+            self._video,
+            self._jobs,
+        )
 
     # ------------------------------------------------------------------ reads
 
@@ -273,8 +290,10 @@ class WorkflowService:
         )
         return project
 
-    def prepare_review_reanalysis(self, project_id: str) -> Project:
-        """Reset an isolated COMPLETE package to the normal intake baseline."""
+    def begin_review_reanalysis(
+        self, project_id: str, analysis_generation: int
+    ) -> Project:
+        """Record the dedicated backward edge used only by review reanalysis."""
 
         project = self.get_project(project_id)
         if project.state not in self.REANALYZABLE_REVIEW_STATES:
@@ -282,6 +301,7 @@ class WorkflowService:
                 "this project can no longer be reanalyzed in place",
                 {"state": project.state.value},
             )
+        now = self._clock.now()
         prepared = project.model_copy(
             update={
                 "state": ProjectState.DRAFT,
@@ -289,10 +309,37 @@ class WorkflowService:
                 "roadmap": None,
                 "policy_stale": False,
                 "registration_number": None,
-                "updated_at": self._clock.now(),
+                "updated_at": now,
             }
         )
-        return self._stores.projects.save(prepared)
+        self._stores.projects.save(prepared)
+        detail = {"generation": analysis_generation}
+        self._stores.audit.add(
+            project_id,
+            AuditEntry(
+                at=now,
+                actor=Actor.CREATOR,
+                from_state=project.state.value,
+                to_state=ProjectState.DRAFT.value,
+                reason="review.reanalysis_reset",
+                detail=detail,
+            ),
+        )
+        self._stores.timeline.add(
+            project_id,
+            TimelineEvent(
+                event_id=new_id("event"),
+                at=now,
+                actor=Actor.CREATOR,
+                event=f"state.{ProjectState.DRAFT.value}",
+                detail={
+                    "from": project.state.value,
+                    "reason": "review.reanalysis_reset",
+                    **detail,
+                },
+            ),
+        )
+        return prepared
 
     def record_review_event(
         self, project_id: str, event: str, detail: dict
@@ -669,9 +716,10 @@ class WorkflowService:
                 {"task_id": task.task_id},
             )
         if task.status is TaskStatus.QUEUED:
-            raise StateInvalidError(
-                "script review analysis is still queued",
-                {"task_id": task.task_id, "status": task.status.value},
+            return (
+                self.get_project(project_id),
+                [],
+                ReviewResult(pending_flags=[PENDING_FLAG], backend="queued"),
             )
         if outcome is None and task.result is None:
             raise UpstreamLLMError(

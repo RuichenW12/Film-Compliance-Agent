@@ -175,8 +175,10 @@ def test_a_queued_review_has_not_written_findings_yet(queued_client):
     project_id, _ = project_with_script(queued_client)
     response = queued_client.post(f"/v1/projects/{project_id}/review", headers=OWNER)
 
-    assert response.status_code == 409
-    assert response.json()["error"]["code"] == "STATE_INVALID"
+    assert response.status_code == 200
+    assert response.json()["backend"] == "queued"
+    assert response.json()["pending_flags"] == ["script_semantic_check_pending"]
+    assert response.json()["findings"] == []
     assert (
         queued_client.get(f"/v1/projects/{project_id}/findings", headers=OWNER).json()
         == []

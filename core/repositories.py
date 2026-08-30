@@ -7,7 +7,7 @@ used by tests and the Firestore store used on Cloud Run stay interchangeable.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Protocol
+from typing import Any, Protocol
 
 from schemas.assets import AssetVersion, MaterialCard, UploadTicket
 from schemas.common import AuditEntry, Fact, TimelineEvent
@@ -24,12 +24,10 @@ from schemas.workflow import (
 
 
 @dataclass(frozen=True)
-class ReviewAnalysisPublication:
-    """One complete project-scoped review generation ready for atomic publish."""
+class ReviewAnalysisBaseline:
+    """Exact durable aggregate captured before one analysis generation claims."""
 
     session: ReviewSession
-    expected_project: Project
-    expected_form: FormDraft | None
     project: Project
     facts: tuple[Fact, ...]
     findings: tuple[Finding, ...]
@@ -37,6 +35,47 @@ class ReviewAnalysisPublication:
     tasks: tuple[WorkflowTask, ...]
     timeline: tuple[TimelineEvent, ...]
     audit: tuple[AuditEntry, ...]
+
+
+@dataclass(frozen=True)
+class ReviewAnalysisStage:
+    baseline: ReviewAnalysisBaseline
+    stores: Any
+
+
+@dataclass(frozen=True)
+class ReviewAnalysisPublication:
+    """One complete project-scoped review generation ready for atomic publish."""
+
+    baseline: ReviewAnalysisBaseline
+    session: ReviewSession
+    project: Project
+    facts: tuple[Fact, ...]
+    findings: tuple[Finding, ...]
+    forms: tuple[FormDraft, ...]
+    tasks: tuple[WorkflowTask, ...]
+    timeline: tuple[TimelineEvent, ...]
+    audit: tuple[AuditEntry, ...]
+
+
+def validate_review_analysis_publication(
+    publication: ReviewAnalysisPublication,
+) -> str:
+    """Return the aggregate id, rejecting a cross-project/session bundle."""
+
+    project_id = publication.project.project_id
+    baseline = publication.baseline
+    if (
+        baseline.project.project_id != project_id
+        or baseline.session.project_id != project_id
+        or publication.session.project_id != project_id
+        or baseline.session.review_id != publication.session.review_id
+        or publication.session.generation != baseline.session.generation + 1
+        or any(task.project_id != project_id for task in baseline.tasks)
+        or any(task.project_id != project_id for task in publication.tasks)
+    ):
+        raise ValueError("review analysis publication crosses aggregate identities")
+    return project_id
 
 
 class ProjectStore(Protocol):

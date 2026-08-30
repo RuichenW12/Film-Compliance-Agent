@@ -8,9 +8,11 @@ from fastapi.testclient import TestClient
 from api.deps.services import AppContext
 from api.main import create_app
 from api.settings import Settings
+from core.jobs import QueuedRunner, RecordingPublisher
 from core.llm import ScriptedLLM, UnavailableLLM
 from core.review_artifacts import ArtifactComposer
 from core.script_intake import SCRIPT_INTAKE_PROMPT_ID
+from schemas.reviews import SemanticStatus
 
 
 SCRIPT = """# 《先挂电话》
@@ -261,6 +263,39 @@ def test_reanalyze_route_maps_validation_state_owner_and_role_errors(client) -> 
     )
     assert wrong_role.status_code == 403
     assert wrong_role.json()["error"]["code"] == "FORBIDDEN"
+
+
+def test_reanalysis_rejects_a_queued_runner_before_claim_or_publish(
+    stores, review_snapshots, clock
+) -> None:
+    publisher = RecordingPublisher()
+    context = AppContext(
+        settings=Settings(),
+        stores=stores,
+        snapshots=review_snapshots,
+        clock=clock,
+        llm=ScriptedLLM({SCRIPT_INTAKE_PROMPT_ID: INTAKE_REPLY}),
+        jobs=QueuedRunner(publisher),
+    )
+    queued_client = TestClient(create_app(context=context))
+    review_id, _ = complete_review(queued_client)
+    before_session = stores.review_sessions.get(review_id)
+    assert before_session.semantic_status is SemanticStatus.PENDING
+    before_project = stores.projects.get(before_session.project_id)
+    before_tasks = stores.tasks.list(before_session.project_id)
+    before_published = list(publisher.published)
+
+    response = queued_client.post(
+        f"/v1/reviews/{review_id}/reanalyze",
+        json={**CONFIRMED, "title": "Unsupported queued reanalysis"},
+    )
+
+    assert response.status_code == 409
+    assert response.json()["error"]["code"] == "STATE_INVALID"
+    assert stores.review_sessions.get(review_id) == before_session
+    assert stores.projects.get(before_session.project_id) == before_project
+    assert stores.tasks.list(before_session.project_id) == before_tasks
+    assert publisher.published == before_published
 
 
 def test_retry_intake_route_preserves_confirmation_step(

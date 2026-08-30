@@ -44,6 +44,8 @@ class AppContext:
             snapshots=self.snapshots,
             clock=self.clock,
             llm=self.llm,
+            video=self.video,
+            jobs=self.jobs,
         )
 
 

@@ -31,7 +31,12 @@ from typing import Iterable, TypeVar
 
 from pydantic import BaseModel
 
-from core.repositories import ReviewAnalysisPublication
+from core.repositories import (
+    ReviewAnalysisBaseline,
+    ReviewAnalysisPublication,
+    ReviewAnalysisStage,
+    validate_review_analysis_publication,
+)
 from schemas.assets import AssetVersion, MaterialCard, UploadTicket
 from schemas.common import AuditEntry, Fact, TimelineEvent
 from schemas.findings import Finding
@@ -542,42 +547,145 @@ class SqliteStores:
         self.notifications = SqliteNotificationStore(self.db)
         self.institutions = SqliteInstitutionRegistry(self.db)
 
-    def review_analysis_baseline(
-        self, project_id: str
-    ) -> tuple[Project, FormDraft | None]:
+    def stage_review_analysis(
+        self, review_id: str, project_id: str
+    ) -> ReviewAnalysisStage:
+        from store.memory import InMemoryStores
+
         connection = self.db._connection
         with self.db._lock:
             connection.execute("BEGIN")
             try:
+                session_row = connection.execute(
+                    "SELECT payload FROM documents "
+                    "WHERE collection = ? AND doc_key = ?",
+                    ("review_sessions", review_id),
+                ).fetchone()
                 project_row = connection.execute(
                     "SELECT payload FROM documents "
                     "WHERE collection = ? AND doc_key = ?",
                     ("projects", project_id),
                 ).fetchone()
-                if project_row is None:
-                    raise KeyError(f"project not found: {project_id}")
-                form_row = connection.execute(
-                    "SELECT payload FROM documents "
-                    "WHERE collection = ? AND parent = ? "
-                    "ORDER BY ordinal DESC LIMIT 1",
-                    ("forms", project_id),
-                ).fetchone()
-                project = Project.model_validate_json(project_row["payload"])
-                form = (
-                    FormDraft.model_validate_json(form_row["payload"])
-                    if form_row is not None
-                    else None
+                if session_row is None or project_row is None:
+                    raise KeyError(
+                        f"review aggregate not found: {review_id}/{project_id}"
+                    )
+
+                def project_rows(collection: str):
+                    return connection.execute(
+                        "SELECT payload FROM documents "
+                        "WHERE collection = ? AND parent = ? ORDER BY ordinal",
+                        (collection, project_id),
+                    ).fetchall()
+
+                facts = tuple(
+                    Fact.model_validate_json(row["payload"])
+                    for row in project_rows("facts")
                 )
+                findings = tuple(
+                    Finding.model_validate_json(row["payload"])
+                    for row in project_rows("findings")
+                )
+                forms = tuple(
+                    FormDraft.model_validate_json(row["payload"])
+                    for row in project_rows("forms")
+                )
+                timeline = tuple(
+                    TimelineEvent.model_validate_json(row["payload"])
+                    for row in project_rows("timeline")
+                )
+                audit = tuple(
+                    AuditEntry.model_validate_json(row["payload"])
+                    for row in project_rows("audit")
+                )
+                task_rows = connection.execute(
+                    "SELECT payload FROM documents "
+                    "WHERE collection = ? ORDER BY ordinal",
+                    ("tasks",),
+                ).fetchall()
+                tasks = tuple(
+                    task
+                    for task in (
+                        WorkflowTask.model_validate_json(row["payload"])
+                        for row in task_rows
+                    )
+                    if task.project_id == project_id
+                )
+                assets = tuple(
+                    AssetVersion.model_validate_json(row["payload"])
+                    for row in project_rows("assets")
+                )
+                blobs: dict[str, bytes] = {}
+                for asset in assets:
+                    for uri in (asset.storage_uri, asset.text_storage_uri):
+                        if not uri:
+                            continue
+                        blob_row = connection.execute(
+                            "SELECT data FROM blobs WHERE uri = ?", (uri,)
+                        ).fetchone()
+                        if blob_row is not None:
+                            blobs[uri] = bytes(blob_row["data"])
+
+                baseline = ReviewAnalysisBaseline(
+                    session=ReviewSession.model_validate_json(session_row["payload"]),
+                    project=Project.model_validate_json(project_row["payload"]),
+                    facts=facts,
+                    findings=findings,
+                    forms=forms,
+                    tasks=tasks,
+                    timeline=timeline,
+                    audit=audit,
+                )
+                project = Project.model_validate_json(project_row["payload"])
                 connection.execute("COMMIT")
-                return project, form
             except Exception:
                 connection.execute("ROLLBACK")
                 raise
 
+        staged = InMemoryStores()
+        staged.projects.create(project)
+        for fact in facts:
+            staged.facts.add(project_id, fact)
+        for finding in findings:
+            staged.findings.add(project_id, finding)
+        for form in forms:
+            staged.forms.put(project_id, form)
+        for task in tasks:
+            staged.tasks.add(task)
+        for event in timeline:
+            staged.timeline.add(project_id, event)
+        for entry in audit:
+            staged.audit.add(project_id, entry)
+        for asset in assets:
+            staged.assets.add(project_id, asset)
+        for uri, content in blobs.items():
+            staged.blobs.put(uri, content)
+        return ReviewAnalysisStage(baseline=baseline, stores=staged)
+
+    def prepare_review_analysis_publication(
+        self, stage: ReviewAnalysisStage, session: ReviewSession
+    ) -> ReviewAnalysisPublication:
+        staged = stage.stores
+        project = staged.projects.get(session.project_id)
+        if project is None:
+            raise KeyError(f"project not found: {session.project_id}")
+        return ReviewAnalysisPublication(
+            baseline=stage.baseline,
+            session=session,
+            project=project,
+            facts=tuple(staged.facts.list(session.project_id)),
+            findings=tuple(staged.findings.list(session.project_id)),
+            forms=tuple(staged.forms.list(session.project_id)),
+            tasks=tuple(staged.tasks.list(session.project_id)),
+            timeline=tuple(staged.timeline.list(session.project_id)),
+            audit=tuple(staged.audit.list(session.project_id)),
+        )
+
     def publish_review_analysis(
         self, publication: ReviewAnalysisPublication
     ) -> bool:
-        project_id = publication.project.project_id
+        project_id = validate_review_analysis_publication(publication)
+        baseline = publication.baseline
         connection = self.db._connection
         with self.db._lock:
             connection.execute("BEGIN IMMEDIATE")
@@ -596,27 +704,51 @@ class SqliteStores:
                     "WHERE collection = ? AND doc_key = ?",
                     ("projects", project_id),
                 ).fetchone()
-                form_row = connection.execute(
-                    "SELECT payload FROM documents "
-                    "WHERE collection = ? AND parent = ? "
-                    "ORDER BY ordinal DESC LIMIT 1",
-                    ("forms", project_id),
-                ).fetchone()
                 live_project = (
                     Project.model_validate_json(project_row["payload"])
                     if project_row is not None
                     else None
                 )
-                live_form = (
-                    FormDraft.model_validate_json(form_row["payload"])
-                    if form_row is not None
-                    else None
+
+                def project_models(collection: str, model):
+                    rows = connection.execute(
+                        "SELECT payload FROM documents "
+                        "WHERE collection = ? AND parent = ? ORDER BY ordinal",
+                        (collection, project_id),
+                    ).fetchall()
+                    return tuple(
+                        model.model_validate_json(item["payload"])
+                        for item in rows
+                    )
+
+                live_facts = project_models("facts", Fact)
+                live_findings = project_models("findings", Finding)
+                live_forms = project_models("forms", FormDraft)
+                live_timeline = project_models("timeline", TimelineEvent)
+                live_audit = project_models("audit", AuditEntry)
+                task_rows = connection.execute(
+                    "SELECT payload FROM documents "
+                    "WHERE collection = ? ORDER BY ordinal",
+                    ("tasks",),
+                ).fetchall()
+                live_tasks = tuple(
+                    task
+                    for task in (
+                        WorkflowTask.model_validate_json(item["payload"])
+                        for item in task_rows
+                    )
+                    if task.project_id == project_id
                 )
                 if (
                     current.state is not ReviewState.ANALYZING
                     or current.generation != publication.session.generation
-                    or live_project != publication.expected_project
-                    or live_form != publication.expected_form
+                    or live_project != baseline.project
+                    or live_facts != baseline.facts
+                    or live_findings != baseline.findings
+                    or live_forms != baseline.forms
+                    or live_tasks != baseline.tasks
+                    or live_timeline != baseline.timeline
+                    or live_audit != baseline.audit
                 ):
                     connection.execute("ROLLBACK")
                     return False

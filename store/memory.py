@@ -10,7 +10,12 @@ from functools import wraps
 import threading
 from typing import Protocol
 
-from core.repositories import ReviewAnalysisPublication
+from core.repositories import (
+    ReviewAnalysisBaseline,
+    ReviewAnalysisPublication,
+    ReviewAnalysisStage,
+    validate_review_analysis_publication,
+)
 
 from schemas.assets import AssetVersion, MaterialCard, UploadTicket
 from schemas.common import AuditEntry, Fact, TimelineEvent
@@ -351,9 +356,13 @@ class Stores(Protocol):
         self, publication: ReviewAnalysisPublication
     ) -> bool: ...
 
-    def review_analysis_baseline(
-        self, project_id: str
-    ) -> tuple[Project, FormDraft | None]: ...
+    def stage_review_analysis(
+        self, review_id: str, project_id: str
+    ) -> ReviewAnalysisStage: ...
+
+    def prepare_review_analysis_publication(
+        self, stage: ReviewAnalysisStage, session: ReviewSession
+    ) -> ReviewAnalysisPublication: ...
 
 
 class _SynchronizedStore:
@@ -438,31 +447,109 @@ class InMemoryStores:
                 _SynchronizedStore(getattr(self, name), self._transaction_lock),
             )
 
-    def review_analysis_baseline(
-        self, project_id: str
-    ) -> tuple[Project, FormDraft | None]:
+    def stage_review_analysis(
+        self, review_id: str, project_id: str
+    ) -> ReviewAnalysisStage:
         with self._transaction_lock:
+            session = self.review_sessions._items.get(review_id)
             project = self.projects._items.get(project_id)
-            if project is None:
-                raise KeyError(f"project not found: {project_id}")
-            drafts = self.forms._items[project_id]
-            return deepcopy(project), deepcopy(drafts[-1] if drafts else None)
+            if session is None or project is None:
+                raise KeyError(f"review aggregate not found: {review_id}/{project_id}")
+            baseline = ReviewAnalysisBaseline(
+                session=deepcopy(session),
+                project=deepcopy(project),
+                facts=tuple(deepcopy(self.facts._items[project_id])),
+                findings=tuple(
+                    deepcopy(list(self.findings._items[project_id].values()))
+                ),
+                forms=tuple(deepcopy(self.forms._items[project_id])),
+                tasks=tuple(
+                    deepcopy(
+                        [
+                            task
+                            for task in self.tasks._items.values()
+                            if task.project_id == project_id
+                        ]
+                    )
+                ),
+                timeline=tuple(deepcopy(self.timeline._items[project_id])),
+                audit=tuple(deepcopy(self.audit._items[project_id])),
+            )
+            assets = deepcopy(list(self.assets._items[project_id].values()))
+            blobs: dict[str, bytes] = {}
+            for asset in assets:
+                for uri in (asset.storage_uri, asset.text_storage_uri):
+                    if uri and uri in self.blobs._blobs:
+                        blobs[uri] = self.blobs._blobs[uri]
+
+        staged = InMemoryStores()
+        staged.projects.create(deepcopy(baseline.project))
+        for fact in baseline.facts:
+            staged.facts.add(project_id, deepcopy(fact))
+        for finding in baseline.findings:
+            staged.findings.add(project_id, deepcopy(finding))
+        for form in baseline.forms:
+            staged.forms.put(project_id, deepcopy(form))
+        for task in baseline.tasks:
+            staged.tasks.add(deepcopy(task))
+        for event in baseline.timeline:
+            staged.timeline.add(project_id, deepcopy(event))
+        for entry in baseline.audit:
+            staged.audit.add(project_id, deepcopy(entry))
+        for asset in assets:
+            staged.assets.add(project_id, asset)
+        for uri, content in blobs.items():
+            staged.blobs.put(uri, content)
+        return ReviewAnalysisStage(baseline=baseline, stores=staged)
+
+    def prepare_review_analysis_publication(
+        self, stage: ReviewAnalysisStage, session: ReviewSession
+    ) -> ReviewAnalysisPublication:
+        staged = stage.stores
+        project = staged.projects.get(session.project_id)
+        if project is None:
+            raise KeyError(f"project not found: {session.project_id}")
+        return ReviewAnalysisPublication(
+            baseline=stage.baseline,
+            session=session,
+            project=project,
+            facts=tuple(staged.facts.list(session.project_id)),
+            findings=tuple(staged.findings.list(session.project_id)),
+            forms=tuple(staged.forms.list(session.project_id)),
+            tasks=tuple(staged.tasks.list(session.project_id)),
+            timeline=tuple(staged.timeline.list(session.project_id)),
+            audit=tuple(staged.audit.list(session.project_id)),
+        )
 
     def publish_review_analysis(
         self, publication: ReviewAnalysisPublication
     ) -> bool:
-        project_id = publication.project.project_id
+        project_id = validate_review_analysis_publication(publication)
+        baseline = publication.baseline
         with self._transaction_lock, self.review_sessions._lock:
             current = self.review_sessions._items.get(publication.session.review_id)
             live_project = self.projects._items.get(project_id)
-            live_forms = self.forms._items[project_id]
-            live_form = live_forms[-1] if live_forms else None
+            live_facts = tuple(self.facts._items[project_id])
+            live_findings = tuple(self.findings._items[project_id].values())
+            live_forms = tuple(self.forms._items[project_id])
+            live_tasks = tuple(
+                task
+                for task in self.tasks._items.values()
+                if task.project_id == project_id
+            )
+            live_timeline = tuple(self.timeline._items[project_id])
+            live_audit = tuple(self.audit._items[project_id])
             if (
                 current is None
                 or current.state is not ReviewState.ANALYZING
                 or current.generation != publication.session.generation
-                or live_project != publication.expected_project
-                or live_form != publication.expected_form
+                or live_project != baseline.project
+                or live_facts != baseline.facts
+                or live_findings != baseline.findings
+                or live_forms != baseline.forms
+                or live_tasks != baseline.tasks
+                or live_timeline != baseline.timeline
+                or live_audit != baseline.audit
             ):
                 return False
 
@@ -498,61 +585,3 @@ class InMemoryStores:
                 publication.session
             )
             return True
-
-
-def stage_review_analysis(stores: Stores, project_id: str) -> InMemoryStores:
-    """Copy one project aggregate so analysis cannot mutate the live package."""
-
-    staged = InMemoryStores()
-    lock = getattr(stores, "_transaction_lock", threading.RLock())
-    with lock:
-        project = stores.projects.get(project_id)
-        if project is None:
-            raise KeyError(f"project not found: {project_id}")
-        staged.projects.create(deepcopy(project))
-        for fact in stores.facts.list(project_id):
-            staged.facts.add(project_id, deepcopy(fact))
-        for finding in stores.findings.list(project_id):
-            staged.findings.add(project_id, deepcopy(finding))
-        for form in stores.forms.list(project_id):
-            staged.forms.put(project_id, deepcopy(form))
-        for task in stores.tasks.list(project_id):
-            staged.tasks.add(deepcopy(task))
-        for event in stores.timeline.list(project_id):
-            staged.timeline.add(project_id, deepcopy(event))
-        for entry in stores.audit.list(project_id):
-            staged.audit.add(project_id, deepcopy(entry))
-        for asset in stores.assets.list(project_id):
-            copied = deepcopy(asset)
-            staged.assets.add(project_id, copied)
-            for uri in (copied.storage_uri, copied.text_storage_uri):
-                if not uri:
-                    continue
-                content = stores.blobs.get(uri)
-                if content is not None:
-                    staged.blobs.put(uri, content)
-    return staged
-
-
-def review_analysis_publication(
-    staged: InMemoryStores,
-    session: ReviewSession,
-    *,
-    expected_project: Project,
-    expected_form: FormDraft | None,
-) -> ReviewAnalysisPublication:
-    project = staged.projects.get(session.project_id)
-    if project is None:
-        raise KeyError(f"project not found: {session.project_id}")
-    return ReviewAnalysisPublication(
-        session=session,
-        expected_project=expected_project,
-        expected_form=expected_form,
-        project=project,
-        facts=tuple(staged.facts.list(session.project_id)),
-        findings=tuple(staged.findings.list(session.project_id)),
-        forms=tuple(staged.forms.list(session.project_id)),
-        tasks=tuple(staged.tasks.list(session.project_id)),
-        timeline=tuple(staged.timeline.list(session.project_id)),
-        audit=tuple(staged.audit.list(session.project_id)),
-    )

@@ -15,15 +15,16 @@ from core.errors import (
     StateInvalidError,
 )
 from core.ids import new_id
+from core.jobs import JobRunner
 from core.llm import LLMClient
+from core.repositories import ReviewAnalysisStage
 from core.review_artifacts import ArtifactComposer, ArtifactFormField, ReviewPackage
 from core.script_intake import ScriptIntakeAnalyzer
 from core.script_text import ParsedScript, parse_script
+from core.teaser import VideoBackend
 from core.workflow_service import WorkflowService
 from schemas.enums import AssetKind, FieldStatus, FindingSeverity, Tier
-from schemas.forms import FormDraft
 from schemas.policy_snapshot import PackName
-from schemas.project import Project
 from schemas.reviews import (
     CandidateReviewDetails,
     ConfirmedReviewDetails,
@@ -44,7 +45,6 @@ from schemas.reviews import (
     UploadedScript,
 )
 from schemas.snapshot import SnapshotService
-from store.memory import review_analysis_publication, stage_review_analysis
 
 
 _CLASS_NAMES = {
@@ -86,13 +86,17 @@ class ReviewFacade:
         snapshots: SnapshotService,
         clock: Clock,
         llm: LLMClient | None,
+        video: VideoBackend | None = None,
+        jobs: JobRunner | None = None,
         artifact_composer: ArtifactComposer | None = None,
     ) -> None:
         self._stores = stores
         self._snapshots = snapshots
         self._clock = clock
         self._llm = llm
-        self._workflow = WorkflowService(stores, snapshots, clock, llm)
+        self._workflow = WorkflowService(
+            stores, snapshots, clock, llm, video=video, jobs=jobs
+        )
         self._intake = ScriptIntakeAnalyzer(llm)
         self._artifact_composer = artifact_composer or ArtifactComposer()
 
@@ -218,9 +222,11 @@ class ReviewFacade:
                 "review details can only be confirmed at the confirmation step",
                 {"state": session.state.value},
             )
-        expected_project, expected_form = self._stores.review_analysis_baseline(
-            session.project_id
+        stage = self._stores.stage_review_analysis(
+            session.review_id, session.project_id
         )
+        if stage.baseline.session != session:
+            raise StateInvalidError("review confirmation baseline changed")
 
         session = self._updated(
             session,
@@ -244,8 +250,7 @@ class ReviewFacade:
         return self._analyze_claimed(
             session,
             force_script_review=False,
-            expected_project=expected_project,
-            expected_form=expected_form,
+            stage=stage,
         )
 
     def reanalyze(
@@ -260,7 +265,13 @@ class ReviewFacade:
                 "only a completed review can be reanalyzed",
                 {"state": session.state.value},
             )
-        project, draft = self._stores.review_analysis_baseline(session.project_id)
+        stage = self._stores.stage_review_analysis(
+            session.review_id, session.project_id
+        )
+        if stage.baseline.session != session:
+            raise StateInvalidError("review reanalysis baseline changed")
+        project = stage.baseline.project
+        draft = stage.baseline.forms[-1] if stage.baseline.forms else None
         if (
             project.state not in WorkflowService.REANALYZABLE_REVIEW_STATES
             or (draft is not None and draft.frozen)
@@ -271,6 +282,13 @@ class ReviewFacade:
             )
         if session.confirmed == details:
             return self._view(session)
+        if (
+            session.mode is ReviewMode.SCRIPT
+            and not self._workflow.supports_synchronous_review_analysis
+        ):
+            raise StateInvalidError(
+                "review reanalysis requires a synchronous job runner"
+            )
 
         analyzing = self._updated(
             session,
@@ -293,8 +311,7 @@ class ReviewFacade:
         return self._analyze_claimed(
             analyzing,
             force_script_review=True,
-            expected_project=project,
-            expected_form=draft,
+            stage=stage,
         )
 
     def _analyze_claimed(
@@ -302,22 +319,16 @@ class ReviewFacade:
         session: ReviewSession,
         *,
         force_script_review: bool,
-        expected_project: Project,
-        expected_form: FormDraft | None,
+        stage: ReviewAnalysisStage,
     ) -> ReviewView:
         try:
             assert session.confirmed is not None
-            staged = stage_review_analysis(self._stores, session.project_id)
-            workflow = WorkflowService(
-                staged,
-                self._snapshots,
-                self._clock,
-                self._llm,
-                self._workflow._video,
-                self._workflow._jobs,
-            )
+            staged = stage.stores
+            workflow = self._workflow.for_staged_stores(staged)
             if force_script_review:
-                workflow.prepare_review_reanalysis(session.project_id)
+                workflow.begin_review_reanalysis(
+                    session.project_id, session.generation
+                )
             workflow.apply_review_confirmation(
                 session.project_id, session.mode, session.confirmed
             )
@@ -364,13 +375,20 @@ class ReviewFacade:
                     ),
                 },
             )
-            publication = review_analysis_publication(
-                staged,
-                complete,
-                expected_project=expected_project,
-                expected_form=expected_form,
+            publication = self._stores.prepare_review_analysis_publication(
+                stage, complete
             )
             if not self._stores.publish_review_analysis(publication):
+                if force_script_review:
+                    restored = stage.baseline.session.model_copy(
+                        update={"generation": session.generation}
+                    )
+                    self._stores.review_sessions.compare_and_put(
+                        restored.review_id,
+                        ReviewState.ANALYZING,
+                        restored,
+                        expected_generation=session.generation,
+                    )
                 raise StateInvalidError("review generation changed during analysis")
             return view
         except Exception as exc:

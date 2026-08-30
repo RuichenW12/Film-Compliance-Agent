@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
+from dataclasses import replace
 from pathlib import Path
 import threading
 
@@ -12,7 +13,16 @@ from core.review import SCRIPT_REVIEW_PROMPT_ID
 from core.review_facade import ReviewFacade
 from core.script_intake import SCRIPT_INTAKE_PROMPT_ID
 from core.workflow_service import WorkflowService
-from schemas.enums import AmountBracket, ProductionStage, ProjectState
+from schemas.common import AuditEntry, Fact, SourceRef, TimelineEvent
+from schemas.enums import (
+    Actor,
+    AmountBracket,
+    FindingStatus,
+    ProductionStage,
+    ProjectState,
+    SourceRefType,
+    TaskStatus,
+)
 from schemas.policy_snapshot import PackName
 from schemas.reviews import (
     ConfirmedReviewDetails,
@@ -1040,9 +1050,17 @@ def test_terminal_publication_failure_preserves_previous_complete_projection(
     )
 
 
-def test_memory_bundle_publish_serializes_unrelated_project_writes(
-    stores, review_snapshots, clock, monkeypatch
+@pytest.mark.parametrize("backend", ["memory", "sqlite"])
+def test_bundle_publish_serializes_unrelated_project_writes(
+    tmp_path, review_snapshots, clock, monkeypatch, backend
 ) -> None:
+    if backend == "memory":
+        stores = InMemoryStores()
+        concurrent = stores
+    else:
+        path = tmp_path / "review-unrelated-project.sqlite3"
+        stores = SqliteStores.at(path)
+        concurrent = SqliteStores.at(path)
     service = facade(stores, review_snapshots, clock)
     first = start_script(service)
     service.confirm(first.review_id, "u_demo", confirmed())
@@ -1061,7 +1079,7 @@ def test_memory_bundle_publish_serializes_unrelated_project_writes(
 
     def write_project():
         write_entered.set()
-        return stores.projects.save(
+        return concurrent.projects.save(
             second_project.model_copy(
                 update={"title_working": "Project B concurrent"}
             )
@@ -1087,6 +1105,9 @@ def test_memory_bundle_publish_serializes_unrelated_project_writes(
     assert stores.projects.get(second_session.project_id).title_working == (
         "Project B concurrent"
     )
+    if backend == "sqlite":
+        concurrent.db.close()
+        stores.db.close()
 
 
 def test_memory_bundle_publish_blocks_aggregate_readers_until_complete(
@@ -1127,8 +1148,106 @@ def test_memory_bundle_publish_blocks_aggregate_readers_until_complete(
     assert read_was_blocked
 
 
+def test_review_publication_rejects_cross_project_aggregate_identity(
+    stores, review_snapshots, clock
+) -> None:
+    service = facade(stores, review_snapshots, clock)
+    started = start_script(service)
+    service.confirm(started.review_id, "u_demo", confirmed())
+    session = stores.review_sessions.get(started.review_id)
+    stage = stores.stage_review_analysis(started.review_id, session.project_id)
+    analyzing = session.model_copy(
+        update={"state": ReviewState.ANALYZING, "generation": session.generation + 1}
+    )
+    assert stores.review_sessions.compare_and_put(
+        session.review_id,
+        ReviewState.COMPLETE,
+        analyzing,
+        expected_generation=session.generation,
+    )
+    publication = stores.prepare_review_analysis_publication(
+        stage,
+        analyzing.model_copy(update={"state": ReviewState.COMPLETE}),
+    )
+    invalid = replace(
+        publication,
+        project=publication.project.model_copy(update={"project_id": "proj_other"}),
+    )
+
+    with pytest.raises(ValueError, match="aggregate identities"):
+        stores.publish_review_analysis(invalid)
+
+
+def test_sqlite_stage_captures_one_consistent_aggregate_snapshot(
+    tmp_path, review_snapshots, clock
+) -> None:
+    path = tmp_path / "review-consistent-stage.sqlite3"
+    stores = SqliteStores.at(path)
+    concurrent = SqliteStores.at(path)
+    service = facade(stores, review_snapshots, clock)
+    started = start_script(service)
+    service.confirm(started.review_id, "u_demo", confirmed())
+    session = stores.review_sessions.get(started.review_id)
+    entered = threading.Event()
+    release = threading.Event()
+
+    def pause_after_snapshot_begins(statement: str) -> None:
+        if (
+            not entered.is_set()
+            and "collection = 'projects'" in statement
+            and session.project_id in statement
+        ):
+            entered.set()
+            assert release.wait(timeout=5)
+
+    stores.db._connection.set_trace_callback(pause_after_snapshot_begins)
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        future = pool.submit(
+            stores.stage_review_analysis,
+            started.review_id,
+            session.project_id,
+        )
+        assert entered.wait(timeout=5)
+        concurrent.facts.add(
+            session.project_id,
+            Fact(
+                fact_id="fact_after_sqlite_snapshot",
+                key="after_snapshot",
+                value="live only",
+                source_ref=SourceRef(
+                    type=SourceRefType.USER_ANSWER,
+                    answer_id="after_sqlite_snapshot",
+                ),
+                created_at=clock.now(),
+            ),
+        )
+        release.set()
+        stage = future.result(timeout=5)
+    stores.db._connection.set_trace_callback(None)
+
+    assert not any(
+        fact.fact_id == "fact_after_sqlite_snapshot" for fact in stage.baseline.facts
+    )
+    assert any(
+        fact.fact_id == "fact_after_sqlite_snapshot"
+        for fact in stores.facts.list(session.project_id)
+    )
+    concurrent.db.close()
+    stores.db.close()
+
+
 @pytest.mark.parametrize(
-    "mutation", ["freeze", "submission", "form_update", "project_update"]
+    "mutation",
+    [
+        "freeze",
+        "submission",
+        "form_update",
+        "project_update",
+        "finding_action",
+        "fact",
+        "task_completion",
+        "timeline_audit",
+    ],
 )
 @pytest.mark.parametrize("backend", ["memory", "sqlite"])
 def test_reanalysis_publish_rejects_concurrent_lifecycle_change(
@@ -1145,6 +1264,7 @@ def test_reanalysis_publish_rejects_concurrent_lifecycle_change(
     started = start_script(service)
     service.confirm(started.review_id, "u_demo", confirmed())
     session = stores.review_sessions.get(started.review_id)
+    previous_complete = session
     before_ready = len(
         [
             event
@@ -1195,11 +1315,64 @@ def test_reanalysis_publish_rejects_concurrent_lifecycle_change(
                 session.project_id,
                 live_form.model_copy(update={"hash": "concurrent-form-update"}),
             )
-        else:
+        elif mutation == "project_update":
             concurrent.projects.save(
                 live_project.model_copy(
                     update={"title_working": "Concurrent title update"}
                 )
+            )
+        elif mutation == "finding_action":
+            finding = next(
+                item
+                for item in concurrent.findings.list(session.project_id)
+                if item.alert is None
+            )
+            WorkflowService(
+                concurrent, review_snapshots, clock
+            ).act_on_finding(session.project_id, finding.finding_id, "resolve")
+        elif mutation == "fact":
+            concurrent.facts.add(
+                session.project_id,
+                Fact(
+                    fact_id="fact_concurrent_reanalysis",
+                    key="concurrent_note",
+                    value="must survive",
+                    source_ref=SourceRef(
+                        type=SourceRefType.USER_ANSWER,
+                        answer_id="concurrent_reanalysis",
+                    ),
+                    created_at=clock.now(),
+                ),
+            )
+        elif mutation == "task_completion":
+            task = concurrent.tasks.list(session.project_id)[-1]
+            concurrent.tasks.save(
+                task.model_copy(
+                    update={
+                        "status": TaskStatus.SUCCEEDED,
+                        "result": {"concurrent_completion": True},
+                    }
+                )
+            )
+        else:
+            concurrent.timeline.add(
+                session.project_id,
+                TimelineEvent(
+                    event_id="event_concurrent_reanalysis",
+                    at=clock.now(),
+                    actor=Actor.SYSTEM,
+                    event="concurrent.timeline",
+                ),
+            )
+            concurrent.audit.add(
+                session.project_id,
+                AuditEntry(
+                    at=clock.now(),
+                    actor=Actor.SYSTEM,
+                    from_state=live_project.state.value,
+                    to_state=live_project.state.value,
+                    reason="concurrent.audit",
+                ),
             )
         release.set()
         with pytest.raises(StateInvalidError):
@@ -1211,6 +1384,10 @@ def test_reanalysis_publish_rejects_concurrent_lifecycle_change(
         "submission": ProjectState.INSTITUTION_REVIEW,
         "form_update": ProjectState.CLASSIFIED,
         "project_update": ProjectState.CLASSIFIED,
+        "finding_action": ProjectState.CLASSIFIED,
+        "fact": ProjectState.CLASSIFIED,
+        "task_completion": ProjectState.CLASSIFIED,
+        "timeline_audit": ProjectState.CLASSIFIED,
     }[mutation]
     assert stored_project.state is expected_state
     if mutation == "freeze":
@@ -1220,9 +1397,38 @@ def test_reanalysis_publish_rejects_concurrent_lifecycle_change(
         assert stored_project.title_working == "Downstream submitted title"
     elif mutation == "form_update":
         assert stores.forms.latest(session.project_id).hash == "concurrent-form-update"
-    else:
+    elif mutation == "project_update":
         assert stored_project.title_working == "Concurrent title update"
-    assert stores.review_sessions.get(started.review_id).state is ReviewState.FAILED
+    elif mutation == "finding_action":
+        assert next(
+            item
+            for item in stores.findings.list(session.project_id)
+            if item.alert is None
+        ).status is FindingStatus.RESOLVED
+    elif mutation == "fact":
+        assert any(
+            item.fact_id == "fact_concurrent_reanalysis"
+            for item in stores.facts.list(session.project_id)
+        )
+    elif mutation == "task_completion":
+        assert any(
+            (item.result or {}).get("concurrent_completion") is True
+            for item in stores.tasks.list(session.project_id)
+        )
+    else:
+        assert any(
+            item.event_id == "event_concurrent_reanalysis"
+            for item in stores.timeline.list(session.project_id)
+        )
+        assert any(
+            item.reason == "concurrent.audit"
+            for item in stores.audit.list(session.project_id)
+        )
+    restored = stores.review_sessions.get(started.review_id)
+    assert restored.state is ReviewState.COMPLETE
+    assert restored.generation == previous_complete.generation + 1
+    assert restored.confirmed == previous_complete.confirmed
+    assert service.get(started.review_id, "u_demo").state is ReviewState.COMPLETE
     assert len(
         [
             event
@@ -1230,6 +1436,16 @@ def test_reanalysis_publish_rejects_concurrent_lifecycle_change(
             if event.event == "review.package_ready"
         ]
     ) == before_ready
+    if mutation == "fact":
+        retried = service.reanalyze(
+            started.review_id,
+            "u_demo",
+            confirmed(title="Retry after aggregate conflict"),
+        )
+        assert retried.state is ReviewState.COMPLETE
+        assert stores.review_sessions.get(started.review_id).generation == (
+            previous_complete.generation + 2
+        )
     if backend == "sqlite":
         concurrent.db.close()
         stores.db.close()
@@ -1286,6 +1502,7 @@ def test_exit_duration_can_be_corrected_by_reanalysis(
     )
     session = stores.review_sessions.get(started.review_id)
     assert stores.projects.get(session.project_id).state is ProjectState.EXIT_SISTER_PATH
+    before_audit = stores.audit.list(session.project_id)
 
     corrected = service.reanalyze(
         started.review_id,
@@ -1297,6 +1514,16 @@ def test_exit_duration_can_be_corrected_by_reanalysis(
     stored = stores.projects.get(session.project_id)
     assert stored.state is ProjectState.CLASSIFIED
     assert stored.intent_profile.episode_minutes == 3
+    audit = stores.audit.list(session.project_id)
+    reset = audit[len(before_audit)]
+    assert reset.from_state == ProjectState.EXIT_SISTER_PATH.value
+    assert reset.to_state == ProjectState.DRAFT.value
+    assert reset.reason == "review.reanalysis_reset"
+    assert reset.detail["generation"] == 2
+    assert all(
+        previous.to_state == current.from_state
+        for previous, current in zip(audit, audit[1:])
+    )
 
 
 def test_review_owner_isolated(stores, review_snapshots, clock) -> None:
