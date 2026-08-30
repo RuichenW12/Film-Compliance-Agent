@@ -1,0 +1,108 @@
+"use client";
+
+import { useEffect, useRef } from "react";
+
+import styles from "@/app/review-flow.module.css";
+import { reviewDownloadUrl, type ReviewView } from "@/lib/reviews-api";
+
+
+export function ResultsStep({ review }: { review: ReviewView }) {
+  const headingRef = useRef<HTMLHeadingElement>(null);
+  const result = review.classification;
+
+  useEffect(() => {
+    headingRef.current?.focus();
+  }, []);
+
+  if (!result) return null;
+
+  return (
+    <section className={styles.resultsPanel} aria-labelledby="results-heading">
+      <div className={styles.resultsHero}>
+        <p className={styles.eyebrow}>Analysis complete</p>
+        <h1 id="results-heading" ref={headingRef} tabIndex={-1}>Review results</h1>
+        <p>
+          Routing support for pre-production review. This is not legal advice or approval.
+        </p>
+      </div>
+
+      <section className={styles.decisionCard} aria-label="Decision summary">
+        <div className={styles.classMark} aria-hidden="true">01</div>
+        <div className={styles.decisionMain}>
+          <span className={styles.decisionLabel}>Recommended route</span>
+          <strong>{result.class_name}</strong>
+          <div className={styles.subjectRow}>
+            {result.subjects.map((subject) => <span key={subject}>{subject}</span>)}
+          </div>
+        </div>
+        <div className={styles.coReview}>
+          <span aria-hidden="true">◆</span>
+          <div><strong>{result.co_review_required ? "Co-review required" : "No co-review indicated"}</strong><small>Subject rules take priority over the estimated investment band.</small></div>
+        </div>
+      </section>
+
+      {review.semantic_status === "pending" ? (
+        <div className={styles.warning} role="status">
+          <strong>Semantic review is pending.</strong> Deterministic findings are shown below; this result must not be read as a pass.
+        </div>
+      ) : null}
+
+      <section className={styles.findingsSection} aria-labelledby="findings-heading">
+        <div className={styles.sectionTitleRow}>
+          <div><p className={styles.eyebrow}>Scene-level review</p><h2 id="findings-heading">Risk findings</h2></div>
+          <span className={styles.countPill}>{review.findings.length} found</span>
+        </div>
+        {review.findings.length ? (
+          <div className={styles.findingList}>
+            {review.findings.map((finding) => (
+              <article className={styles.findingCard} key={finding.risk_id}>
+                <div className={styles.findingMeta}>
+                  <strong>{finding.risk_id}</strong>
+                  <span>{finding.episode ? `Episode ${finding.episode}` : "Episode —"} · {finding.scene ? `Scene ${finding.scene}` : "Scene —"}</span>
+                  <span className={styles.humanStatus}>{finding.status}</span>
+                </div>
+                <blockquote>{finding.quote}</blockquote>
+                <p>{finding.explanation ?? "A qualified reviewer should confirm this depiction."}</p>
+                {finding.suggestion ? <p className={styles.suggestion}><strong>Next step</strong>{finding.suggestion}</p> : null}
+              </article>
+            ))}
+          </div>
+        ) : (
+          <p className={styles.emptyState}>No rule-based risks detected.</p>
+        )}
+      </section>
+
+      <section className={styles.packageSection} aria-label="Review package">
+        <div className={styles.sectionTitleRow}>
+          <div><p className={styles.eyebrow}>Ready to share</p><h2>Review package</h2></div>
+          <span className={styles.readyPill}>Files prepared</span>
+        </div>
+        <div className={styles.downloadGrid}>
+          {review.artifacts.map((artifact) => (
+            <a key={artifact.artifact_type} href={reviewDownloadUrl(artifact.download_url)} download={artifact.filename}>
+              <span className={styles.downloadIcon} aria-hidden="true">↓</span>
+              <strong>{artifact.filename}</strong>
+              <small>{artifact.artifact_type === "annotated-script" ? "Script copy with adjacent review notes" : "Generated review document"}</small>
+            </a>
+          ))}
+          {review.source_download_url ? (
+            <a href={reviewDownloadUrl(review.source_download_url)} download={review.source_filename ?? "source-script"}>
+              <span className={styles.downloadIcon} aria-hidden="true">↧</span>
+              <strong>Original source</strong>
+              <small>Unmodified · checksum {review.source_sha256?.slice(0, 10)}…</small>
+            </a>
+          ) : null}
+        </div>
+      </section>
+
+      <section className={styles.beyondSection} aria-label="Beyond this demo">
+        <div><p className={styles.eyebrow}>Showcase only</p><h2>Beyond this demo</h2><p>These capabilities remain outside the interactive demo flow.</p></div>
+        <div className={styles.beyondGrid}>
+          <article><span>01</span><strong>Institution collaboration</strong><p>Share a prepared package with a qualified filing institution.</p></article>
+          <article><span>02</span><strong>Filing workflow</strong><p>Track institution-supplied fields and official filing outcomes.</p></article>
+          <article><span>03</span><strong>Live policy updates</strong><p>Review governed policy changes before they affect classifications.</p></article>
+        </div>
+      </section>
+    </section>
+  );
+}
