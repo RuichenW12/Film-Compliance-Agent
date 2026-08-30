@@ -1,325 +1,325 @@
 # Hang Up First
 
-> Synthetic, unreviewed test screenplay. It is only for end-to-end workflow validation, is not an industry-confirmed golden sample, does not establish any content conclusion, and is not legal guidance.
+> Synthetic, unreviewed test screenplay. It is solely for end-to-end workflow validation, is not an industry-reviewed golden sample, does not establish any content conclusion, and is not legal guidance.
 
 ## Test Profile
 
-- As an example:`E2E-SCRIPT-030-PUBLIC-SECURITY`
-- Type: Contemporary urban reality, single full story
+- Use Case ID: `E2E-SCRIPT-030-PUBLIC-SECURITY`
+- Genre: Contemporary urban realism, single-episode complete story
 - Target runtime: 30 minutes
 - Episodes: 1
-- Core uses: Validation of long Markdown uploads, multi-scene resolution, clarification of type hits, cluster/field positioning, repeat hits heavy, personal extraction and cross-field continuity
-- Expected hit category:`public_security`
-- Anticipated life: not less than 5; specific quantity based on a snapshot of the rules used at the time of operation
-- Expected location of field: at least cluster and field numbers should be carried on the title lines of 3rd, 4th, 10th, 11th, 14th
-- The following shall not be reported:`political`、`military`、`diplomatic`、`national_security`、`united_front`、`ethnic`、`religious`、`judicial`
-- The offline semantic phase is expected: to determine whether to retain life while returning `script_semantic_check_pending`
-- Severity expectations: Discoveries from the current digitized vocabulary should be maintained `needs_human`, do not directly output the conclusions
-- Sample attributes: synthesis, without external review
+- Core Purpose: Verify long Markdown upload, multi-scene parsing, explicit category hits, episode/scene positioning, deduplication of repeated hits, character relationship extraction, and cross-scene continuity
+- Expected Hit Category: `public_security`
+- Expected deterministic findings: at least 5; the exact count depends on the rule snapshot used at runtime
+- Expected Locatable Scenes: The title lines of Scenes 3, 4, 10, 11, and 14 should carry at least the episode number and scene number
+- Should Not Report: `political`, `military`, `diplomatic`, `national_security`, `united_front`, `ethnic`, `religious`, `judicial`
+- Offline semantic-stage expectation: deterministic findings are retained while `script_semantic_check_pending` is also returned
+- Severity expectation: findings produced by the current placeholder glossary must remain `needs_human` and must not directly produce a blocking conclusion
+- Sample Attributes: Synthetic, not reviewed by external personnel
 
 ## Logline
 
-An audio clipper wanted the father to tell him about his dangerous experiences of deception and to make a reminder recording for the community; when a neighbour received a similar call, the father had to lay down his shame and admit in front of many that he had believed the same story.
+An audio editor wants her father to talk about his experience of almost being scammed to make a warning recording for the community; when a neighbor receives a similar call, the father must put aside his shame and admit in front of everyone that he also once believed the same story.
 
 ## Synopsis
 
-Su Qing Go back to the old city and help your father.Su Guoliang I've been running radio repair shops for over 20 years. Community civilian police Xu Ning We're working on a fraud-proof alert for the neighborhood, hopefully.Su Guoliang It's a story about what happened a month ago.Su Guoliang Instead, he insisted that he was “a little while with the other” and refused to admit that he believed the urgent news on the phone because he feared for his daughter, much less to let his voice be heard by his neighbours.
+Su Qing returns to the old town district, preparing to help her father, Su Guoliang, take stock of the radio repair shop he has run for over twenty years. Community police officer Xu Ning is producing an anti-fraud reminder for the neighborhood, hoping Su Guoliang will share his real experience of almost being scammed a month ago. However, Su Guoliang insists that he was just "playing along with them for a while," refusing to admit that he had believed the urgent message on the phone out of worry for his daughter, and is even less willing to let his neighbors hear his voice.
 
-Su Qing In order to complete the recording as soon as possible, the father was assisted in writing a decent set of statements describing him as someone who had learned the trick from the outset.Xu Ning Not adopted because it does not explain the real moment of danger: the other party continues to create a sense of urgency and demand Su Guoliang Keep talking and don't give him the chance to contact his daughter and make an independent judgement. The father and daughter clashed as a result.Su Guoliang It's been a long time since I've heard from my daughter.Su Qing The father could not accept that he would prefer to believe strange voices and would not seek her confirmation directly.
+In order to finish the recording as quickly as possible, Su Qing first helps her father write a decent narrative, describing him as someone who saw through the scam from the very beginning. Xu Ning does not use it, because this narrative fails to explain the truly dangerous moment: the other party constantly created a sense of urgency, demanding that Su Guoliang stay on the line, giving him no opportunity to contact his daughter or make an independent judgment. A conflict breaks out between the father and daughter. Su Guoliang complains about his daughter not replying to messages for a long time, while Su Qing cannot accept that her father would rather believe a stranger's voice than contact her directly to confirm.
 
-The repair shop neighbor.Aunt Luo Having heard the dispute, confidently said that he would never be deceived. In the evening of the same day, she received a telephone call claiming that an emergency had occurred to her family. I'm familiar with words and constant push.Su Guoliang Perception abnormal.Aunt Luo They refused to hang up because of fear or to admit that they were wrong.Su Guoliang In front of her,Su Qing and Xu Ning He said the truth: a month ago, he believed, was afraid, and he held a handle without knowing who to listen to. It's this confession.Aunt Luo Stop and find the family by means of the contacts normally kept and confirm the safety of each other.
+Aunt Luo, a neighbor of the repair shop, overhears the argument and confidently claims that she would never be scammed. That evening, she receives a phone call claiming that a family member has run into an emergency. The familiar rhetoric and continuous urging make Su Guoliang sense that something is wrong. Out of worry, Aunt Luo refuses to hang up, nor is she willing to admit that she is unsure. In the end, in front of her, Su Qing, and Xu Ning, Su Guoliang speaks the truth: a month ago, he had also believed it, he had also been afraid, and he had also held his phone, not knowing who to listen to. It is precisely this confession that makes Aunt Luo stop, find her family through the contact information she usually keeps, and confirm that they are safe.
 
-After the incident,Su Guoliang Agreed to re-record. This time there was no heroic narrative, and only one ordinary person made mistakes in tension, stopped to confirm and accepted help.Su Qing Keeps the father ' s real pause and breath, and does not cut it into a perfect propaganda cavity. The video was broadcast in the community.Su Guoliang It is still embarrassing, but it is no longer in the shop. For the first time, the father and the daughter have changed the term “pre-connected” from blame to enforceable agreement.
+After the incident, Su Guoliang agrees to re-record. This time, there is no heroic narrative, only the process of an ordinary person making a mistake under stress, stopping to confirm, and accepting help. Su Qing keeps her father's real pauses and breaths, instead of editing it into a perfect promotional tone. When the recording is played in the community, Su Guoliang still feels embarrassed, but he no longer hides in the shop. For the first time, the father and daughter also turn "contact each other first if anything happens" from a reproach into an actionable agreement.
 
 ## Themes and Audience Experience
 
-- Theme: Recognition of the possibility of being deceived does not diminish the dignity of a person; honesty about weak moments allows experience to really help others.
-- Sub-theme: Reliable intimacy is not “should understand me”, but rather leaves a path of contact that can be identified with one another.
-- Emotional path: Restraint and evasive packaging and dispute actual pressure public acknowledgement of joint completion.
-- End experience: No exaggerating victory, with a person willing to stand next to his real voice.
+- Theme: Admitting that one might have been scammed does not diminish a person's dignity; only by honestly speaking of vulnerable moments can experience truly help others.
+- Sub-theme: A reliable intimate relationship is not about "you should understand me," but about leaving a path of connection where both can verify each other.
+- Emotional path: Restraint and avoidance → Packaging and dispute → Real-world pressure → Public admission → Joint completion.
+- Ending experience: Do not manufacture exaggerated victories; complete the transformation with the characters willing to stand by their own true voices.
 
 ## Principal Characters
 
 ### CH-001 Su Qing
 
-- Age: 32
-- Identity: Free audio clipper
-- External target: 2 minutes of alarm recording completed and father ' s repair shop counted before departure
-- Internal demand: stop using professional efficiency to avoid real communication with fathers
-- Characteristics of behaviour: hearing people speak with volume waves; cutting off pauses in uneases; habit of describing concern as an arrangement
-- Role arc: from writing a “right version” for the father to retaining his real pause and establishing a clear link agreement with him
+- Age: 32 years old
+- Identity: Freelance audio editor
+- External Goal: Complete the two-minute reminder recording, and take inventory of her father's repair shop before leaving
+- Internal Need: Stop using professional efficiency to avoid real communication with her father
+- Behavioral Characteristics: Looks at volume waveforms when listening to people speak; repeatedly cuts out pauses when anxious; is used to phrasing care as arrangements
+- Character Arc: Shifts from writing the "correct version" for her father to preserving his real pauses and establishing a clear contact agreement with him
 
 ### CH-002 Su Guoliang
 
-- Age: 61 years
-- Identity: Owner of radio repair shop
-- Outside target: Keep decent, keep the neighborhood from knowing that you believe in strangers.
-- Internal needs: receiving fear and seeking help does not amount to incompetence
-- Behavioural characteristics: twisting the radio tune buttons during stress; rubbing the already clean screwdrivers when you can't go down
-- Role Arc: From fiction to fiction about how to be trapped by urgency
+- Age: 61 years old
+- Identity: Radio repair shop owner
+- External Goal: Maintain his dignity, preventing neighbors from knowing he once believed a call from a stranger
+- Internal Need: Accept that being afraid and asking for help does not equal incompetence
+- Behavioral Characteristics: Twists the radio tuning knob when nervous; wipes an already clean screwdriver when unable to go on speaking
+- Character Arc: Shifts from fabricating that he "saw through it long ago" to openly speaking about how he was trapped by a sense of urgency
 
 ### CH-003 Xu Ning
 
-- Age: 35 years
-- Status: Community civilian police
-- External objective: to obtain a voluntary, accurate and truly helpful recording of reminders
-- Characteristics of behaviour: brief questions; confirmation of the party ' s willingness; no substitute sentence
-- Personal boundaries: no informed judgment, no commitment to results, no coercion Su Guoliang Show or record
+- Age: 35 years old
+- Identity: Community police officer
+- External goal: Obtain a voluntary, accurate, and truly helpful reminder recording from the party involved
+- Behavioral traits: Ask short questions; first confirm whether the party is willing; do not complete sentences for others
+- Character boundaries: Do not make omniscient judgments, do not promise results, do not force Su Guoliang to appear on camera or record
 
 ### CH-004 Luo Guilan
 
-- Age: 66 years
-- Identity: a neighbour of a repair shop, running a small grocery store
-- Outside target: prove to be smart and not to be the subject of discussion
-- Internal needs: Allow yourself to stop to testify when you fear your family
-- Characteristics of behaviour: Speak loud and sound when you're really nervous, and close your phone to your ears.
+- Age: 66
+- Identity: Repair shop neighbor, runs a small grocery store
+- External goal: To prove she is shrewd, and not become the subject of others' discussion
+- Internal need: To allow herself to pause and verify when worrying about her family
+- Behavioral characteristics: Usually speaks loudly; when truly nervous, she lowers her voice instead, pressing the phone tightly to her ear
 
-### CH-005 Luo Xiaozhe(phone ringing only)
+### CH-005 Luo Xiaozhe (Voice on phone only)
 
-- Age: 23 years
-- Identity:Luo Guilan My grandson.
-- Theatrical function: Factual confirmation through day-to-day, identifiable means of communication, with no heroic function
+- Age: 23
+- Identity: Luo Guilan's grandson
+- Dramatic function: Completes factual confirmation through daily, recognizable means of contact, without assuming a heroic function
 
 ## Four-Part Outline
 
-### First paragraph: Refusal to leave a real voice (approximately 0:00-7:40)
+### Part 1: Refusing to Leave a Real Voice (Approx. 0:00–7:40)
 
-Xu Ning Come to the repair shop and invite again.Su Guoliang Record real experience.Su Guoliang Reject.Su Qing To take stock of the items at the store and offer to assist in recording them so that they can be quickly completed with their own expertise. She and her father came to the police station and pre-empted a decent version of “read from the beginning”.
+Xu Ning comes to the repair shop and once again invites Su Guoliang to record his real experience. Su Guoliang refuses. Su Qing arrives at the shop to take inventory of the items and volunteers to help with the recording, thinking she can finish it quickly with her professional skills. She and her father go to the police station and first produce a respectable version of "seeing through it from the very beginning".
 
-### Second paragraph: Packaging failure, break-up (approximately 7:40-16:00)
+### Part 2: Failed Packaging, Fractured Relationship (Approx. 7:40–16:00)
 
-Xu Ning Point out that the recording lacks a real dangerous node. My father and daughter are back at the store and re-recording.Su Guoliang Still avoiding.Su Qing And he kept cutting off his pause. During the dispute, the two individuals stated their grievances: the father felt that the daughter was always not connected and the daughter felt that the father had never expressed his needs directly.Aunt Luo And laugh when you hear it.Su Guoliang It's too easy to trust people.Su Guoliang Closer.
+Xu Ning points out that the recording is missing the true danger nodes. The father and daughter return to the shop to re-record, but Su Guoliang remains evasive, while Su Qing keeps cutting out his pauses. During the argument, the two voice their respective grievances: the father feels his daughter is always unreachable, while the daughter feels her father never directly expresses his needs. Overhearing this, Aunt Luo mocks Su Guoliang for being too gullible, making Su Guoliang close himself off even more.
 
-### Third paragraph: Similar calls become a real pressure (approximately 16:00-24:10)
+### Part 3: Similar Calls Become Real-Life Pressure (Approx. 16:00–24:10)
 
-Aunt Luo Upon receiving a strange telephone call alleging an emergency, the family was asked to remain in contact and act immediately.Su Guoliang Listen to familiar rhetoric and try to stop her.Aunt Luo They refused to hang up and believed they were delaying themselves to help their families.Xu Ning When you get there, you don't mess with the other side of the phone.Aunt Luo Independent confirmation by means of contacts normally maintained. It's a standoff.Su Guoliang It is a matter of public recognition that I believed the same thing a month ago.
+Aunt Luo receives a call from a stranger claiming that her family member has run into an emergency, and she is asked to stay on the line and take immediate action. Hearing the familiar rhetoric, Su Guoliang tries to make her stop. Aunt Luo refuses to hang up, believing they are delaying her from helping her family. After Xu Ning arrives, he does not get entangled with the other end of the line, but only asks Aunt Luo to independently verify through her usually saved contact information. During the standoff, Su Guoliang publicly admits that he had also believed the same words a month ago.
 
-### Fourth paragraph: Real version retained (approximately 24:10-30:00)
+### Part 4: The True Version Is Preserved (Approx. 24:10–30:00)
 
-Aunt Luo Make sure your family is safe.Su Guoliang and Su Qing Go back to the repair shop, re-record the recordings, and stop making the story of the experience a success story. In the police station recording room,Su Qing Keep the father a real pause. The final recording is played in the community.Su Guoliang Stand outside the shop and listen to one another ' s voice, after having made an agreement with the daughter, by means of a familiarization number.
+Aunt Luo confirms that her family is safe. Su Guoliang and Su Qing return to the repair shop to rewrite the recording script, no longer embellishing their experience into a story of victory. In the recording room of the police station, Su Qing preserves a genuine pause of her father's. The final recording is played in the community. Su Guoliang stands outside the shop, listens to his own voice, and makes an agreement with his daughter to first confirm with each other through familiar numbers in the future.
 
 ## Scene Table
 
-| Session | Projected duration | Location/time | Site Target | Changes in status | Key vision |
+| Scene | Estimated Duration | Location/Time | Scene Objective | State Change | Key Visuals |
 | --- | ---: | --- | --- | --- | --- |
-| 1 | 1:40 | State repair shop/morning | Xu Ning Again. | Su Guoliang Refusal. Real experience is forbidden. | Old radio, unopened audio invitation. |
-| 2 | 2:00 | Repair shop/later | Su Qing Take stock of the shop and take on the recording. | She treated relationship issues as audio missions. | Colour labels, recording equipment boxes |
-| 3 | 1:50 | Police station reception room/at noon | Confirming the recording will and boundaries | Su Guoliang It's agreed that only the "readout version" will be recorded. | Voluntary confirmation form, glass water. |
-| 4 | 2:10 | Station studios/continuing | Finish the first set. | A decent version is finished and lost its real value. | A flat, cut-off pause. |
-| 5 | 2:00 | Repair shop/afternoon | Xu Ning Explain why it can't be used | Su Qing It was decided to repeat itself.Su Guoliang I feel cut short. | Old radios that didn't pass the tags, turned off. |
-| 6 | 2:10 | Back shop/continuing | Rebuild the call process | Father said he couldn't reach his daughter. | It's a recording wave. It's spinning. |
-| 7 | 1:50 | Repair shop door/afternoon | Aunt Luo Join and judge events | Su Guoliang And being pushed back to silence by shame. | Aunt Luo A loud laugh, a father's tool. |
-| 8 | 2:20 | Street groceries/event | Aunt Luo We got a similar call. | Fiction risk becomes immediate stress. | Cell phones with ears close, half a roll of curtains. |
-| 9 | 1:50 | Repair shop/continuing | Su Qing Try to contact Aunt Luo Family. | The usual numbers are temporarily unaccepted. | Double cell phone lined up and clocked. Noodles. |
-| 10 | 2:10 | Police station entrance/event | People are looking for help. | Aunt Luo The blogger says:Xu Ning Starting to stabilize. | The steps at the door, the phone off. |
-| 11 | 2:20 | Police station reception room/continuing | Independent confirmation through familiarization with the path | Su Guoliang I've always believed it. | Old radio stickers, cell phones put on the desktop |
-| 12 | 1:50 | Repair shop/night | Clean up after the incident. | Aunt Luo I don't know.Su Guoliang Agreed to repeat | Two cups of cold tea, re-opened radio. |
-| 13 | 2:00 | Backroom/night repair shop | Write Real Version | For the first time, the father and the daughter have determined everything together. | Handwritten outline, undeleted long pause |
-| 14 | 2:10 | Police station studio/night | Final recording completed | Su Qing I'm not sure if I'm going to do this.Su Guoliang Signed | Stable waves, lighted audio signals. |
-| 15 | 1:40 | Streets outside the repair shop/the following evening | Play the recording and honour the relationship agreement | Su Guoliang No more hiding. The father and daughter have established confirmation rules. | Out-of-shop small speaker, card with a common number. |
-| Total** | **30:00** |  |  |  |  |
+| 1 | 1:40 | Guoliang Repair Shop/Morning | Xu Ning proposes recording again | Su Guoliang refuses, real experience becomes a forbidden zone | Old radio, unopened recording invitation card |
+| 2 | 2:00 | Repair Shop/Later | Su Qing takes stock of the shop and accepts the recording task | She treats relationship issues as an audio task | Color labels, recording equipment box |
+| 3 | 1:50 | Police Station Reception Room/Noon | Confirm recording willingness and boundaries | Su Guoliang agrees to record only the version in which he saw through the scam | Voluntary confirmation form, water in a glass |
+| 4 | 2:10 | Police Station Recording Room/Continuous | Complete the first version of recording | Decent version completed but loses real value | Flat waveform, cut-out pauses |
+| 5 | 2:00 | Repair Shop/Afternoon | Xu Ning explains why it cannot be used | Su Qing decides to re-record on her own, Su Guoliang feels his shortcomings are exposed | Failed mark, turned-off old radio |
+| 6 | 2:10 | Repair Shop Back Room/Continuous | Reconstruct the incoming call process | The father voices the old grievance of "unable to contact daughter" | Frame-by-frame recording waveforms, repeatedly turning knob |
+| 7 | 1:50 | Repair Shop Entrance/Afternoon | Aunt Luo joins and judges the incident | Su Guoliang is pushed back into silence by shame | Aunt Luo's loud laughter, father packing up tools |
+| 8 | 2:20 | Street-side Grocery Store/Evening | Aunt Luo receives a similar call | Fictional risk becomes immediate pressure | Mobile phone pressed close to ear, half-pulled shutter door |
+| 9 | 1:50 | Repair Shop/Continuous | Su Qing tries to contact Aunt Luo's family | Frequently used number is temporarily unanswered, tension escalates | Dual mobile phones side-by-side, constantly timing call interface |
+| 10 | 2:10 | Police Station Entrance/Evening | Everyone seeks on-site help | Aunt Luo still refuses to hang up, Xu Ning begins to stabilize the situation | Entrance steps, mobile phone with speakerphone turned off |
+| 11 | 2:20 | Police Station Reception Room/Continuous | Complete independent confirmation through a familiar path | Su Guoliang publicly admits that he also once believed it | Old radio sticker, mobile phone placed on the table |
+| 12 | 1:50 | Repair Shop/Nightfall | Clearing emotions after the incident | Aunt Luo accepts help, Su Guoliang agrees to re-record | Two cups of herbal tea, reopened radio |
+| 13 | 2:00 | Repair Shop Back Room/Night | Write the real version | Father and daughter determine every sentence together for the first time | Handwritten outline, undeleted long pauses |
+| 14 | 2:10 | Police Station Recording Room/Night | Complete the final recording | Su Qing retains the real voice, Su Guoliang completes the credit | Stable waveform, lit recording indicator light |
+| 15 | 1:40 | Alley Outside Repair Shop/Following Evening | Play the recording and fulfill the relationship agreement | Su Guoliang no longer avoids, father and daughter establish confirmation rules | Small speaker outside the shop, card with frequently used numbers written on it |
+| **Total** | **30:00** |  |  |  |  |
 
 ## Continuity Bible
 
 ### Character Appearance and Wardrobe
 
-- `CH-001 Su Qing`: straight-head, light khaki jackets, white t-shirts, gray pants, black soft-floor shoes; dark blue audio kit with you. Site 4 was wired with earphones, and 8 scenes covered with a grey mark on the sleeves of the jackets until the scene was kept.
-- `CH-002 Su Guoliang`• Short hair with white hair, deep brown needle woven vests, blue grey shirts, black old shoes; and a thin screwdriver in the chest pocket. The blue coat was deepened when scene 8 went out and the scene was taken off and hung behind the door when it returned.
-- `CH-003 Xu Ning`Short hair, clean uniforms, dark folders; scenes 1, 3, 4, 10, 11, 14. The cuff length or marking position may not be changed for no reason during the same time period.
-- `CH-004 Luo Guilan`: Grey roll short hair, dark red needles knit open shirts, flower shirts, black cloth handbags; 8 scenes with mobile phones held in the right hand until scene 11 took the initiative to put them on the desktop.
+- `CH-001 Su Qing`: Ear-length straight hair, light khaki jacket, white crewneck shirt, dark gray trousers, black soft-soled shoes; carries a dark blue audio equipment case with her. Wears monitoring headphones in Scene 4; from Scene 8 onwards, a gray smudge gets on her jacket cuff and remains until Scene 15.
+- `CH-002 Su Guoliang`: Graying short hair, dark brown knit vest, blue-gray shirt, old black cloth shoes; a thin screwdriver is tucked into his breast pocket. Adds a thin dark blue jacket when going out in Scene 8, and takes it off to hang behind the door after returning to the shop in Scene 12.
+- `CH-003 Xu Ning`: Short hair, neat uniform, dark folder; clothing remains consistent in Scenes 1, 3, 4, 10, 11, and 14. Sleeve length or logo placement must not be changed without reason during the same time period.
+- `CH-004 Luo Guilan`: Curly gray short hair, dark red knit cardigan, floral shirt, black cloth handbag; from Scene 8 onwards, her right hand always holds a mobile phone until she actively puts the phone on the table in Scene 11.
 
 ### Locations
 
-- `LOC-001 It's a national repair shop.`: Down the street. The left side of the doorway is a wooden counter, with the right wall full of old radios and curtains in the back to separate the maintenance room. Green table lights and spare parts discs are fixed on the counter.
-- `LOC-002 Police station reception room`: Light wall, entrance to reception table, right bench, table with pots of water and transparent glass. Scenario 3 corresponds to scene 11 space.
-- `LOC-003 Police station recording room`: Small soundroom, left microphone, right computer and listening machine, visible operating booth outside glass windows. Scenario 4 is consistent with scenario 14 slots.
-- `LOC-004 Street groceries.`Two doors away from the repair shop, a green rain shed, paper boxes and folding stools at the door, and only half the curtains.
-- `LOC-005 Outside the shop.`: Cyclops, hot-coloured lamps on top of their heads, community soundboxes fixed below utility poles.
+- `LOC-001 Guoliang Repair Shop`: A narrow street-front shop. On the left side of the entrance is a wooden counter, the right wall is hung with old radios, and the back is separated by a cloth curtain to form a repair room. A green desk lamp and a parts tray are fixed on the counter.
+- `LOC-002 Police Station Reception Room`: Light-colored walls, the entrance directly faces the reception desk, a bench is on the right, and there is a water pitcher and a transparent glass cup on the desk. The spatial positions of Scene 3 and Scene 11 are identical.
+- `LOC-003 Police Station Recording Room`: A small soundproof room, with a microphone on the left, a computer and monitoring headphones on the right, and the operator's station visible outside the glass window. The camera angle relationship between Scene 4 and Scene 14 remains consistent.
+- `LOC-004 Street-side Grocery Store`: Two storefronts away from the repair shop, with a green awning, cardboard boxes and folding stools placed at the entrance, and the rolling shutter door can only be pulled down halfway.
+- `LOC-005 Alley Outside the Repair Shop`: Blue-gray floor tiles, warm-colored string lights overhead, and a small community speaker fixed below the utility pole.
 
 ### Core Prop States
 
-| Props ID | Props. | Initial Status | Changes in status |
+| Prop ID | Prop | Initial State | State Changes |
 | --- | --- | --- | --- |
-| `PROP-001` | Old wood shell radio. | Scene 1 is unstable. | Scene 6 with spin buttons; Scene 12 reconnected; Scene 15 clearly played the recording |
-| `PROP-002` | Deep blue audio kit | Scene 2 off, by Su Qing Carry | Site 4 is open and used; scene 5 is taken back to the shop; scene 14 is taken back to the studio |
-| `PROP-003` | Recorded invitation card | Scene 1 is under a spare parts plate. | Scene 2 by Su Qing Open; scene 13 is written on the back as an audio outline; scene 14 remains on the microphone Side |
-| `PROP-004` | Aunt Luo Black phone. | Scene 7 is in the bag. | Scene 8 continues; scene 10 is closed; scene 11 is closed Aunt Luo Actively put on the desktop and end the conversation |
-| `PROP-005` | Su Qing Silver phone. | scene 2 for the process | Scene 9 calling the familiar. Scene 11.Luo Xiaozhe Call back; scene 15 keeps photos of parent and daughter contact cards |
-| `PROP-006` | Common contact card | Scene 11 by Xu Ning Provide blank cards | Scene 13 by both parents; scene 15 on the radio and photo preservation |
+| `PROP-001` | Old wooden-cased radio | Scene 1: Back cover removed, unable to tune in stably | Scene 6: Knob reinstalled; Scene 12: Powered back on; Scene 15: Can clearly play the recording |
+| `PROP-002` | Dark blue audio equipment case | Scene 2: Closed, carried by Su Qing | Scene 4: Opened and used; Scene 5: Brought back to the shop; Scene 14: Brought into the recording studio again |
+| `PROP-003` | Recording invitation card | Scene 1: Unopened, pressed under the parts tray | Scene 2: Opened by Su Qing; Scene 13: Back written as a recording outline; Scene 14: Left beside the microphone |
+| `PROP-004` | Aunt Luo's black phone | Scene 7: Placed inside the handbag | Scene 8: Ongoing call; Scene 10: Speakerphone turned off; Scene 11: Actively placed on the table by Aunt Luo and call ended |
+| `PROP-005` | Su Qing's silver phone | Scene 2: Used to check the schedule | Scene 9: Dialing a familiar number; Scene 11: Receives a callback from Luo Xiaozhe; Scene 15: Saves a photo of the father-daughter contact card |
+| `PROP-006` | Common contact card | Scene 11: Blank card provided by Xu Ning | Scene 13: Filled out together by father and daughter; Scene 15: Pasted inside the radio's inner cover and saved as a photo |
 
 ### Emotional and Relationship Timeline
 
-- Video 1-2: Father and daughter hide each other's grievances behind shop counts and recording assignments.
-- 3-4: A temporary alliance to try to maintain it together Su Guoliang Decent.
-- Scene 5-7: Demeaning versions are rejected, father-daughter conflicts are public, and the children are not allowed to go to school.Su Guoliang Back to silence.
-- Scenario 8-10: External pressure forced the three to work together, but Aunt Luo Their judgment has not yet been accepted.
-- Scene 11:Su Guoliang In exchange for publicly acknowledging your weakness.Aunt Luo Stop confirming.
-- Scene 12-14: Father and daughter turn real experiences into usable audio recordings and no longer speak for each other.
-- Scenario 15: The relationship is not completely repaired by a sentence, but an enforceable engagement.
+- Scenes 1-2: The father and daughter hide their mutual dissatisfaction behind the shop inventory and recording tasks.
+- Scenes 3-4: The two form a temporary alliance, attempting to jointly maintain Su Guoliang's dignity.
+- Scenes 5-7: The respectable version is rejected, the conflict between father and daughter becomes public, and Su Guoliang retreats into silence.
+- Scenes 8-10: External pressure forces the three to cooperate, but Aunt Luo has not yet accepted their judgment.
+- Scene 11: Su Guoliang publicly admits his own weak moments in exchange for Aunt Luo stopping to verify.
+- Scenes 12-14: The father and daughter transform their real experiences into usable recordings, no longer speaking for each other.
+- Scene 15: The relationship is not completely repaired by a single sentence, but an actionable agreement on staying in touch is formed.
 
 ## Complete Screenplay
 
-### Episode 1 Scene 1: It's a national repair shop.
+### Episode 1 Scene 1: Guoliang Repair Shop
 
-**Inner view Kuoyang repair shop morning**
+**INT. GUOLIANG REPAIR SHOP - MORNING**
 
-The old hull radio was on the back, and the thin wire was laid on the counter like a faded vein.
+The back cover of an old wooden radio is open, with thin wires spread across the counter like faded blood vessels.
 
-Su Guoliang Keep your head down and pick up a little screw with a hammer. There are only intermittent sands on the radio.
+Su Guoliang keeps his head down and uses tweezers to pick up a tiny screw. Only intermittent static comes from the radio.
 
-The curtains were lifted. Community civilian police Xu Ning Come in with the dark folder.
-
-**Xu Ning**
-
-Master Su Did you find the knob?
-
-**Su Guoliang**
-
-Old model, good match. Come tomorrow.
-
-Xu Ning Half a light blue card was seen under the spare parts plate.
+The door curtain is lifted. Xu Ning, a community police officer, walks in, holding a dark folder in his hand.
 
 **Xu Ning**
 
-The recording, too?
-
-Su Guoliang Put a screw on the card and press the word "invite."
+Master Su, did you find the knob?
 
 **Su Guoliang**
 
-You guys find someone to talk to. When I opened my mouth, it was all radio noises.
+It is an old model and still needs a matching part. Come back tomorrow.
+
+Xu Ning sees half of a light blue card peeking out from under the parts tray.
 
 **Xu Ning**
 
-We don't want to broadcast the sound. We just want to tell the truth. You can stop at any time or just record the sound.
+The recording, is that tomorrow too?
+
+Su Guoliang places a screw on the card, pressing down exactly on the word "Invitation".
 
 **Su Guoliang**
 
-Nothing happened. I knew it was wrong. I went around with him.
+You should find someone who's good with words. Once I open my mouth, it's nothing but radio static.
 
-Xu Ning No rebuttal. He picked up another small radio and tried to turn the spin button.
+**Xu Ning**
 
-Clear music.
+We don't want a broadcaster's voice; we just want to make the actual events clear. You can stop at any time, and you can also just record your voice.
+
+**Su Guoliang**
+
+There are no events to speak of. I knew something was wrong as soon as I heard it, so I just played along with him for a few words.
+
+Xu Ning does not argue. He picks up another small radio that has been repaired and tries turning the knob.
+
+Clear music comes out from inside.
 
 **Xu Ning**
 
 That's not what you said a month ago.
 
-Su Guoliang The twig in his hand touched the plate and made a snap.
+The tweezers in Su Guoliang's hand hit the parts tray, making a sharp clink.
 
 **Su Guoliang**
 
-I didn't wake up a month ago.
+A month ago, I wasn't fully awake.
 
 **Xu Ning**
 
-Then wait till you figure it out. No recording by you.
+Then wait until you've thought it through. Whether to record or not is up to you.
 
-Xu Ning Put the repairs on the corner of the counter and turn around and leave.
+Xu Ning presses the repair fee onto the corner of the counter and turns to leave.
 
-Door curtains fall.Su Guoliang When the footsteps disappear, the light blue card will be pulled out.
+The door curtain falls. Su Guoliang waits for the footsteps to fade before pulling out the light blue card.
 
-He did not unseal it and stuffed it back under the spare parts plate.
+He doesn't open it, but stuffs it back under the parts tray.
 
-The sand on the old radio suddenly got bigger.Su Guoliang Scratch it harder, but it's more messy.
+The static from the old radio suddenly grows louder. Su Guoliang twists the knob forcefully, but the sound only becomes more chaotic.
 
 ---
 
-### Episode 1 Scene 2: Clear the shop.
+### Episode 1 Scene 2: Shop Inventory
 
-**Innerview Kuo-Lang. Later.**
+**INT. GUOLIANG REPAIR SHOP - LATER**
 
-A dark blue kit hit the curtain.
+A dark blue equipment case bumps open the door curtain.
 
-Su Qing He entered the door with a suitcase and a canvas bag on his shoulder. She looked at cell phone time and put a colour label on the counter.
+Su Qing enters carrying the case, a canvas bag still hanging over her shoulder. She glances at the time on her phone and places a roll of colored labels on the counter.
 
 **Su Qing**
 
-Red stays, yellow deliveries, blue recycling. Clear the counter and back room today.
+Red to keep, yellow to give away, blue to recycle. Today we'll clear the counter and the back room first.
 
-Su Guoliang Keep fixing the radio.
+Su Guoliang continues repairing the radio.
 
 **Su Guoliang**
 
-Who said anything?
+Who said we're clearing it?
 
 **Su Qing**
 
-You said you had a backache last week and there was no place to turn around. I'll just stay for two days, and I'll split the 20-year-old thing.
+You said last week your back was hurting, and there's no room to turn around in the shop. I'm only staying for two days, so let's first sort out the things that haven't been touched for twenty years.
 
-She picked up a grey cardboard box and placed yellow labels.
+She picks up a dusty cardboard box and sticks a yellow label on it.
 
-Su Guoliang Reach out and rip the label off.
+Su Guoliang reaches out and tears the label off.
 
 **Su Guoliang**
 
-It's useful inside.
+The things in here are useful.
 
 **Su Qing**
 
-Four bad antennas, three old price lists, one bag of knobs that don't know what to wear.
+Four broken antennas, three old price lists, and a bag of knobs that I don't even know what they go with.
 
 **Su Guoliang**
 
-I don't know now, it doesn't mean it's useless.
+Not knowing now doesn't mean they're useless.
 
-Su Qing Take a breath and swallow the debate back. She saw the light blue card under the spare parts plate and pulled it out of the box.
-
-**Su Guoliang**
-
-Who told you to open it?
-
-**Su Qing**
-
-Community alerts ... invite clients to tell the true story.
-
-She looked up to the father.
-
-**Su Qing**
-
-You're the client?
+Su Qing takes a breath, swallowing her argument. She spots a light blue card under the parts tray, pulls it out, and opens it.
 
 **Su Guoliang**
 
-Nope.Xu Ning Lack of material.
-
-Su Qing Just now.Xu Ning Go away and look back at the cards.
+Who told you to open that?
 
 **Su Qing**
 
-Two minutes of audio. I'll do it. It'll be over in half an hour.
+Community reminder recording... inviting the parties involved to share their real experiences.
+
+She looks up at her father.
+
+**Su Qing**
+
+Are you the party involved?
 
 **Su Guoliang**
 
-Don't do it.
+No. Xu Ning is short on material.
+
+Su Qing looks in the direction Xu Ning just left, then looks back at the card.
 
 **Su Qing**
 
-I thought you said you knew right from the beginning. That's right. Tell me what to say.
-
-Su Guoliang Put the screwdriver back in the chest pocket.
+A two-minute audio. I'll record it, we can get it done in half an hour.
 
 **Su Guoliang**
 
-Since when do you care so much about the neighborhood?
+Not doing it.
 
 **Su Qing**
 
-I don't care about the neighborhood. I'll finish this. You don't have to do this every day. Hide!Xu Ning。
+Didn't you say you knew something was wrong the moment you heard it? Then that's perfect, talk about how you figured it out.
 
-She shot the deep blue kit.
-
-**Su Qing**
-
-After recording and cleaning.
-
-Su Guoliang Looked at the color labels on the counter and finally turned off the old radio.
+Su Guoliang slips the screwdriver back into his breast pocket.
 
 **Su Guoliang**
 
-Just how I found out.
+Since when do you care so much about the neighbors' business?
 
-Su Qing A short smile when dealing with tasks.
+**Su Qing**
+
+I don't care about the neighbors. Once I get this done, you won't have to hide from Xu Ning every day.
+
+She pats the dark blue equipment case.
+
+**Su Qing**
+
+We'll clear the shop after we record.
+
+Su Guoliang looks at the counter full of colored labels, and finally turns off the power to the old radio.
+
+**Su Guoliang**
+
+Only talking about how I saw through it.
+
+Su Qing gives a brief, task-oriented smile.
 
 **Su Qing**
 
@@ -327,885 +327,885 @@ Deal.
 
 ---
 
-### Episode 1 Scene 3: Police station reception room
+### Episode 1 Scene 3: Police Station Reception Room
 
-**Interior Police Station reception room noon**
+**INT. POLICE STATION RECEPTION ROOM - NOON**
 
-Su Guoliang and Su Qing Sitting in rows on benches with deep blue boxes.
+Su Guoliang and Su Qing sit side by side on a bench, separated by a dark blue equipment case.
 
-Xu Ning A voluntary confirmation form was placed on the reception desk without handing over a pen.
+Xu Ning places a voluntary confirmation form on the reception desk, without handing over a pen.
 
 **Xu Ning**
 
-Confirm again. Just sound, no face; make a film for you; stop if you don't want to. Do you want to record it now?
+Let's confirm one more time. Only recording audio, no faces on camera; you get to listen to the final cut first; you can stop if there's something you don't want to say. Do you still want to record now?
 
-Su Guoliang Look.Su Qing。
+Su Guoliang looks at Su Qing.
 
-Su Qing Push the equipment box to the foot side and give room between the two.
+Su Qing pushes the equipment case to her feet, clearing the space between them.
 
 **Su Guoliang**
 
-Record. But I'm just gonna tell you how to figure it out, so don't put all that shit in there.
+Record. But I'm only talking about how I saw through it, don't put all that other messy stuff in.
 
 **Xu Ning**
 
-What really happened could be left open; however, it could not be written that it had not happened.
+For things that actually happened, you can choose not to make them public; but you can't write things that didn't happen as if they did.
 
-Su Qing Take the confirmation form and hand it to the father.
+Su Qing takes the confirmation form and hands it to her father first.
 
 **Su Qing**
 
-I only record and cut. I don't answer for you.
+I'm only responsible for recording and editing, I won't answer for you.
 
-Su Guoliang Sign slowly.
+Su Guoliang slowly signs his name.
 
-Xu Ning Get him some water. The glass is only halfway down.
+Xu Ning pours him some water. The glass is only filled halfway.
 
 **Xu Ning**
 
-I'm not in there.Su Qing Question, do as you say.
+I won't be in there in a moment. Su Qing will ask the questions, and you just speak in your own words.
 
 **Su Guoliang**
 
-It's just a phone call.
+It's just answering a phone call, what's so hard to talk about.
 
-And he takes up the cup, and he finishes it. And when the bottom of the cup is put back on the table, it hits it.
+He picks up the water glass and drinks it in one gulp. When the bottom of the glass is placed back on the table, it makes a distinct clink.
 
-Su Qing I saw my father's back very tight.
+Su Qing sees that the veins on the back of her father's hand are very tense.
 
-She reached out to get a cup.Su Guoliang I've pushed the empty cup back.Xu Ning In front.
+She reaches out to grab the glass, but Su Guoliang has already pushed the empty glass back in front of Xu Ning.
 
 ---
 
-### Episode 1 Scene 4: Police station recording room
+### Episode 1 Scene 4: Police Station Recording Room
 
-**Inner view, police station studio.**
+**INT. POLICE STATION RECORDING ROOM - CONTINUOUS**
 
-Red recording light on.
+The red recording light turns on.
 
-Su Guoliang Sitting in front of the microphone with a straight back.Su Qing Put on a wire and sit in front of the right computer.
+Su Guoliang sits in front of the microphone, his back very straight. Su Qing, wearing monitoring headphones, sits in front of the computer on the right.
 
-The wave shape on the screen begins to move.
-
-**Su Qing**
-
-First say when you get the call.
-
-**Su Guoliang**
-
-Last month, afternoon. As soon as the strange number opened, it was said that there was an emergency. I can't hear right away, because my daughter's doing a good job.
-
-Su Qing Hands up.
+The waveform on the screen begins to move.
 
 **Su Qing**
 
-Just say what happened, not judge me.
-
-Su Guoliang Clear your voice.
+First, tell me when you received the call.
 
 **Su Guoliang**
 
-I heard something wrong, and I said something to him. I wanted to see what else he was doing. I ended the conversation on my own initiative and contacted the community police and told them.
+Last month, in the afternoon. A strange number, and as soon as they spoke, they said Xiao Qing was in urgent trouble. I immediately heard something was off, because my daughter is steady in how she does things, it's impossible—
 
-He finishes his speech and looks at the window.
-
-Xu Ning Stand outside, no nod, no shake.
-
-Su Qing Press and stop.
+Su Qing raises her hand.
 
 **Su Qing**
 
-Pretty complete. Two minutes and forty seconds, cut to two minutes.
+First, just say what happened, don't evaluate me.
 
-She pulled the tracks and cut all the inhaling, paused and coughing out of her father.
-
-The tracks became tight and flat.
-
-Xu Ning Push the door in.
-
-**Xu Ning**
-
-Can you listen to the original recording?
-
-Su Qing Play.
-
-In the loudspeaker.Su Guoliang Be calm and fluid, like talking about others.
-
-Play over.
-
-**Xu Ning**
-
-Why didn't you give it first?Su Qing Call?
+Su Guoliang clears his throat.
 
 **Su Guoliang**
 
-I told you, I knew it.
+I heard something was off, so I deliberately kept talking to him for a bit longer to see what other tricks he had. Later, I took the initiative to end the call, contacted the community police officer, and explained the situation.
 
-**Xu Ning**
+He finishes in one breath and looks toward the glass window.
 
-You sat in our reception room for 40 minutes and you kept asking her if she was safe. This part, not in the recording.
+Xu Ning stands at the operating console outside, neither nodding nor shaking his head.
 
-Su Guoliang Take off the headset, put it on the table.
-
-**Su Guoliang**
-
-You have to warn people. Just tell them the results.
-
-**Xu Ning**
-
-It's really easy to get into trouble, often in the few minutes that “not yet seen”.
-
-Su Qing Look at the blanks on the screen that were cut off by themselves.
+Su Qing presses stop.
 
 **Su Qing**
 
-I can add one.
+Quite complete. Two minutes and forty seconds, cutting it down to two minutes won't be a problem.
+
+She drags the audio track, cutting out all of her father's inhalations, pauses, and a cough in the middle.
+
+The audio track becomes tight and flat.
+
+Xu Ning pushes the door open and comes in.
 
 **Xu Ning**
 
-Not to add. You have to be right.
+Can I listen to the original recording?
 
-Red recording light out.Su Guoliang Get up, get your coat.
+Su Qing plays it.
+
+Su Guoliang's voice from the speaker is calm and fluent, as if he is talking about someone else's business.
+
+The playback ends.
+
+**Xu Ning**
+
+Why didn't you call Su Qing first at that time?
 
 **Su Guoliang**
 
-Then don't.
+I told you, I saw through it early on.
 
-He pushed the door away. The wave shape on the desktop is still stuck in the phrase “I can't hear right now”.
+**Xu Ning**
+
+That day you sat in our reception room for forty minutes, constantly asking if she was safe. This part is not in the recording.
+
+Su Guoliang takes off the headphones and puts them on the table.
+
+**Su Guoliang**
+
+If you want to warn others, isn't it enough just to tell them the outcome?
+
+**Xu Ning**
+
+The moments where things are truly prone to going wrong are often during those few minutes when you "haven't seen through it yet."
+
+Su Qing looks at the blank segments on the screen that she cut out.
+
+**Su Qing**
+
+I can add a line.
+
+**Xu Ning**
+
+It's not about adding a line. We have to get the facts right first.
+
+The red recording light goes out. Su Guoliang gets up and picks up his coat.
+
+**Su Guoliang**
+
+Then don't use it.
+
+He pushes the door open and leaves. The waveform on the desktop is still paused at the line "I immediately heard something was off."
 
 ---
 
-### Episode 1 Scene 5: Returned Version
+### Episode 1 Scene 5: The Returned Version
 
-**Nexus Kuoyang's repair shop.**
+**INT. GUOLIANG REPAIR SHOP - AFTERNOON**
 
-Old radios are locked in the corner of the counter.
+The old radio is shut away in the corner of the counter.
 
-Su Qing Sitting on a maintenance bench, the computer screen displays the first version of the audio, with a grey mark behind the file name:** not used**.
+Su Qing sits on a repair stool. Her computer screen displays the first version of the audio, with a gray tag added after the filename: **Unused**.
 
-Su Guoliang Back to her, tear the colored label out of the box and rub it in small groups.
-
-**Su Qing**
-
-Xu Ning Not that you can't record. He just doesn't fake it.
-
-**Su Guoliang**
-
-Which one? The call came, I didn't pay, and I made it clear.
+Su Guoliang has his back to her, peeling colored labels off a cardboard box one by one and crumpling them into small balls.
 
 **Su Qing**
 
-You said you heard right away.
-
-Su Guoliang Throw the label group into the spare parts disk.
+Xu Ning didn't say you couldn't record. He just doesn't want anything fake.
 
 **Su Guoliang**
 
-The results are the same.
+Which part was fake? The call came, I didn't give them money, and everything was made clear afterward.
 
 **Su Qing**
 
-It's the process that reminds others. How do you believe that? How did you stop? What happened in the middle.
+You said you realized something was wrong right away.
+
+Su Guoliang throws the crumpled labels into a parts tray.
 
 **Su Guoliang**
 
-You come back two hours and you start teaching me how to talk?
-
-Su Qing Close the computer, open it again.
+The result is the same.
 
 **Su Qing**
 
-You say it yourself. I don't write, I record.
+Warning others depends on the process. How you believed it, how you stopped, what happened in between.
 
 **Su Guoliang**
 
-Not recorded.
+You've been back for two hours, and you're already teaching me how to tell my own story?
+
+Su Qing closes her laptop, then opens it again.
+
+**Su Qing**
+
+Then tell it yourself. I won't write a script, I'll just record.
+
+**Su Guoliang**
+
+I'm not recording.
 
 **Su Qing**
 
 What are you afraid of?
 
-Su Guoliang Finally turned around.
+Su Guoliang finally turns around.
 
 **Su Guoliang**
 
-I fear that you will cut my breath, my pause, and my wrong words to the people of the street.
+I'm afraid you'll edit all my gasps, pauses, and misspoken words for the whole street to hear.
 
-Su Qing Hold on.
+Su Qing is stunned.
 
 **Su Qing**
 
-I'm doing the clips, not hanging people out.
+I do editing, I don't expose people.
 
 **Su Guoliang**
 
-Isn't that one good? Sounds like I've never been afraid of anything.
+Wasn't that segment just now edited pretty well too? It made it sound like I was never afraid of anything.
 
-Su Qing Look at the computer. That flat wave is like a dead stitch.
+Su Qing looks at the computer. That flat waveform looks like a sealed seam.
 
-It's coming out of the neighborhood saying laughter.Su Guoliang Put the old radio in the back and the curtains fall behind him.
+The sound of neighbors chatting and laughing comes from outside the door. Su Guoliang carries the old radio into the back room, the cloth curtain falling behind him.
 
 ---
 
-### Episode 1 Scene 6: Nobody's connected.
+### Episode 1 Scene 6: The Person Who Didn't Pick Up
 
-**Inner view in the back of Kuoyang's repair shop.**
+**INT. GUOLIANG REPAIR SHOP - BACK ROOM - CONTINUOUS**
 
-There was only one green lamp in the back.
+Only a single green desk lamp is lit in the back room.
 
-Su Guoliang Put the old radio on the maintenance table and reload the tune button.
+Su Guoliang places the old radio on the workbench and reinstalls the tuning knob.
 
-Su Qing Put in the equipment box and it didn't open.
-
-**Su Qing**
-
-I'm not recording. Just ask again.
-
-Su Guoliang Wrestle. And the sand was dazzling and low.
+Su Qing enters carrying her equipment case, without opening it.
 
 **Su Qing**
 
-Why didn't you come to me the other day?
+I'm not recording. Just asking once.
+
+Su Guoliang turns the knob. The static rises and falls.
+
+**Su Qing**
+
+Why didn't you try to reach me first that day?
 
 **Su Guoliang**
 
-Find it.
+I did.
 
 **Su Qing**
 
-I didn't see it.
+I didn't see any missed calls.
 
 **Su Guoliang**
 
-I looked the other day. You said in the shed, back later. Not at night, not the next day.
+I tried the day before. You said you were in the studio and would call back later. You didn't call back that night, and you didn't call back the next day either.
 
-Su Qing Get out the phone, turn it over a month ago. On the screen is a long series of workgroup alerts with two messages from my father:
+Su Qing pulls out her phone and scrolls back to a month ago. On the screen is a long list of work group notifications, with two messages from her father sandwiched in between:
 
-"Are you done?"
+"Are you done working?"
 
-"Here's the new tea."
+"Some new tea arrived at the shop."
 
 **Su Qing**
 
-You didn't say anything.
+You didn't say anything was wrong.
 
 **Su Guoliang**
 
-Can't you find it?
+Can't I reach out if nothing is wrong?
 
 **Su Qing**
 
-So when a stranger tells me something happened, you believe it?
+So as soon as a stranger said something happened to me, you just believed them?
 
-Su Guoliang Screw the knob.
+Su Guoliang turns the knob all the way.
 
 **Su Guoliang**
 
-He says your phone's broken. He knows your name, he knows you make recordings, and he knows you're busy out there.
+He said your phone was broken and you couldn't be reached. He knew your name, knew you did sound recording, and knew you were often busy outside.
 
 **Su Qing**
 
-It's not hard to know.
+That's not hard to find out.
 
 **Su Guoliang**
 
-It was hard to think about.
+It was hard to think straight at the time.
 
-Radio suddenly received a fuzzy channel in which someone spoke but could not hear.
+The radio suddenly picks up a fuzzy channel; someone is speaking, but the words are unintelligible.
 
-Su Guoliang Turn the volume down.
+Su Guoliang turns down the volume.
 
 **Su Guoliang**
 
-He kept telling me to hang up and said he'd hold you off. I've got another old phone in my hand. I'm afraid he's telling the truth.
+He kept telling me not to hang up, saying that if I did, it would delay helping you. I was holding another old phone in my hand, wanting to call you, but I was afraid what he said was true.
 
-Su Qing Sit next to the little bench.
+Su Qing sits down on a small stool nearby.
 
 **Su Qing**
 
-And then?
+What happened next?
 
 **Su Guoliang**
 
-Later.Xu Ning Come to the store. He didn't rob my phone. He just asked me to look at him and use the usual numbers to find you.
+Then Xu Ning came to the shop. He didn't grab my phone; he just had me look at him and try to reach you again using the number I usually had saved.
 
 **Su Qing**
 
-I still haven't answered.
+I still didn't pick up.
 
 **Su Guoliang**
 
-Your colleague answered.
+Your colleague picked up.
 
-Two men quiet down.
+The two of them fall silent.
 
-Su Qing Put your cell phone on the maintenance table.
+Su Qing sets her phone to ring and places it on the workbench.
 
 **Su Qing**
 
-This paragraph is more useful than that.
+This part is more useful than the last one.
 
-Su Guoliang Wipe the screwdriver over and no response.
+Su Guoliang wipes down a thin screwdriver, offering no response.
 
 ---
 
-### Episode 1 Scene 7: No one's gonna fall for it.
+### Episode 1 Scene 7: Nobody Will Fall for It
 
-**Outside view at Kuo Liang's.**
+**INT/EXT. GUOLIANG REPAIR SHOP DOORWAY - AFTERNOON**
 
-Luo Guilan Open the curtain and put a bag of oranges on the counter.
+Luo Guilan lifts the door curtain and places a bag of oranges on the counter.
 
 **Luo Guilan**
 
-What meeting do you two have in the curtains? Both of them heard.
+What kind of meeting are you two, father and daughter, holding with the curtain closed? I could hear you from two rooms away.
 
-Su Qing Get out of the back and put your cell phone in your pocket.
+Su Qing comes out from the back room and puts her phone into her pocket.
 
 **Su Qing**
 
-Talk about a community recording.
+We're talking about a community recording.
 
 **Luo Guilan**
 
-Isn't that the phone call he took last month?
+Is it that phone call Guoliang picked up last month?
 
-Su Guoliang Come out, pick up the orange and put it back in the bag.
+Su Guoliang follows her out, picks up the oranges, and stuffs them back into the bag.
 
 **Su Guoliang**
 
-Take your stuff away.
+Take your things away.
 
 **Luo Guilan**
 
-I don't laugh at you. I just can't figure it out. I can't believe it.
+I'm not laughing at you. I just can't wrap my head around it—you didn't even see the person, how could you believe them just based on a few words?
 
-Su Guoliang Bring a fixed radio at the door to the counter.
+Su Guoliang moves a repaired radio from the doorway onto the counter.
 
 **Luo Guilan**
 
-I'd say the first one. Who's the kid who talks like an elder?
+If it were me, I would have told from the very first sentence. How can an elder not know what their own kid sounds like?
 
 **Su Qing**
 
-It is not necessarily the family.
+The person on the phone might not actually be the family member.
 
 **Luo Guilan**
 
-That's easier. Hang up.
+That's even simpler, just hang up.
 
-She's loud enough to lead two people through the store.
+She speaks loudly, drawing looks into the shop from two passersby.
 
-Su Guoliang(b) A low-head collection tool and a piece of a screwdriver, twig and brush in an iron box.
+Su Guoliang lowers his head to pack up his tools, putting the precision screwdriver, tweezers, and small brush into a metal box one by one.
 
 **Luo Guilan**
 
-You call me when you record, I'll tell you something. Don't panic.
+Call me when you record, and I'll say a few words for you. You have to stay clear-headed when things happen, don't panic.
 
 **Su Guoliang**
 
-No shortage of words.
+We're not short of people who can talk.
 
-Luo Guilan I didn't hear him cold.
+Luo Guilan doesn't catch the coldness in his voice and picks up the bag of oranges.
 
 **Luo Guilan**
 
-Then I'll go back to the shop.Xiaozhe I have to buy food.
+Then I'm heading back to the shop. Xiaozhe is coming over for dinner tonight, I still need to buy groceries.
 
-She turned away and disappeared outside the door.
+She turns and leaves, her dark red cardigan disappearing outside the door curtain.
 
-Su Guoliang Bind the toolbox.
+Su Guoliang snaps the tool box shut.
 
 **Su Guoliang**
 
-The recording is off. You don't have to clean the store.
+We're not doing the recording anymore. And you don't need to clear out the shop.
 
 **Su Qing**
 
-Dad...
+Dad—
 
 **Su Guoliang**
 
-You're busy tomorrow.
+You go about your own business tomorrow.
 
-He turned off the green lights. After dark down.
+He switches off the green desk lamp. The back room goes dark.
 
 ---
 
-### Episode 1 Scene 8: Similar call.
+### Episode 1 Scene 8: A Similar Call
 
-**Look out. Street groceries.**
+**EXT. STREETSIDE GROCERY STORE - EVENING**
 
-The sky turned blue.Luo Guilan Put the box inside the door.
+The sky turns blue. Under the green awning of the grocery store, Luo Guilan pushes a cardboard box inside the door.
 
-Her black phone rings. Strange number.
+Her black phone rings. An unknown number.
 
 **Luo Guilan**
 
 Hello?
 
-On the other side of the telephone, the sound was too fast to hear the full sentence, but only the word “family” was “urgent”.
+The voice on the other end of the phone is urgent, and complete sentences cannot be heard clearly; only "family member," "urgent matter," and "don't hang up" can be made out.
 
-Luo Guilan The smile disappeared.
+The smile on Luo Guilan's face disappears.
 
 **Luo Guilan**
 
-Xiaozhe What? You let him say it.
+What happened to Xiaozhe? Let him speak for himself.
 
-Keep talking.Luo Guilan Keep your voice down and go to the edge of the shed.
+The other party continues to speak. Luo Guilan lowers her voice and walks to the edge of the awning.
 
 **Luo Guilan**
 
 I'm listening. Slow down.
 
-She pulled half the curtain door and the black cloth bag was under the armpit.
+She pulls the rolling shutter door halfway down, tucking a black cloth handbag under her arm.
 
-In the repair shop next door,Su Guoliang The old radio is on the air. He heard several intermittent words “can't hang up” and “handle immediately”.
+In the repair shop next door, Su Guoliang is powering up an old radio. He hears a few intermittent words: "can't hang up" and "handle it immediately."
 
-He stopped.
+He stops what he is doing.
 
-Su Qing Get out of the back.
-
-**Su Qing**
-
-What?
-
-Su Guoliang Weared a dark blue coat and walked to the grocery store.
-
-**Su Guoliang**
-
-Luo Guilan Hang up.
-
-Luo Guilan Put your hands over your phone.
-
-**Luo Guilan**
-
-Don't mess with me.Xiaozhe Something.
-
-**Su Guoliang**
-
-You just said no one would be fooled. I'll hang up now. Here.Xiaozhe Hit it.
-
-**Luo Guilan**
-
-He said his phone wasn't around.
-
-Su Qing Follow the door and take out your silver phone.
+Su Qing walks out from the back room.
 
 **Su Qing**
 
-You saved it.Xiaozhe No. Tell me I'm on my phone.
+What's wrong?
 
-Luo Guilan Keep an eye on her, hold back.
+Su Guoliang has already put on a thin dark blue jacket and walks quickly toward the grocery store.
 
-The other end of the phone suddenly raised the volume.Luo Guilan Put your cell phone back in your ear immediately.
+**Su Guoliang**
+
+Luo Guilan, hang up first.
+
+Luo Guilan turns her back and covers the phone with her hand.
 
 **Luo Guilan**
 
-I didn't hang up, I did. You go on.
+Don't cause trouble, something happened to Xiaozhe.
 
-Su Guoliang She saw her hand shaking with her mobile phone.
+**Su Guoliang**
 
-His hands are also slowly tightening.
+You just said no one would fall for it. Hang up first now, and call Xiaozhe.
+
+**Luo Guilan**
+
+The other side said his phone isn't with him.
+
+Su Qing follows to the doorway and takes out her silver phone.
+
+**Su Qing**
+
+Tell me the number you usually have saved for Xiaozhe, and I'll contact him with my phone.
+
+Luo Guilan stares at her, hesitating.
+
+The voice on the other end of the phone suddenly raises its volume. Luo Guilan immediately puts the phone back to her ear.
+
+**Luo Guilan**
+
+I didn't hang up, I'm here. Keep talking.
+
+Su Guoliang sees her hand holding the phone shaking.
+
+His hand also slowly clenches into a fist.
 
 ---
 
-### Episode 1 Scene 9: Two numbers.
+### Episode 1 Scene 9: Two Numbers
 
-**Inner view Kuoyang repair shop**
+**INT. GUOLIANG REPAIR SHOP - CONTINUOUS**
 
-Luo Guilan By Su Qing Put it in the store, but still keep talking.
+Aunt Luo is helped into the shop by Su Qing, but she remains on the call.
 
-Su Qing Put the silver phone on the counter.Luo Xiaozhe The normal number.
+Su Qing places the silver phone on the counter and inputs the number Luo Xiaozhe usually uses.
 
-Dial up.
+The dialing tone rings.
 
-No answer.
+No one answers.
 
-Luo Guilan Turn right now.Su Guoliang。
+Aunt Luo immediately turns to Su Guoliang.
 
-**Luo Guilan**
+**AUNT LUO**
 
-Look, nobody answered. They didn't lie to me.
+See, no one is answering. They didn't lie to me.
 
-**Su Qing**
+**SU QING**
 
-Not once can prove either. Any other contacts you know?
+Not answering once doesn't prove either side. Are there any other familiar contacts?
 
-**Luo Guilan**
+**AUNT LUO**
 
-Words across the street can't be told.
+The other side said this matter cannot be told to anyone else.
 
-**Su Guoliang**
+**SU GUOLIANG**
 
-I've heard that too.
+I've heard that line before too.
 
-Luo Guilan Look at him.
+Aunt Luo glares at him.
 
-**Luo Guilan**
+**AUNT LUO**
 
-Don't fuck with me.Xiaozhe He's not here, he's not answering.
+Don't apply your situation to me. Xiaozhe was supposed to come tonight, but now he hasn't shown up, and he's not answering his phone.
 
-Su Qing Dial again.
+Su Qing dials again.
 
-There is still no answer.
+Still no answer.
 
-The number of calls on the screen continues to increase.
+The call timer on the screen continues to tick up.
 
-Su Guoliang Reach out and touch.Luo Guilan The phone, she step back immediately.
+Su Guoliang reaches out to touch Aunt Luo's phone, but she immediately takes a step back.
 
-**Luo Guilan**
+**AUNT LUO**
 
-Don't move! You're responsible for this!
+Don't touch it! If things really get delayed, will you take responsibility?
 
-Su Guoliang Hands stopped in half empty.
+Su Guoliang's hand freezes in mid-air.
 
-**Su Guoliang**
+**SU GUOLIANG**
 
-I can't take responsibility. So find someone who can confirm it for you.
+I can't take responsibility. That's why we should find someone who can help you confirm.
 
-He looked out the door.
+He looks out the door.
 
-**Su Guoliang**
+**SU GUOLIANG**
 
-Find it.Xu Ning。
+Go find Xu Ning.
 
-**Luo Guilan**
+**AUNT LUO**
 
-I'm not going. What if I go across the street?
+I'm not going. What if the other side hears me when I leave?
 
-**Su Qing**
+**SU QING**
 
-The police station is at the corner. You don't have to fight the other side, you don't have to decide now, you just sit down and check.
+The police station is right at the end of the street. You don't have to argue with them, and you don't have to make a decision right now. Just change locations, sit down, and confirm.
 
-Luo Guilan Hold on tight. The other side of the phone is still pushing.
+Aunt Luo clutches her handbag tightly. The other end of the phone is still urging her.
 
-Su Guoliang Pick up the old radio on the counter and turn off the power.
+Su Guoliang picks up the old radio on the counter and turns off the power.
 
-**Su Guoliang**
+**SU GUOLIANG**
 
-The store is closed. We'll go together.
+I'll close the shop. We'll go together.
 
-He pulled the curtains in half and kept them at the same height as the grocery store.
+He pulls the rolling shutter door halfway down, keeping it at the same height as the grocery store.
 
 ---
 
-### Episode 1 Scene 10: Police station entrance.
+### Episode 1 Scene 10: Outside the Police Station
 
-**Looks like the police station door.**
+**EXT. OUTSIDE THE POLICE STATION - EVENING**
 
-Luo Guilan Standing below the stairs, he wouldn't go in.
+Luo Guilan stands at the bottom of the steps, refusing to walk inside.
 
-Her phone is still on the right ear.Su Guoliang Stand on her left.Su Qing On the right, three people are tied to the same invisible line.
+Her phone is still pressed to her right ear. Su Guoliang stands on her left, and Su Qing stands on her right, the three of them looking as if they are tied together by the same invisible thread.
 
-Xu Ning Get out of the door.Luo Guilan Look again.Su Guoliang。
-
-**Xu Ning**
-
-Aunt Luo I am.Xu Ning I don't know. Do you know me?
-
-Luo Guilan Nod your head.
+Xu Ning comes out of the door, looking first at Luo Guilan, then at Su Guoliang.
 
 **Xu Ning**
 
-You don't have to answer the person on the phone right now, and you don't have to prove who's right. Turn off the loudspeaker and protect your voices.
+Aunt Luo, I'm Xu Ning. Do you recognize me?
 
-Luo Guilan Finger stiff.Su Qing Not working for her, just pointing out the button.
+Luo Guilan nods.
 
-Luo Guilan Press the phone and the sound disappears, leaving only a weak leak close to the ears.
+**Xu Ning**
+
+You don't need to answer the person on the phone right now, nor do you need to prove to me who is right. Turn off the speakerphone first to protect the voices on both sides.
+
+Luo Guilan's fingers are stiff. Su Qing doesn't do it for her, but just points out the button from the side.
+
+Luo Guilan presses it, and the phone's sound disappears, leaving only a faint leakage of sound close to her ear.
 
 **Luo Guilan**
 
-He said...Xiaozhe In an emergency, let me help immediately.
+He said Xiaozhe ran into an emergency and asked me to help right away.
 
 **Xu Ning**
 
-What do you worry about most?
+What are you most worried about?
 
 **Luo Guilan**
 
-I'm hanging up, nobody cares about him.
+If I hang up, no one will take care of him.
 
 **Xu Ning**
 
-Understood. So let's do something that won't stand in the way of confirmation: using the number you usually keep.Xiaozhe Or someone you know around him.
+Understood. Then let's do something that won't get in the way of verification: use a number you normally have saved to reach Xiaozhe or someone you know who is with him.
 
-Luo Guilan Shake your head.
+Luo Guilan shakes her head.
 
 **Luo Guilan**
 
-Su Qing Hit, no answer.
+Su Qing called, but no one answered.
 
 **Xu Ning**
 
-You can find someone you know. You provide the number, we don't listen to the other side of the phone.
+We can try another familiar person. You provide the number yourself; we won't listen to any contact information given by the other end of the call.
 
-What did the other side of the phone say?Luo Guilan He's so tight, he turns around and wants to walk down the stairs.
+The other end of the phone says something else. Luo Guilan's expression tenses up, and she turns to walk down the steps.
 
-Su Guoliang She was not stopped, but the old woodshell radio was placed on the steps.
+Su Guoliang doesn't stop her, but simply places the old wooden-cased radio on the steps.
 
 **Su Guoliang**
 
-You have to go, I'll stay with you. But let me finish.
+If you want to leave, I'll go with you. But let me finish one sentence first.
 
-Luo Guilan No turning back.
+Luo Guilan doesn't look back.
 
 **Su Guoliang**
 
-Last month, I was standing here too, afraid to hang up.
+Last month, I was also standing right here, not daring to hang up.
 
-Luo Guilan Stop the foot.
+Luo Guilan's feet stop.
 
 ---
 
-### Episode 1 Scene 11: Police station reception room
+### Episode 1 Scene 11: Police Station Reception Room
 
-**Interior Police Station reception room**
+**INT. POLICE STATION RECEPTION ROOM - CONTINUOUS**
 
-Luo Guilan Sitting at the end of the bench, the cell phone was still on the line.
+Luo Guilan sits on the very edge of the bench, her phone still on a call.
 
-Xu Ning Sitting behind the reception table without touching her cell phone.Su Qing Get in touch with your own silver phone.Luo Guilan The second person I usually know.
+Xu Ning sits behind the reception desk, not touching her phone. Su Qing uses her own silver phone to contact the second person Luo Guilan is usually familiar with.
 
-Su Guoliang Put the old hull radio on the corner of the table. The back was marked with the old label of his repair shop, which had been in use for many years.
+Su Guoliang places the old wooden-cased radio on the corner of the desk. An old label from his repair shop is stuck to the back, showing a phone number used for many years.
 
 **Luo Guilan**
 
-Didn't you say you knew?
+Didn't you say you'd know the moment you heard it?
 
-Su Guoliang Look at the radio, don't look at her.
+Su Guoliang looks at the radio, not looking at her.
 
 **Su Guoliang**
 
 I made that up.
 
-Luo Guilan Heads up.
+Luo Guilan looks up.
 
 **Su Guoliang**
 
-I believe it. I'm afraid there'll be a real accident when I hang up.Officer Xu Let me confirm with the usual number, and I think he's holding me up.
+I believed it. I was also afraid that the moment I hung up, something would really happen to Xiao Qing. When Officer Xu asked me to confirm using my usual number, I also felt like he was wasting my time.
 
-Xu Ning Keep quiet.
+Xu Ning remains quiet.
 
 **Su Guoliang**
 
-I'm sitting in your seat. The hand is shaking and there's only one thing in my head: Come on, don't delay.
+I was sitting right where you are. My hands kept shaking, and there was only one thought in my head: hurry up, don't delay.
 
-Luo Guilan Take your hands off the phone slowly.
+Luo Guilan's fingers gripping the phone slowly loosen a bit.
 
 **Luo Guilan**
 
-How did you stop?
+Then how did you stop?
 
 **Su Guoliang**
 
-Not at all. First someone sits with me, then they use the number I already know. I finally found her colleague and heard she was fine.
+It wasn't something I figured out all at once. First, someone sat with me, and then we used numbers I already knew to look them up one by one. Finally, we reached Xiao Qing's colleague and heard that she was fine.
 
-Su Qing The phone rings.
+Su Qing's phone rings.
 
-Screen display:**Luo Xiaozhe Call back**.
+The screen displays: **Luo Xiaozhe Calling Back**.
 
-She passed the phone.Luo Guilan But it didn't click.
+She hands the phone to Luo Guilan, but does not press answer.
 
 **Su Qing**
 
-That's the number you just told me. Take it yourself.
+This is the number you just gave me. Answer it yourself.
 
-Luo Guilan A call from a stranger still on his right ear, and a name on a silver phone.
+Luo Guilan glances at the unfamiliar incoming call still held to her right ear, then looks at the name on the silver phone.
 
-She finally took the black phone from her ear and put it on the table.
+She finally takes the black phone away from her ear and places it on the desk.
 
-The call is not over.
+The call has not ended yet.
 
-She picked up the silver phone first.
-
-**Luo Guilan**
-
-Xiaozhe？
-
-**Luo Xiaozhe(Telephone)**
-
-Grandma, I just fell asleep in the car. Why are you making so many calls?
-
-Luo Guilan Close your eyes and your shoulders fall down.
+She answers the silver phone first.
 
 **Luo Guilan**
 
-All right. You come back slowly, don't worry.
+Xiaozhe?
 
-She hangs up a silver phone and picks up her own black phone.
+**Luo Xiaozhe (on phone)**
 
-Strange calls are still coming.
+Grandma, I fell asleep in the car just now. You called so many times, what's wrong?
 
-Luo Guilan Click to close.
-
-Call stop.
-
-Xu Ning Put a glass of hot water in front of her.
-
-Luo Guilan Didn't drink immediately. She looked...Su Guoliang。
+Luo Guilan closes her eyes, her shoulders suddenly slumping.
 
 **Luo Guilan**
 
-Why didn't you just say it this morning?
+It's nothing. Take your time coming back, don't rush.
+
+She hangs up the silver phone, then picks up her own black phone.
+
+The unfamiliar caller is still speaking.
+
+Luo Guilan presses end.
+
+The call timer stops.
+
+Xu Ning pushes a glass of warm water in front of her.
+
+Luo Guilan doesn't drink it immediately. She looks at Su Guoliang.
+
+**Luo Guilan**
+
+Why didn't you just say so this morning?
 
 **Su Guoliang**
 
-Afraid you'll laugh at me as I laugh at you.
+I was afraid you'd laugh at me the way I laughed at you.
 
-Luo Guilan In order to counter it, only the phone was turned over to the desktop.
+Luo Guilan wants to argue back, but in the end, she only places her phone face down on the desk.
 
 ---
 
-### Episode 1 Scene 12: Two cold teas.
+### Episode 1 Scene 12: Two Cups of Herbal Tea
 
-**Inner view Kuoyang's repair shop**
+**INT. GUOLIANG REPAIR SHOP - NIGHT**
 
-The curtain door is rising again.Su Guoliang Hang the dark blue coat behind the door.
+The roller shutter door rises again. Su Guoliang hangs his dark blue coat behind the door.
 
-There's two cups of cool tea on the counter.Su Guoliang Right in front of you.Luo Guilan In front.
+Two cups of herbal tea sit on the counter, one in front of Su Guoliang, and one in front of Aunt Luo.
 
-Su Qing Charge the audio equipment in the back.Xu Ning Stand at the door and don't come in.
-
-**Xu Ning**
-
-Aunt Luo Let's take a break tonight. Follow-up, if any, will be done tomorrow. Keep the number and message on the phone as it is.
-
-Luo Guilan Nod your head.
-
-**Luo Guilan**
-
-I'm not recording. As soon as I'm heard, the whole street knows.
+Su Qing is charging the audio equipment in the back room. Xu Ning stands at the door, not coming in.
 
 **Xu Ning**
 
-It's okay not to record.
+Aunt Luo, get some rest tonight. If you want to add more details about what happened later, we can talk tomorrow. Don't delete the numbers and messages on your phone for now, keep them as they are.
 
-Xu Ning Look.Su Guoliang。
+Aunt Luo nods.
+
+**Aunt Luo**
+
+I'm not recording. Once my voice is played, the whole street will know.
 
 **Xu Ning**
 
-You too.
+It's fine if you don't record.
 
-He said leave.
+Xu Ning looks at Su Guoliang.
 
-Luo Guilan Touched the cup with your fingertips, didn't drink it.
+**Xu Ning**
 
-**Luo Guilan**
+Same goes for you.
 
-I said those words this afternoon...
+He leaves after saying this.
 
-**Su Guoliang**
+Aunt Luo touches the herbal tea cup with her fingertips, but doesn't drink.
 
-Sounds pretty loud.
+**Aunt Luo**
 
-**Luo Guilan**
-
-Can't you just ignore me?
+What I said about you this afternoon...
 
 **Su Guoliang**
 
-Yes. You didn't hear me say hang up.
+You said it pretty loud.
 
-Two people looked at each other and couldn't stand it. It's embarrassing to laugh.
+**Aunt Luo**
 
-Luo Guilan Take that bag of oranges out of the bag and put it under the counter.
-
-**Luo Guilan**
-
-If the tape is made, give it to me first. Don't put me in today.
+Can't you just pretend you didn't hear?
 
 **Su Guoliang**
 
-Just me.
+I can. Just like you pretended you didn't hear me telling you to hang up just now.
 
-Luo Guilan Stand up.
+The two look at each other, and neither can help but let out a brief laugh. After laughing, both feel a bit embarrassed again.
 
-**Luo Guilan**
+Aunt Luo takes the bag of oranges out of her handbag and places it under the counter.
 
-You want to say it?
+**Aunt Luo**
 
-Su Guoliang Look back. Green lights.Su Qing Cleaning up sound cards.
+If the recording is made, let me listen to it first. Don't include what happened to me today.
 
 **Su Guoliang**
 
-It's worse to be laughing at someone.
+Only mine.
 
-Luo Guilan Pick up the empty bag and leave.
+Aunt Luo stands up.
 
-Su Guoliang Reconnect the old radio. In the sand, there was finally a stable human voice.
+**Aunt Luo**
+
+You're willing to talk now?
+
+Su Guoliang looks toward the back room. Under the green desk lamp, Su Qing is clearing the recording card.
+
+**Su Guoliang**
+
+If someone actually falls for it, it feels worse than being laughed at.
+
+Aunt Luo picks up her empty handbag and leaves.
+
+Su Guoliang plugs the old radio back in. Amidst the static, a stable human voice finally emerges.
 
 ---
 
-### Episode 1 Scene 13: It's not cut off.
+### Episode 1 Scene 13: The Parts Not Cut Out
 
-**Inner view in the back of the shop**
+**INT. GUOLIANG REPAIR SHOP - BACK ROOM - NIGHT**
 
-The deep blue kit is completely open. Small microphones, connections and listening earphones are placed on the maintenance table.
+The dark blue equipment case is completely open. A small microphone, connection cables, and monitoring headphones are neatly laid out on the repair workbench.
 
-The light blue taped invitation card turned to the back, pressing between the two.
+The light blue recording invitation card is flipped to its back, pressed between the two of them.
 
-Su Qing Write three lines with a pen:
+Su Qing takes a pen and writes down three lines:
 
-"Why do I believe?"
+"Why I believed."
 
-"Why don't I hang up?"
+"Why I didn't dare to hang up."
 
-"How do I know?"
-
-**Su Qing**
-
-No need to be complete. Every line can stop anywhere.
-
-**Su Guoliang**
-
-You're not cutting if it stops?
+"How I confirmed."
 
 **Su Qing**
 
-It's too long to cut, but it's not like it's "not clear."
-
-Su Guoliang Put your finger on the corner of the card.
+You don't have to speak in complete sentences. One sentence per line, you can stop wherever you want.
 
 **Su Guoliang**
 
-What's the beginning?
+If I stop, won't you cut it?
 
 **Su Qing**
 
-Name. Say what you do. And said you took a call the other day.
+If it's too long, I'll cut it, but I won't edit "not having figured it out" into "knowing it all along."
 
-Su Guoliang Face the little microphone.
-
-**Su Guoliang**
-
-My name is...Su Guoliang Twenty-six years on the radio. Last month, I got a strange phone call saying my daughter had an emergency.
-
-He stopped, and his right hand touched the tune button.
-
-Su Qing No rush.
-
-There was a long gap between the waves, with only breathing and the sound of a far-off car.
+Su Guoliang presses down on a corner of the card with his finger.
 
 **Su Guoliang**
 
-I believe it. Not because he looked like him, because I couldn't get in touch with her.
+How do I start?
 
-Su Qing Look at the father.
+**Su Qing**
 
-**Su Guoliang**
+Say your name. Say what you do. Then say that you received a phone call that day.
 
-They kept me hanging. The more I was in a hurry, the more I thought it was delaying. The community police later reconnected with me with the usual numbers to confirm that the daughter was okay.
-
-He stopped again.
+Su Guoliang faces the small microphone.
 
 **Su Guoliang**
 
-If you've got a call for you to decide immediately, not to tell anyone, not to hang up, stop. You can use the number you knew to find your family, and you can find someone who can trust you.
+My name is Su Guoliang, and I've been repairing radios for twenty-six years. Last month, I received a call from an unknown number, and the person on the other end said my daughter was in an emergency.
 
-Su Qing Press and stop.
+He stops, his right hand reaching to touch the tuning knob.
+
+Su Qing does not rush him.
+
+A long blank space is left in the middle of the waveform, with only the sound of breathing and distant traffic.
 
 **Su Guoliang**
 
-Is it too long?
+I believed it. Not because of how convincing he sounded, but because I just happened to be unable to get in touch with her.
+
+Su Qing looks up at her father.
+
+**Su Guoliang**
+
+The other party kept telling me not to hang up. The more anxious I got, the more I felt that hanging up would cause a delay. Later, the community police officer accompanied me to reconnect using the number I usually had saved, and only then did I confirm my daughter was fine.
+
+He stops again.
+
+**Su Guoliang**
+
+If you also receive a call asking you to make an immediate decision, not to tell anyone, and not to hang up, stop for a moment first. Reach out to your family using a number you already know, or ask someone trustworthy around you to help confirm.
+
+Su Qing presses stop.
+
+**Su Guoliang**
+
+Was the last part too long?
 
 **Su Qing**
 
@@ -1215,190 +1215,190 @@ Two minutes and seven seconds.
 
 Cut seven seconds.
 
-Su Qing Moves the cursor to the middle long pause.
+Su Qing moves the cursor to that long pause in the middle.
 
-She didn't move.
+She doesn't move.
 
 **Su Qing**
 
 Cut the sound of my questions. Keep this pause.
 
-Su Guoliang Look at her.
+Su Guoliang looks at her.
 
-Su Qing At the bottom of the card, write: ** There is a previous contact number and no second contact has been contacted. **
+Su Qing writes at the very bottom of the card: **If something happens, call a familiar number first; if unanswered, then look for a secondary contact.**
 
-She pushed the pen to the father.
+She pushes the pen to her father.
 
-Su Guoliang Add the following line to the side:** Don't just say “Do you want to do something” and just say “Please call back”. **
+Su Guoliang adds a line next to it: **Don't just send "Are you busy?", say "Please call back" directly.**
 
-Father and daughter looked at the two lines, and there was no argument.
+Father and daughter both look at those two lines, without any argument.
 
 ---
 
-### Episode 1 Scene 14: Police station recording room
+### Episode 1 Scene 14: Police Station Recording Room
 
-**Inner view Police Station studio night**
+**INT. POLICE STATION RECORDING ROOM - NIGHT**
 
-Same place as noon.
+The same position as at noon.
 
-Su Guoliang Sitting in front of the left microphone.Su Qing Sit in front of the right computer.Xu Ning Stand outside the window.
+Su Guoliang sits in front of the microphone on the left, and Su Qing sits in front of the computer on the right. Xu Ning stands outside the glass window.
 
-Light blue invitation cards are placed next to the microphone, with two handwritings on the back.
+The light blue invitation card is placed next to the microphone, its back covered in two different handwritings.
 
-Red recording light on.
-
-**Su Guoliang**
-
-My name is...Su Guoliang Twenty-six years on the radio. Last month, I got a strange phone call saying my daughter had an emergency.
-
-He said up here, stop.
-
-Waves stretch forward, leaving a real blank.
-
-Su Qing Not looking at the clip button, just looking at the father.
+The red recording light turns on.
 
 **Su Guoliang**
 
-I believe it.
+My name is Su Guoliang, and I've been repairing radios for twenty-six years. Last month, I received a call from an unfamiliar number, and the person on the other end said my daughter was in an emergency.
 
-His voice is lower than noon, but more steady.
+He stops here.
 
-**Su Guoliang**
+The waveform extends forward, leaving a real silence.
 
-The more I hurry, the more I can't hang up. The community police later reconnected with me with a familiar number to confirm that the daughter was safe.
-
-He concluded with the last sentence along the lines of the outline.
+Su Qing doesn't look at the edit button, only at her father.
 
 **Su Guoliang**
 
-Stop confirming, no shame. If you can't get it, you'll find someone who can trust you.
+I believed it.
 
-Su Qing Press and stop.
+His voice is lower than at noon, but steadier.
 
-The studio was quiet for three seconds.
+**Su Guoliang**
 
-Xu Ning Press the call button from the table.
+The more anxious I got, the less I dared to hang up. Later, a community police officer accompanied me to call back using a familiar number, and only then did I confirm that my daughter was safe.
 
-**Xu Ning(Speaker)**
+He finishes the last sentence according to the outline.
 
-Master Su Do you want to start over?
+**Su Guoliang**
 
-Su Guoliang Look.Su Qing。
+Stopping to confirm is nothing to be ashamed of. If you're not sure on your own, let someone you trust accompany you to confirm.
+
+Su Qing presses stop.
+
+The recording room is quiet for three seconds.
+
+Xu Ning presses the talkback button from the console.
+
+**Xu Ning (Speaker)**
+
+Master Su, do you want to do it again?
+
+Su Guoliang looks at Su Qing.
 
 **Su Guoliang**
 
 What does she think?
 
-Su Qing Take off one earphone.
+Su Qing takes off one side of her headphones.
 
 **Su Qing**
 
-I'm in charge of the voice. You're not responsible for what you're saying.
+I'm in charge of the sound. You're in charge of whether this is what you wanted to say.
 
-Su Guoliang Look at the card by the microphone.
+Su Guoliang looks at the card next to the microphone.
 
 **Su Guoliang**
 
-This time.
+Just this take.
 
-Su Qing Save file with the name:`苏国良_真实经历_确认版`。
+Su Qing saves the file under the name: `苏国良_真实经历_确认版`.
 
-She didn't delete the pause.
+She doesn't delete the pause in the middle.
 
-Xu Ning Walk into the studio and put a blank common contact card on the table.
+Xu Ning walks into the recording room and places a blank frequently used contact card on the table.
 
 **Xu Ning**
 
-I'll send you confirmation tomorrow. The card is not a uniform answer, filled in on a home basis and placed in an easy to find place.
+I'll send the final cut to you tomorrow for confirmation first. The card doesn't have a standard answer; fill it out according to your own family's situation and put it somewhere easy to find.
 
-Su Guoliang Pick up the card and hand it over.Su Qing Half.
+Su Guoliang takes the card and hands half of it to Su Qing.
 
-Two people held the paper together.
+The two of them press down on the paper together.
 
 ---
 
-### Episode 1 Scene 15: My voice.
+### Episode 1 Scene 15: One's Own Voice
 
-**The next evening.**
+**EXT. STREET ALLEY OUTSIDE GUOLIANG REPAIR SHOP - THE NEXT EVENING**
 
-A warm line of lights. There's a stand in the alley and a bench is moved to cool.
+Warm string lights turn on. In the alley, some people are packing up their stalls, while others are bringing out stools to enjoy the cool air.
 
-After a short hint was sent out from the community's small speaker box,Su Guoliang The sound is ringing.
+After a short prompt plays from the community speaker, Su Guoliang's voice rings out.
 
-**Su Guoliang(recording)**
+**Su Guoliang (Recording)**
 
-My name is...Su Guoliang Twenty-six years on the radio. Last month, I got a strange phone call...
+My name is Su Guoliang, and I've been repairing radios for twenty-six years. Last month, I received a call from an unfamiliar number...
 
-In the repair shop, the same recording was played on the old woodshell radio. The knob is loaded and the sound is clear and stable.
+Inside the repair shop, an old wooden-cased radio is playing the same recording. The knob has been installed, and the sound is clear and stable.
 
-Su Guoliang I was standing behind the curtains. He heard his first pause, and he wanted to go back to the store.
+Su Guoliang was originally standing behind the door curtain. Hearing his first pause, he instinctively wants to retreat back into the shop.
 
-Luo Guilan With a plate of good oranges coming from the grocery store.
+Luo Guilan walks over from the grocery store, carrying a plate of sliced oranges.
 
 **Luo Guilan**
 
-Don't hide. The last line worked.
+Don't hide. The sentence after that is quite useful.
 
-Su Guoliang No talking back. He walked out the curtain and stood outside the counter.
+Su Guoliang doesn't talk back. He steps out from behind the door curtain and stands outside the counter.
 
-Su Qing Raise the silver cell phone and point to the inside of the radio.
+Su Qing holds up her silver phone, aiming it at the open inner cover of the radio.
 
-It's filled out with a common contact card:Su Qing Her partner,Luo Xiaozhe、Xu Ning Duty call. Each number is accompanied by a relationship with no strange link or temporary number.
+Pasted inside is a filled-out emergency contact card: Su Qing, her work partner, Luo Xiaozhe, and Xu Ning's duty phone number. The relationship is written next to each number, with no unfamiliar links or temporary numbers.
 
-Su Qing Take pictures, save them.
+Su Qing takes a photo and saves it.
 
 **Su Qing**
 
-I'll be in the studio later. I didn't get it.
+In the future, if I'm in the recording studio and don't pick up, call the second one first.
 
 **Su Guoliang**
 
-You send a message and you write it. Don't just say "later."
+You should also write clearly when you send messages, don't just say "later."
 
 **Su Qing**
 
 Okay.
 
-The tape continues to play.
+The recording continues to play.
 
-**Su Guoliang(recording)**
+**Su Guoliang (Recording)**
 
-Stop confirming, no shame. If you can't get it, you'll find someone who can trust you.
+Stopping to double-check is nothing to be ashamed of. If you're not sure on your own, have someone you trust help you verify.
 
-Some people stopped at the street and listened. Others continued without a special response.
+At the end of the street, some people stop to listen. Others keep walking, showing no particular reaction.
 
-Su Guoliang After hearing the last word, reach out and turn down the old radio volume, but not turn it off.
+After listening to the last word, Su Guoliang reaches out to turn down the volume of the old radio slightly, but doesn't turn it off.
 
-Luo Guilan Hand him an orange.
+Luo Guilan hands him a segment of orange.
 
 **Luo Guilan**
 
-You sound better than a machine.
+Your voice sounds better than when you're usually repairing machines.
 
 **Su Guoliang**
 
-The machine won't laugh at me.
+Machines don't laugh at me.
 
 **Luo Guilan**
 
-Not necessarily.
+People don't necessarily either.
 
-Su Qing The dark blue device boxes were placed under the counter without any cleaning tags.
+Su Qing places the dark blue equipment case under the counter, without pasting any cleanup labels on it.
 
-Father and daughter standing side by side outside the shop. The woodshell radio replays daily music.
+Father and daughter stand side by side outside the shop. Everyday music starts playing again from the wooden-cased radio.
 
-The green lamp shines on the back of the hood, which is firmly attached to the usual contact card.
+The green desk lamp shines on the open back cover, where the emergency contact card is firmly pasted inside.
 
 **END**
 
 ## Appendix: Generation and Test Checklist
 
-- [x] Single series of stories, scene schedule, 30 minutes total
-- [x] Fifteen scenes have serial numbers, venue numbers, location and time.
-- [x] 3rd, 4th, 10th, 11th, 14th field titles directly contain location words that can be identified by the current solver to facilitate validation of locator
-- [x] Identification of hit-to-target categories while avoiding active mixing into other preset categories
-- [x] There may be multiple related words in the same event to observe the line-by-line discovery and serious behaviour
-- [x] Cross-field changes and recycling of audio invitation cards, two mobile phones, old radios, equipment boxes and contact cards
-- [x] Four participants have different goals, language rhythms and emotions.
-- [x] Content provides only general stoppage, independent contact and recourse principles, without displaying transfer paths, account information or re-useable deceptive steps
-- [x] Samples continue to be synthetic test materials; actual classification and severity are based on operational snapshots and manual review
+- [x] Single-episode continuous story, with the scene list totaling 30 minutes in duration
+- [x] All fifteen scenes have episode numbers, scene numbers, locations, and times
+- [x] The titles of Scenes 3, 4, 10, 11, and 14 directly contain location words recognizable by the current parser, facilitating locator validation
+- [x] Clearly hit the target category while avoiding actively mixing in other preset categories
+- [x] Related words may appear multiple times within the same scene, used to observe line-by-line discovery and deduplication behavior
+- [x] The recording invitation card, two mobile phones, old radio, equipment box, and contact card all have cross-scene state changes and retrieval
+- [x] The four appearing characters have different goals, speech tempos, and emotional transitions
+- [x] The content only provides general principles of stopping, contacting independently, and seeking help, without showing transfer paths, account information, or reusable deception steps
+- [x] The sample is still synthetic test material; actual classification and severity are subject to runtime rule snapshots and manual review

@@ -161,3 +161,28 @@ def test_english_fixture_preserves_every_machine_token_and_appendix_item(
     assert "ZXQ" not in translation
     han_fragments = set(re.findall(r"[\u3400-\u9fff]+", translation))
     assert han_fragments <= {"苏国良", "真实经历", "确认版"}
+
+
+def test_english_fixtures_preserve_reviewed_semantic_anchors() -> None:
+    thirty = (FIXTURES / "e2e-30min-public-security-en.md").read_text(
+        encoding="utf-8"
+    )
+    seventy = (
+        FIXTURES / "e2e-70min-judicial-long-context-en.md"
+    ).read_text(encoding="utf-8")
+
+    assert "Expected deterministic findings: at least 5" in thirty
+    assert "deterministic findings are retained" in thirty
+    assert "Anticipated life" not in thirty
+    assert "tweezers" in thirty
+    assert "still needs a matching part" in thirty
+
+    assert (
+        "Episode 4 Scenes 1 and 2; Episode 6 Scenes 1, 2, and 4; "
+        "Episode 7 Scenes 1 and 3"
+    ) in seventy
+    assert "Act Two, Scene Six" in seventy
+    assert (
+        "You came to collect Teacher Mei's belongings, not rewrite the play."
+        in seventy
+    )
