@@ -1,0 +1,34 @@
+# What Cloud Build must not upload.
+#
+# Without this the source archive is 244 MB, almost all of it web/node_modules,
+# and every build pays to send it. `.gcloudignore` replaces gcloud's default of
+# reading `.gitignore`, so anything that must stay out has to be named here even
+# if git already ignores it.
+
+.git/
+.gitignore
+
+# Installed, never shipped. The web image runs `npm ci` from the lockfile.
+**/node_modules/
+web/.next/
+web/out/
+
+# Python build and test residue.
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+*.egg-info/
+.venv/
+venv/
+
+# Local state. `var/` holds the SQLite file a local run writes; it is not
+# configuration and must never reach an image.
+var/
+*.db
+
+# Local secrets. Cloud Run takes its configuration from the service definition
+# and Secret Manager, never from a file in the image.
+.env
+.env.*
+!.env.example

@@ -47,7 +47,7 @@ foreach ($port in 8080,3000) {
 **Sanity-check the API before touching the UI:**
 
 ```powershell
-Invoke-RestMethod http://localhost:8080/healthz | ConvertTo-Json
+Invoke-RestMethod http://localhost:8080/health | ConvertTo-Json
 ```
 
 On a machine with Vertex credentials in `.env` this reads:
@@ -561,7 +561,7 @@ Invoke-RestMethod "http://localhost:8080/v1/projects/$P/timeline" -Headers $H |
 | Video analysis | A vision model, and a change to the non-goals (Q-6) |
 
 Vertex now runs locally when `.env` carries credentials, so semantic checks are
-testable on this machine — the healthz line tells you which mode you are in.
+testable on this machine — the health line tells you which mode you are in.
 Without it, every semantic check reports *pending*, which is the product being
 honest rather than broken.
 
