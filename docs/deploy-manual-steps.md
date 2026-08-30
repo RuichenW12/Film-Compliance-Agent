@@ -1,8 +1,8 @@
 # Deployment — the parts that need you
 
 Everything in this file is something I cannot or should not do unattended:
-an irreversible choice, an interactive login, or a secret value only you should
-see. Everything *not* in this file, I am doing myself.
+an irreversible choice, an interactive login, or a console-only screen.
+Everything *not* in this file, I am doing myself.
 
 Written for Windows PowerShell. Updated 2026-08-30.
 
@@ -11,30 +11,54 @@ Related: [the design overview](https://claude.ai/code/artifact/746a003c-f4ea-4e1
 
 ---
 
+## Where you are
+
+> ### ▶ Continue at [§4 — the OAuth consent screen](#4-the-oauth-consent-screen--console-only).
+> It is the only thing waiting on you. Two console pages, no commands.
+
+| Step | | Verified |
+|---|---|---|
+| §1 gcloud on PATH | **done** | on your user PATH; `film` configuration active on `film-compliance-agent` |
+| §2 Firestore database | **done** | `(default)` · `us-east1` · `FIRESTORE_NATIVE` — the irreversible one, and it landed correctly |
+| §3 Credentials | **done** | ADC quota project set to `film-compliance-agent` |
+| **§4 OAuth consent screen** | **← you are here** | not yet configured |
+| §5 Budget alert | optional | do it whenever; nothing depends on it |
+| §6 Look at the deployed thing | later | I will ask, after the first deploy |
+
+After §4 there is nothing else for you until I have something deployed to look
+at. §5 is a five-minute console click you can do any time.
+
+---
+
 ## 0. Already done — do not redo
 
-Checked or performed on 2026-08-30. Listed so you don't repeat any of it.
+Performed or verified on 2026-08-30, by me unless the table above says it was
+you. Listed so nobody repeats it.
 
 | | |
 |---|---|
 | Project | `film-compliance-agent` · number `827776020662` · ACTIVE |
 | Billing | `01CE31-A7C20B-F215BA` — attached and open (your free-credit account) |
 | APIs enabled | `aiplatform` `firestore` `run` `pubsub` `cloudbuild` `artifactregistry` `secretmanager` `cloudscheduler` `iap` `storage` `logging` `monitoring` `cloudtrace` |
-| gcloud | 582.0.0, installed at `%LOCALAPPDATA%\Google\Cloud SDK` |
+| gcloud | 582.0.0 at `%LOCALAPPDATA%\Google\Cloud SDK`, on PATH, config `film` active |
 | Emulators | `cloud-firestore-emulator` and `pubsub-emulator` installed |
 | Java | present — the Firestore emulator needs it |
-| Signed in as | `maxma0223@gmail.com`, ADC refreshed 2026-08-27 |
-| Resources | **none yet** — no database, no buckets, no services |
+| Signed in as | `maxma0223@gmail.com` · ADC quota project `film-compliance-agent` |
+| **Firestore** | **`(default)` in `us-east1`, Native mode — created, permanent** |
+| Other resources | none yet — no buckets, no services, no topics |
 
 Docker is **not** installed and does not need to be. Cloud Build builds from
 source, and the emulators come from gcloud rather than from `docker-compose`.
 
+Sections 1 to 3 below are kept for reference — how it was set up, and what to
+run if something breaks later. You do not need to do them again.
+
 ---
 
-## 1. Make `gcloud` reachable — do this first
+## 1. Make `gcloud` reachable  ·  ✅ done
 
-`gcloud` is installed but **not on PATH**, which is why `gcloud` alone gives
-"not recognized". Everything below assumes you have fixed that.
+Done — `gcloud` is on your user PATH and the `film` configuration is active.
+Kept here for reference, and for a new machine.
 
 **For one terminal:**
 
@@ -56,9 +80,9 @@ if ($current -notlike "*$sdk*") {
 
 ### Keep this project separate from your other work
 
-Your active gcloud config currently points at `gen-lang-client-0338256795`
-(*incharacter*). Rather than switching it back and forth, make a named
-configuration for this project:
+So that this project does not disturb the config pointing at
+`gen-lang-client-0338256795` (*incharacter*), it lives in its own named
+configuration — already created and active:
 
 ```powershell
 gcloud config configurations create film --activate
@@ -84,13 +108,13 @@ gcloud config configurations list
 
 ---
 
-## 2. Create the Firestore database — the one irreversible step
+## 2. Create the Firestore database  ·  ✅ done
 
-**A Firestore database's location is fixed at creation and can never be
-changed.** Moving later means a new database and a data migration. This is the
-only command in this file that you cannot undo, which is why it is yours.
+**Done, and it is permanent:** `(default)` in `us-east1`, Firestore Native
+mode. A database's location is fixed at creation, so this was the one command
+in this file that could not be undone — it landed as intended.
 
-You chose `us-east1`. Before running it, one genuine either/or:
+The choice that was made, recorded for whoever reads this later:
 
 | | `us-east1` | `nam5` |
 |---|---|---|
@@ -99,8 +123,10 @@ You chose `us-east1`. Before running it, one genuine either/or:
 | Storage cost | baseline | roughly 2× |
 | Right for | a judged demo | a service with real users |
 
-**My recommendation: `us-east1`.** Take the multi-region only if this outlives
-the demo — and it is equally unrevisitable either way.
+`us-east1` was taken, on the grounds that the demo is judged in the United
+States and multi-region buys availability this does not need yet.
+
+The command that was run:
 
 ```powershell
 gcloud firestore databases create `
@@ -109,7 +135,7 @@ gcloud firestore databases create `
   --project=film-compliance-agent
 ```
 
-Confirm it landed:
+To re-confirm at any time:
 
 ```powershell
 gcloud firestore databases list --project=film-compliance-agent `
@@ -120,10 +146,10 @@ Expect one row, `(default)`, `us-east1`, `FIRESTORE_NATIVE`.
 
 ---
 
-## 3. Credentials — only you can do these
+## 3. Credentials  ·  ✅ done, and where to come back to
 
-I never handle passwords or run interactive logins. These are yours whenever
-they come up.
+Done — ADC is pointed at this project. I never handle passwords or run
+interactive logins, so if any of these are needed again, they are yours.
 
 **If application-default credentials expire** (symptom: local Vertex calls start
 failing, or `/healthz` reports `llm_available: false` on a machine where it
@@ -139,8 +165,8 @@ gcloud auth application-default login
 gcloud auth login
 ```
 
-**Point application-default credentials at this project** — worth doing once, so
-quota and billing land on the right project:
+**Point application-default credentials at this project** — already done; the
+quota project reads `film-compliance-agent`:
 
 ```powershell
 gcloud auth application-default set-quota-project film-compliance-agent
@@ -148,7 +174,7 @@ gcloud auth application-default set-quota-project film-compliance-agent
 
 ---
 
-## 4. The OAuth consent screen — console only
+## 4. The OAuth consent screen — console only  ·  ◀ DO THIS
 
 **Decided: Google sign-in via IAP, open to anyone with a Google account.** No
 shared access code, no allow-list to maintain, and — the reason it wins under
@@ -257,17 +283,12 @@ switcher still works exactly as it does locally, behind the Google sign-in.
 
 ## The short version
 
-If you only do two things:
+Everything with a command in it is done. **One thing is left, and it has no
+command** — §4, in the console:
 
-```powershell
-# 1. gcloud on PATH, permanently
-$sdk = "$env:LOCALAPPDATA\Google\Cloud SDK\google-cloud-sdk\bin"
-$current = [Environment]::GetEnvironmentVariable("Path", "User")
-if ($current -notlike "*$sdk*") { [Environment]::SetEnvironmentVariable("Path", "$sdk;$current", "User") }
+1. <https://console.cloud.google.com/auth/branding?project=film-compliance-agent>
+   → **External**, app name, your email, Save.
+2. **Audience** → **Publish app**. Not Testing — Testing caps at 100
+   hand-listed accounts and undoes the whole point of the choice.
 
-# 2. the database (reopen your terminal first)
-gcloud firestore databases create --location=us-east1 --type=firestore-native --project=film-compliance-agent
-```
-
-Then the one console task, §4: configure and **publish** the OAuth consent
-screen. Everything else in this file can wait until the phase that needs it.
+Then tell me, and I take it from there.
