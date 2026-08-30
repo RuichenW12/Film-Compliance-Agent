@@ -15,6 +15,7 @@ passes this file or it is not finished.
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
+from concurrent.futures import ThreadPoolExecutor
 
 import pytest
 
@@ -154,6 +155,21 @@ def test_updating_a_review_session_replaces_the_document(stores) -> None:
     assert stores.review_sessions.get(session.review_id) == updated
 
 
+def test_review_session_state_claim_is_atomic(stores) -> None:
+    session = _review_session().model_copy(
+        update={"state": ReviewState.AWAITING_CONFIRMATION}
+    )
+    stores.review_sessions.put(session)
+    claimed = session.model_copy(update={"state": ReviewState.ANALYZING})
+
+    assert stores.review_sessions.compare_and_put(
+        session.review_id, ReviewState.AWAITING_CONFIRMATION, claimed
+    )
+    assert not stores.review_sessions.compare_and_put(
+        session.review_id, ReviewState.AWAITING_CONFIRMATION, claimed
+    )
+
+
 def test_sqlite_review_session_survives_adapter_reconstruction(tmp_path) -> None:
     path = tmp_path / "review-session.db"
     first = SqliteStores.at(path)
@@ -165,6 +181,34 @@ def test_sqlite_review_session_survives_adapter_reconstruction(tmp_path) -> None
         assert reopened.review_sessions.get("review_1") == _review_session()
     finally:
         reopened.db.close()
+
+
+def test_sqlite_state_claim_is_atomic_across_two_connections(tmp_path) -> None:
+    path = tmp_path / "review-session-race.db"
+    first = SqliteStores.at(path)
+    second = SqliteStores.at(path)
+    session = _review_session().model_copy(
+        update={"state": ReviewState.AWAITING_CONFIRMATION}
+    )
+    first.review_sessions.put(session)
+    analyzing = session.model_copy(update={"state": ReviewState.ANALYZING})
+    extracting = session.model_copy(update={"state": ReviewState.EXTRACTING})
+    try:
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            results = list(
+                pool.map(
+                    lambda item: item[0].review_sessions.compare_and_put(
+                        session.review_id,
+                        ReviewState.AWAITING_CONFIRMATION,
+                        item[1],
+                    ),
+                    [(first, analyzing), (second, extracting)],
+                )
+            )
+        assert sorted(results) == [False, True]
+    finally:
+        first.db.close()
+        second.db.close()
 
 
 # ------------------------------------------------------------------ facts

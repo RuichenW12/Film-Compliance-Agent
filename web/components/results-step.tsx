@@ -1,13 +1,21 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import styles from "@/app/review-flow.module.css";
-import { reviewDownloadUrl, type ReviewView } from "@/lib/reviews-api";
+import { downloadReviewFile, reviewDownloadUrl, type ReviewView } from "@/lib/reviews-api";
+
+
+function displayValue(value: unknown): string {
+  if (typeof value !== "string") return "Route requires confirmation";
+  const normalized = value.replaceAll("_", " ");
+  return normalized.charAt(0).toUpperCase() + normalized.slice(1);
+}
 
 
 export function ResultsStep({ review }: { review: ReviewView }) {
   const headingRef = useRef<HTMLHeadingElement>(null);
+  const [downloadError, setDownloadError] = useState<string | null>(null);
   const result = review.classification;
 
   useEffect(() => {
@@ -41,6 +49,16 @@ export function ResultsStep({ review }: { review: ReviewView }) {
         </div>
       </section>
 
+      <section className={styles.warning} aria-label="Routing evidence">
+        <strong>{displayValue(result.route?.authority)}</strong>
+        <span>{` · Policy snapshot ${result.snapshot_version}`}</span>
+        <div className={styles.subjectRow}>
+          {result.evidence_refs.length
+            ? result.evidence_refs.map((reference) => <span key={`${reference.snapshot_version}-${reference.clause_id}`}>{reference.clause_id}</span>)
+            : <span>No clause reference; human confirmation required</span>}
+        </div>
+      </section>
+
       {review.semantic_status === "pending" ? (
         <div className={styles.warning} role="status">
           <strong>Semantic review is pending.</strong> Deterministic findings are shown below; this result must not be read as a pass.
@@ -62,7 +80,9 @@ export function ResultsStep({ review }: { review: ReviewView }) {
                   <span className={styles.humanStatus}>{finding.status}</span>
                 </div>
                 <blockquote>{finding.quote}</blockquote>
+                <p><strong>Category</strong> {displayValue(finding.category)}</p>
                 <p>{finding.explanation ?? "A qualified reviewer should confirm this depiction."}</p>
+                <p><strong>Evidence</strong> {finding.evidence_refs.length ? finding.evidence_refs.map((reference) => reference.clause_id).join(", ") : "No clause reference; human confirmation required"}</p>
                 {finding.suggestion ? <p className={styles.suggestion}><strong>Next step</strong>{finding.suggestion}</p> : null}
               </article>
             ))}
@@ -77,16 +97,25 @@ export function ResultsStep({ review }: { review: ReviewView }) {
           <div><p className={styles.eyebrow}>Ready to share</p><h2>Review package</h2></div>
           <span className={styles.readyPill}>Files prepared</span>
         </div>
+        {downloadError ? <div className={styles.error} role="alert">{downloadError}</div> : null}
         <div className={styles.downloadGrid}>
           {review.artifacts.map((artifact) => (
-            <a key={artifact.artifact_type} href={reviewDownloadUrl(artifact.download_url)} download={artifact.filename}>
+            <a key={artifact.artifact_type} href={reviewDownloadUrl(artifact.download_url)} download={artifact.filename} onClick={(event) => {
+              event.preventDefault();
+              setDownloadError(null);
+              void downloadReviewFile(artifact.download_url, artifact.filename).catch((caught) => setDownloadError(caught instanceof Error ? caught.message : String(caught)));
+            }}>
               <span className={styles.downloadIcon} aria-hidden="true">↓</span>
               <strong>{artifact.filename}</strong>
               <small>{artifact.artifact_type === "annotated-script" ? "Script copy with adjacent review notes" : "Generated review document"}</small>
             </a>
           ))}
           {review.source_download_url ? (
-            <a href={reviewDownloadUrl(review.source_download_url)} download={review.source_filename ?? "source-script"}>
+            <a href={reviewDownloadUrl(review.source_download_url)} download={review.source_filename ?? "source-script"} onClick={(event) => {
+              event.preventDefault();
+              setDownloadError(null);
+              void downloadReviewFile(review.source_download_url!, review.source_filename ?? "source-script").catch((caught) => setDownloadError(caught instanceof Error ? caught.message : String(caught)));
+            }}>
               <span className={styles.downloadIcon} aria-hidden="true">↧</span>
               <strong>Original source</strong>
               <small>Unmodified · checksum {review.source_sha256?.slice(0, 10)}…</small>

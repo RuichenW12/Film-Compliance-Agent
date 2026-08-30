@@ -9,6 +9,7 @@ from api.deps.services import AppContext
 from api.main import create_app
 from api.settings import Settings
 from core.llm import ScriptedLLM, UnavailableLLM
+from core.review_artifacts import ArtifactComposer
 from core.script_intake import SCRIPT_INTAKE_PROMPT_ID
 
 
@@ -139,6 +140,22 @@ def test_script_mode_requires_an_upload_and_creator_role(client) -> None:
     assert forbidden.status_code == 403
 
 
+def test_rejected_uploads_do_not_create_projects_and_large_reads_are_bounded(
+    client, stores
+) -> None:
+    invalid = upload_review(client, filename="script.pdf", content=b"not a script")
+    assert invalid.status_code == 422
+    assert stores.projects.list_all() == []
+
+    oversized = upload_review(
+        client,
+        content=b"x" * (5 * 1024 * 1024 + 1),
+    )
+    assert oversized.status_code == 413
+    assert oversized.json()["error"]["code"] == "SCRIPT_TOO_LARGE"
+    assert stores.projects.list_all() == []
+
+
 def test_get_confirm_validation_state_and_owner_errors(client) -> None:
     started = upload_review(client).json()
     review_id = started["review_id"]
@@ -235,6 +252,25 @@ def test_completed_review_downloads_all_artifacts_with_safe_headers(client) -> N
             assert "<!-- RISK-001" in response.text
 
 
+def test_artifact_renderer_failure_uses_stable_503_envelope(
+    client, monkeypatch
+) -> None:
+    review_id, _ = complete_review(client)
+
+    def fail(*_args, **_kwargs):
+        raise RuntimeError("renderer internals must not cross the API boundary")
+
+    monkeypatch.setattr(ArtifactComposer, "compose", fail)
+    response = client.get(f"/v1/reviews/{review_id}/artifacts/form")
+
+    assert response.status_code == 503
+    assert response.json()["error"] == {
+        "code": "ARTIFACT_GENERATION_FAILED",
+        "message": "could not generate the requested review artifact",
+        "details": {"artifact_type": "form"},
+    }
+
+
 def test_idea_review_exposes_only_form_artifact(client) -> None:
     started = client.post("/v1/reviews", data={"mode": "idea"}).json()
     review_id = started["review_id"]
@@ -246,3 +282,4 @@ def test_idea_review_exposes_only_form_artifact(client) -> None:
     ]
     summary = client.get(f"/v1/reviews/{review_id}/artifacts/summary")
     assert summary.status_code == 409
+    assert summary.json()["error"]["code"] == "ARTIFACT_UNAVAILABLE"

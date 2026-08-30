@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections import defaultdict
 from datetime import datetime, timezone
 from dataclasses import dataclass, field
+import threading
 from typing import Protocol
 
 from schemas.assets import AssetVersion, MaterialCard, UploadTicket
@@ -12,7 +13,7 @@ from schemas.common import AuditEntry, Fact, TimelineEvent
 from schemas.findings import Finding
 from schemas.forms import FormDraft
 from schemas.project import Project
-from schemas.reviews import ReviewSession
+from schemas.reviews import ReviewSession, ReviewState
 from schemas.workflow import (
     InstitutionReview,
     MockInstitution,
@@ -45,6 +46,7 @@ class InMemoryProjectStore:
 class InMemoryReviewSessionStore:
     def __init__(self) -> None:
         self._items: dict[str, ReviewSession] = {}
+        self._lock = threading.Lock()
 
     def put(self, session: ReviewSession) -> ReviewSession:
         self._items[session.review_id] = session
@@ -52,6 +54,16 @@ class InMemoryReviewSessionStore:
 
     def get(self, review_id: str) -> ReviewSession | None:
         return self._items.get(review_id)
+
+    def compare_and_put(
+        self, review_id: str, expected_state: ReviewState, session: ReviewSession
+    ) -> bool:
+        with self._lock:
+            current = self._items.get(review_id)
+            if current is None or current.state is not expected_state:
+                return False
+            self._items[review_id] = session
+            return True
 
 
 class InMemoryFactStore:

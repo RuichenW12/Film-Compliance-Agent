@@ -5,7 +5,7 @@ from __future__ import annotations
 import re
 from io import BytesIO
 from pathlib import Path
-from zipfile import BadZipFile
+from zipfile import BadZipFile, ZipFile
 
 from docx import Document
 from docx.opc.exceptions import PackageNotFoundError
@@ -24,6 +24,8 @@ from schemas.reviews import ScriptStructure
 
 
 MAX_SCRIPT_BYTES = 5 * 1024 * 1024
+MAX_DOCX_UNCOMPRESSED_BYTES = 25 * 1024 * 1024
+MAX_DOCX_COMPRESSION_RATIO = 100
 SUPPORTED_EXTENSIONS = frozenset({".md", ".txt", ".docx"})
 
 _TITLE = re.compile(
@@ -57,6 +59,27 @@ def _decode_text(content: bytes) -> str:
 
 
 def _docx_text(content: bytes) -> str:
+    try:
+        with ZipFile(BytesIO(content)) as archive:
+            members = archive.infolist()
+            expanded = sum(member.file_size for member in members)
+            suspicious_ratio = any(
+                member.file_size > 0
+                and (
+                    member.compress_size == 0
+                    or member.file_size / member.compress_size
+                    > MAX_DOCX_COMPRESSION_RATIO
+                )
+                for member in members
+            )
+            if expanded > MAX_DOCX_UNCOMPRESSED_BYTES or suspicious_ratio:
+                raise UnreadableScriptError(
+                    "DOCX expansion exceeds the safe parsing limit"
+                )
+    except BadZipFile as exc:
+        raise UnreadableScriptError(
+            "script is not a readable DOCX document"
+        ) from exc
     try:
         document = Document(BytesIO(content))
     except (

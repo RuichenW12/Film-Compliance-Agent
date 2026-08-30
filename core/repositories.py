@@ -13,7 +13,7 @@ from schemas.common import AuditEntry, Fact, TimelineEvent
 from schemas.findings import Finding
 from schemas.forms import FormDraft
 from schemas.project import Project
-from schemas.reviews import ReviewSession
+from schemas.reviews import ReviewSession, ReviewState
 from schemas.workflow import (
     InstitutionReview,
     MockInstitution,
@@ -36,6 +36,10 @@ class ReviewSessionStore(Protocol):
     def put(self, session: ReviewSession) -> ReviewSession: ...
 
     def get(self, review_id: str) -> ReviewSession | None: ...
+
+    def compare_and_put(
+        self, review_id: str, expected_state: ReviewState, session: ReviewSession
+    ) -> bool: ...
 
 
 class FactStore(Protocol):

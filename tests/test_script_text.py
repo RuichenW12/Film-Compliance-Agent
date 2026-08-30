@@ -127,6 +127,15 @@ def test_docx_with_malformed_document_xml_is_rejected() -> None:
         parse_script("broken.docx", minimal_docx("<w:p>"))
 
 
+def test_highly_compressed_docx_is_rejected_before_xml_expansion() -> None:
+    repeated = "x" * 500_000
+    content = minimal_docx(f"<w:p><w:r><w:t>{repeated}</w:t></w:r></w:p>")
+    assert len(content) < MAX_SCRIPT_BYTES
+
+    with pytest.raises(UnreadableScriptError, match="safe parsing limit"):
+        parse_script("compressed.docx", content)
+
+
 def test_numbers_in_story_text_do_not_become_structure_facts() -> None:
     parsed = parse_script("script.txt", "角色 32 岁，等了 2 分钟。".encode())
     assert parsed.structure.source_episode_count is None

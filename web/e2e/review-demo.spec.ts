@@ -1,4 +1,5 @@
 import path from "node:path";
+import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 
 import { expect, test, type Page } from "@playwright/test";
@@ -70,15 +71,23 @@ for (const width of [1440, 1024, 768, 390]) {
     await expect(beyond.getByRole("button")).toHaveCount(0);
 
     if (width === 1440) {
-      for (const filename of [
-        "project-review-form.pdf",
-        "risk-summary.pdf",
-        "annotated-script.md",
-      ]) {
+      const expectedContent: Record<string, string> = {
+        "project-review-form.pdf": "Routing authority",
+        "risk-summary.pdf": "Counts by category",
+        "annotated-script.md": "<!-- RISK-001",
+        "e2e-30min-public-security.md": "# 《先挂电话》",
+      };
+      for (const [filename, marker] of Object.entries(expectedContent)) {
         const downloadPromise = page.waitForEvent("download");
-        await packageRegion.getByRole("link", { name: new RegExp(filename) }).click();
+        const linkName = filename.startsWith("e2e-") ? /Original source/ : new RegExp(filename);
+        await packageRegion.getByRole("link", { name: linkName }).click();
         const download = await downloadPromise;
         expect(download.suggestedFilename()).toBe(filename);
+        const downloadedPath = await download.path();
+        expect(downloadedPath).not.toBeNull();
+        const content = await readFile(downloadedPath!);
+        if (filename.endsWith(".pdf")) expect(content.subarray(0, 5).toString()).toBe("%PDF-");
+        expect(content.toString("utf8")).toContain(marker);
       }
     }
   });

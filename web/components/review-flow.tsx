@@ -46,6 +46,28 @@ export function ReviewFlow({ initialReviewId }: { initialReviewId?: string }) {
     return () => { active = false; };
   }, [initialReviewId]);
 
+  useEffect(() => {
+    if (!review || !["UPLOADING", "EXTRACTING", "ANALYZING"].includes(review.state)) return;
+    let active = true;
+    let timer: number | undefined;
+    const poll = async () => {
+      try {
+        const value = await getReview(review.review_id);
+        if (!active) return;
+        remember(value);
+        if (["UPLOADING", "EXTRACTING", "ANALYZING"].includes(value.state)) {
+          timer = window.setTimeout(poll, 600);
+        }
+      } catch (caught) {
+        if (!active) return;
+        setError(messageFor(caught));
+        timer = window.setTimeout(poll, 1200);
+      }
+    };
+    timer = window.setTimeout(poll, 600);
+    return () => { active = false; if (timer !== undefined) window.clearTimeout(timer); };
+  }, [review?.review_id, review?.state]);
+
   function remember(value: ReviewView) {
     setReview(value);
     const url = new URL(window.location.href);
@@ -66,6 +88,28 @@ export function ReviewFlow({ initialReviewId }: { initialReviewId?: string }) {
     }
   }
 
+  async function confirm(details: ConfirmedReviewDetails) {
+    if (!review) return;
+    setBusy("analyze");
+    setError(null);
+    try {
+      remember(await confirmReview(review.review_id, details));
+    } catch (caught) {
+      setError(messageFor(caught));
+      try { remember(await getReview(review.review_id)); } catch {}
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  function startOver() {
+    setReview(null);
+    setError(null);
+    const url = new URL(window.location.href);
+    url.searchParams.delete("review");
+    window.history.replaceState(null, "", `${url.pathname}${url.search}`);
+  }
+
   const activeStep = review?.state === "COMPLETE" || busy === "analyze" ? 3 : review ? 2 : 1;
 
   return (
@@ -73,7 +117,7 @@ export function ReviewFlow({ initialReviewId }: { initialReviewId?: string }) {
       <ProgressSteps active={activeStep} />
       {error ? <div className={styles.error} role="alert"><strong>We couldn’t continue.</strong>{error}</div> : null}
       {busy === "restore" ? <div className={styles.processing} role="status">Restoring your review…</div> : null}
-      {busy === "analyze" ? (
+      {busy === "analyze" || (review && ["UPLOADING", "EXTRACTING", "ANALYZING"].includes(review.state)) ? (
         <section className={styles.processingPanel} aria-live="polite">
           <span className={styles.processingMark} aria-hidden="true">◎</span>
           <h1>Classifying project and reviewing scenes…</h1>
@@ -81,11 +125,18 @@ export function ReviewFlow({ initialReviewId }: { initialReviewId?: string }) {
         </section>
       ) : review?.state === "COMPLETE" ? (
         <ResultsStep review={review} />
+      ) : review?.state === "FAILED" ? (
+        <section className={styles.processingPanel} aria-labelledby="failed-heading">
+          <span className={styles.processingMark} aria-hidden="true">!</span>
+          <h1 id="failed-heading">Review could not be completed.</h1>
+          <p>{review.failure_message ?? "Start a new review and upload the source again."}</p>
+          <button className={styles.primaryAction} type="button" onClick={startOver}>Start a new review</button>
+        </section>
       ) : review?.state === "AWAITING_CONFIRMATION" ? (
         <ConfirmStep
           key={review.review_id}
           review={review}
-          onConfirm={(details: ConfirmedReviewDetails) => run(() => confirmReview(review.review_id, details), "analyze")}
+          onConfirm={confirm}
           onRetry={() => run(() => retryReviewIntake(review.review_id), "retry")}
         />
       ) : !review && busy !== "restore" ? (

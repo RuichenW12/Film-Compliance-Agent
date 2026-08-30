@@ -205,6 +205,8 @@ class ReviewFindingView(DomainModel):
     risk_id: str
     episode: int | None = None
     scene: int | None = None
+    line: int | None = None
+    match_lines: list[int] = Field(default_factory=list)
     quote: str
     category: str
     status: str
@@ -247,3 +249,4 @@ class ReviewView(DomainModel):
     classification: ReviewClassificationView | None = None
     findings: list[ReviewFindingView] = Field(default_factory=list)
     artifacts: list[ReviewArtifactLink] = Field(default_factory=list)
+    failure_message: str | None = None

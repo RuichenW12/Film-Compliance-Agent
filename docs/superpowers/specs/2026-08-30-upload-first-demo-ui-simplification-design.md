@@ -2,7 +2,7 @@
 
 **Date:** 2026-08-30
 
-**Status:** Confirmed; ready for implementation planning
+**Status:** Implemented and locally verified; Vertex live smoke and cloud deployment remain unverified
 
 **Scope owner:** Product workflow / Demo experience
 

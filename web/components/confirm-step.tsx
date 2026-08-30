@@ -57,7 +57,7 @@ export function ConfirmStep({ review, onConfirm, onRetry }: ConfirmStepProps) {
   }, []);
 
   const structure = candidates?.structure;
-  const unavailable = review.intake_status === "unavailable";
+  const extractionNeedsHelp = ["unavailable", "partial"].includes(review.intake_status);
 
   return (
     <section className={styles.confirmPanel} aria-labelledby="confirm-heading">
@@ -75,9 +75,9 @@ export function ConfirmStep({ review, onConfirm, onRetry }: ConfirmStepProps) {
         ) : null}
       </div>
 
-      {unavailable ? (
+      {extractionNeedsHelp ? (
         <div className={styles.warning} role="status">
-          <strong>Analysis unavailable.</strong> Enter the essential details manually.
+          <strong>{review.intake_status === "partial" ? "Some suggestions are missing." : "Analysis unavailable."}</strong> Enter or edit the essential details manually.
           <button type="button" onClick={() => void onRetry()}>Retry extraction</button>
         </div>
       ) : review.mode === "idea" ? (

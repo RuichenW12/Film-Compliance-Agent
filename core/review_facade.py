@@ -7,12 +7,18 @@ from pathlib import Path
 from core.clock import Clock
 from core.classify.subject_rules import load_subject_rules
 from core.comparison import budget_comparison
-from core.errors import ForbiddenError, NotFoundError, StateInvalidError
+from core.errors import (
+    ArtifactGenerationFailedError,
+    ArtifactUnavailableError,
+    ForbiddenError,
+    NotFoundError,
+    StateInvalidError,
+)
 from core.ids import new_id
 from core.llm import LLMClient
 from core.review_artifacts import ArtifactComposer, ArtifactFormField, ReviewPackage
 from core.script_intake import ScriptIntakeAnalyzer
-from core.script_text import parse_script
+from core.script_text import ParsedScript, parse_script
 from core.workflow_service import WorkflowService
 from schemas.enums import AssetKind, FieldStatus, FindingSeverity, Tier
 from schemas.policy_snapshot import PackName
@@ -88,6 +94,11 @@ class ReviewFacade:
         self._artifact_composer = artifact_composer or ArtifactComposer()
 
     def start(self, command: StartReviewCommand) -> ReviewView:
+        parsed = None
+        if isinstance(command.source, UploadedScript):
+            # Validate before creating durable project/session records so rejected
+            # uploads cannot leave orphaned UPLOADING reviews.
+            parsed = parse_script(command.source.filename, command.source.content)
         project = self._workflow.create_project(command.owner_uid)
         now = self._clock.now()
         mode = (
@@ -113,29 +124,47 @@ class ReviewFacade:
             updated_at=now,
         )
         self._stores.review_sessions.put(session)
-        self._record(project.project_id, "review.session_created", session)
+        try:
+            self._record(project.project_id, "review.session_created", session)
+            if mode is ReviewMode.IDEA:
+                return self._view(session)
+            assert isinstance(command.source, UploadedScript)
+            assert parsed is not None
+            return self._start_script(session, command.source, parsed)
+        except Exception as exc:
+            current = self._stores.review_sessions.get(session.review_id) or session
+            code = getattr(getattr(exc, "code", None), "value", None)
+            failed = self._updated(
+                current,
+                state=ReviewState.FAILED,
+                error_code=code or type(exc).__name__,
+                error_message=str(exc),
+            )
+            try:
+                self._stores.review_sessions.put(failed)
+            except Exception:
+                pass
+            raise
 
-        if mode is ReviewMode.IDEA:
-            return self._view(session)
-
-        assert isinstance(command.source, UploadedScript)
-        parsed = parse_script(command.source.filename, command.source.content)
+    def _start_script(
+        self, session: ReviewSession, source: UploadedScript, parsed: ParsedScript
+    ) -> ReviewView:
         filename = (
-            Path(command.source.filename.replace("\\", "/")).name or "script.md"
+            Path(source.filename.replace("\\", "/")).name or "script.md"
         )
         normalized_uri = (
-            f"blob://{project.project_id}/{session.review_id}/normalized-text"
+            f"blob://{session.project_id}/{session.review_id}/normalized-text"
         )
         self._stores.blobs.put(normalized_uri, parsed.text.encode("utf-8"))
         ticket = self._workflow.issue_upload_ticket(
-            project.project_id,
+            session.project_id,
             AssetKind.SCRIPT,
-            command.owner_uid,
+            session.owner_uid,
             filename,
         )
         asset = self._workflow.complete_upload(
             ticket.ticket_id,
-            command.source.content,
+            source.content,
             text_storage_uri=normalized_uri,
         )
         session = self._updated(
@@ -148,7 +177,7 @@ class ReviewFacade:
             intake_status=IntakeStatus.RUNNING,
         )
         self._stores.review_sessions.put(session)
-        self._record(project.project_id, "review.source_normalized", session)
+        self._record(session.project_id, "review.source_normalized", session)
 
         analysis = self._intake.analyze(parsed, self._threshold_options())
         session = self._updated(
@@ -160,7 +189,7 @@ class ReviewFacade:
         )
         self._stores.review_sessions.put(session)
         self._record(
-            project.project_id,
+            session.project_id,
             "review.candidates_prepared",
             session,
             {"backend": analysis.backend},
@@ -192,7 +221,16 @@ class ReviewFacade:
             state=ReviewState.ANALYZING,
             confirmed=details,
         )
-        self._stores.review_sessions.put(session)
+        if not self._stores.review_sessions.compare_and_put(
+            review_id, ReviewState.AWAITING_CONFIRMATION, session
+        ):
+            current = self._owned(review_id, actor_uid)
+            if current.state is ReviewState.COMPLETE and current.confirmed == details:
+                return self._view(current)
+            raise StateInvalidError(
+                "review confirmation is already being processed",
+                {"state": current.state.value},
+            )
         try:
             self._workflow.apply_review_confirmation(
                 session.project_id, session.mode, details
@@ -249,18 +287,41 @@ class ReviewFacade:
             state=ReviewState.EXTRACTING,
             intake_status=IntakeStatus.RUNNING,
         )
-        self._stores.review_sessions.put(extracting)
-        parsed = parse_script("normalized.md", content)
-        analysis = self._intake.analyze(parsed, self._threshold_options())
-        updated = self._updated(
-            extracting,
-            state=ReviewState.AWAITING_CONFIRMATION,
-            candidates=analysis.candidates,
-            intake_status=analysis.status,
-            intake_pending_flags=analysis.pending_flags,
-        )
-        self._stores.review_sessions.put(updated)
-        return self._view(updated)
+        if not self._stores.review_sessions.compare_and_put(
+            review_id, ReviewState.AWAITING_CONFIRMATION, extracting
+        ):
+            current = self._owned(review_id, actor_uid)
+            raise StateInvalidError(
+                "review intake is already being processed",
+                {"state": current.state.value},
+            )
+        try:
+            parsed = parse_script("normalized.md", content)
+            analysis = self._intake.analyze(parsed, self._threshold_options())
+            updated = self._updated(
+                extracting,
+                state=ReviewState.AWAITING_CONFIRMATION,
+                candidates=analysis.candidates,
+                intake_status=analysis.status,
+                intake_pending_flags=analysis.pending_flags,
+            )
+            if not self._stores.review_sessions.compare_and_put(
+                review_id, ReviewState.EXTRACTING, updated
+            ):
+                raise StateInvalidError("review state changed during intake retry")
+            return self._view(updated)
+        except Exception as exc:
+            code = getattr(getattr(exc, "code", None), "value", None)
+            failed = self._updated(
+                extracting,
+                state=ReviewState.FAILED,
+                error_code=code or type(exc).__name__,
+                error_message=str(exc),
+            )
+            self._stores.review_sessions.compare_and_put(
+                review_id, ReviewState.EXTRACTING, failed
+            )
+            raise
 
     def source(self, review_id: str, actor_uid: str) -> GeneratedArtifact:
         session = self._owned(review_id, actor_uid)
@@ -297,7 +358,10 @@ class ReviewFacade:
             session.mode is ReviewMode.IDEA
             and artifact_type is not ReviewArtifactType.FORM
         ):
-            raise StateInvalidError("idea reviews expose only the review form")
+            raise ArtifactUnavailableError(
+                "idea reviews expose only the review form",
+                {"artifact_type": artifact_type.value},
+            )
         if session.confirmed is None:
             raise StateInvalidError("completed review details are missing")
 
@@ -332,8 +396,15 @@ class ReviewFacade:
             ),
             source_text=source_text,
             source_filename=session.source_filename,
+            source_sha256=session.source_sha256,
         )
-        return self._artifact_composer.compose(package, artifact_type)
+        try:
+            return self._artifact_composer.compose(package, artifact_type)
+        except Exception as exc:
+            raise ArtifactGenerationFailedError(
+                "could not generate the requested review artifact",
+                {"artifact_type": artifact_type.value},
+            ) from exc
 
     def _owned(self, review_id: str, actor_uid: str) -> ReviewSession:
         session = self._stores.review_sessions.get(review_id)
@@ -367,6 +438,32 @@ class ReviewFacade:
         return f"CNY {upper:,} or above"
 
     def _view(self, session: ReviewSession) -> ReviewView:
+        if session.state is ReviewState.FAILED:
+            return ReviewView(
+                review_id=session.review_id,
+                state=session.state,
+                mode=session.mode,
+                candidates=session.candidates,
+                confirmed=session.confirmed,
+                intake_status=session.intake_status,
+                semantic_status=session.semantic_status,
+                source_filename=session.source_filename,
+                source_sha256=session.source_sha256,
+                source_download_url=(
+                    f"/v1/reviews/{session.review_id}/source"
+                    if session.mode is ReviewMode.SCRIPT
+                    and session.asset_version is not None
+                    else None
+                ),
+                amount_options=[],
+                classification=None,
+                findings=[],
+                artifacts=[],
+                failure_message=(
+                    "We couldn't complete this review. Start a new review and "
+                    "upload the source again."
+                ),
+            )
         project = self._workflow.get_project(session.project_id)
         findings = sorted(
             self._stores.findings.list(session.project_id),
@@ -382,6 +479,8 @@ class ReviewFacade:
                 risk_id=f"RISK-{index:03d}",
                 episode=finding.locator.episode,
                 scene=finding.locator.scene,
+                line=finding.locator.line,
+                match_lines=finding.locator.match_lines,
                 quote=finding.locator.quote,
                 category=finding.category,
                 status=_SEVERITY_NAMES[finding.severity],
@@ -466,6 +565,12 @@ class ReviewFacade:
             classification=classification,
             findings=finding_views,
             artifacts=artifacts,
+            failure_message=(
+                "We couldn't complete this review. Start a new review and upload "
+                "the source again."
+                if session.state is ReviewState.FAILED
+                else None
+            ),
         )
 
     def _updated(self, session: ReviewSession, **changes) -> ReviewSession:

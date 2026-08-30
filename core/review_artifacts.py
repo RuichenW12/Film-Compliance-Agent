@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from collections import Counter
 from io import BytesIO
 import textwrap
 
@@ -19,6 +20,11 @@ from schemas.reviews import (
     ReviewFindingView,
     ReviewMode,
     SemanticStatus,
+)
+
+
+DEMO_FIXTURE_SHA256 = (
+    "e172493cb8691a6ee4a7e6c8e10e737bfc2672e7a2f532deb81f84e5e1b44005"
 )
 
 
@@ -42,6 +48,7 @@ class ReviewPackage:
     form_fields: tuple[ArtifactFormField, ...]
     source_text: str | None = None
     source_filename: str | None = None
+    source_sha256: str | None = None
 
 
 class ArtifactComposer:
@@ -75,7 +82,8 @@ class ArtifactComposer:
     @staticmethod
     def _classification_lines(package: ReviewPackage) -> list[str]:
         result_view = package.classification
-        return [
+        route = result_view.route or {}
+        lines = [
             f"Classification boundary: {result_view.class_name}",
             (
                 "Co-review required: Yes"
@@ -94,6 +102,15 @@ class ArtifactComposer:
                 or "No clause reference available; human review boundary applies"
             ),
         ]
+        for label, key in (
+            ("Routing authority", "authority"),
+            ("Pre-shoot filing", "pre_shoot_filing"),
+            ("Result document", "result_document"),
+        ):
+            value = route.get(key)
+            if value is not None:
+                lines.append(f"{label}: {str(value).replace('_', ' ')}")
+        return lines
 
     def _form_lines(self, package: ReviewPackage) -> list[str]:
         details = package.confirmed
@@ -105,13 +122,18 @@ class ArtifactComposer:
             else "To be supplied by filing institution"
         )
         lines = [
-            f"Review ID: {package.review_id}",
+            (
+                "Boundary: Review preparation only; not a filing submission, "
+                "legal advice, official approval, or production clearance."
+            ),
             f"Title: {details.title}",
             f"Tags: {', '.join(details.tags)}",
             f"Synopsis: {details.synopsis}",
             f"Episode count: {details.episode_count}",
             f"Episode length (minutes): {details.episode_minutes:g}",
-            f"Investment category: {details.amount_bracket.value}",
+            "Investment category: " + self._amount_bracket_label(
+                details.amount_bracket.value
+            ),
             f"Applicant entity: {applicant_value}",
             "",
             *self._classification_lines(package),
@@ -130,13 +152,33 @@ class ArtifactComposer:
             if package.semantic_status is not None
             else "Not applicable"
         )
+        category_counts = Counter(item.category for item in package.findings)
+        status_counts = Counter(item.status for item in package.findings)
         lines = [
-            f"Review ID: {package.review_id}",
             *self._classification_lines(package),
             f"Semantic status: {semantic}",
+            "Counts by category: " + (
+                ", ".join(
+                    f"{self._human_label(key)}={value}"
+                    for key, value in sorted(category_counts.items())
+                )
+                or "none"
+            ),
+            "Counts by status: " + (
+                ", ".join(f"{key}={value}" for key, value in sorted(status_counts.items()))
+                or "none"
+            ),
             (
                 "Evidence boundary: Findings marked Needs human review are "
-                "signals for review, not legal conclusions."
+                "signals for review, not legal conclusions. This preparation "
+                "is not legal advice or official approval. Uploaded content is "
+                "user-supplied and not independently verified."
+            ),
+            (
+                "Fixture provenance: Synthetic and externally unreviewed demo "
+                "fixture; not an industry-approved or legal benchmark."
+                if package.source_sha256 == DEMO_FIXTURE_SHA256
+                else "Source provenance: User supplied; external review status unknown."
             ),
             "",
         ]
@@ -160,7 +202,7 @@ class ArtifactComposer:
                 [
                     f"{finding.risk_id} - {finding.status}",
                     f"Location: {location}",
-                    f"Category: {finding.category}",
+                    f"Category: {self._human_label(finding.category)}",
                     f"Quote: {finding.quote}",
                     f"Explanation: {finding.explanation or 'Not supplied'}",
                     f"Suggestion: {finding.suggestion or 'Review manually'}",
@@ -171,19 +213,44 @@ class ArtifactComposer:
         return lines
 
     @staticmethod
+    def _human_label(value: str) -> str:
+        normalized = value.replace("_", " ").strip()
+        return normalized[:1].upper() + normalized[1:]
+
+    @staticmethod
+    def _amount_bracket_label(value: str) -> str:
+        return {
+            "below_lower": "Below the lower policy threshold",
+            "between": "Between the lower and upper policy thresholds",
+            "at_or_above_upper": "At or above the upper policy threshold",
+        }.get(value, ArtifactComposer._human_label(value))
+
+    @staticmethod
     def _annotated_script(package: ReviewPackage) -> str:
         if package.source_text is None:
             raise ValueError("annotated scripts require normalized source text")
 
+        findings_by_line: dict[int, list[ReviewFindingView]] = {}
         findings_by_quote: dict[str, list[ReviewFindingView]] = {}
         for finding in package.findings:
+            if finding.line is not None:
+                findings_by_line.setdefault(finding.line, []).append(finding)
             findings_by_quote.setdefault(finding.quote.strip(), []).append(finding)
 
-        rendered: list[str] = []
+        rendered: list[str] = [
+            "<!-- Derived review copy from normalized script text; download "
+            "Original source for the exact uploaded bytes. -->\n"
+        ]
         inserted: set[str] = set()
-        for source_line in package.source_text.splitlines(keepends=True):
+        for line_number, source_line in enumerate(
+            package.source_text.splitlines(keepends=True), start=1
+        ):
             rendered.append(source_line)
-            matches = findings_by_quote.get(source_line.rstrip("\r\n").strip(), [])
+            matches = findings_by_line.get(line_number, [])
+            if not matches:
+                matches = findings_by_quote.get(
+                    source_line.rstrip("\r\n").strip(), []
+                )
             for finding in matches:
                 if finding.risk_id in inserted:
                     continue
@@ -219,6 +286,13 @@ class ArtifactComposer:
             parts.append(f"evidence={evidence}")
         if finding.suggestion:
             parts.append(f"suggestion={safe(finding.suggestion)}")
+        parts.append(
+            "explanation="
+            + safe(
+                finding.explanation
+                or "Human confirmation is required for this review signal"
+            )
+        )
         return f"<!-- {' | '.join(safe(part) for part in parts)} -->\n"
 
     @staticmethod

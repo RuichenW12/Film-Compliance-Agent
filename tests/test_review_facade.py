@@ -172,6 +172,62 @@ def test_confirm_uses_edited_values_then_runs_analysis(
     assert stores.forms.latest(project.project_id) is not None
 
 
+def test_failed_confirmation_exposes_safe_recovery_copy(
+    stores, review_snapshots, clock, monkeypatch
+) -> None:
+    service = facade(stores, review_snapshots, clock)
+    started = start_script(service)
+
+    def fail(*_args, **_kwargs):
+        raise RuntimeError("private renderer hostname and stack detail")
+
+    monkeypatch.setattr(service._workflow, "apply_review_confirmation", fail)
+    with pytest.raises(RuntimeError):
+        service.confirm(started.review_id, "u_demo", confirmed())
+
+    restored = service.get(started.review_id, "u_demo")
+    assert restored.state is ReviewState.FAILED
+    assert "private renderer" not in (restored.failure_message or "")
+    assert "Start a new review" in (restored.failure_message or "")
+
+
+def test_failed_view_does_not_reload_the_broken_snapshot(
+    stores, review_snapshots, clock, monkeypatch
+) -> None:
+    service = facade(stores, review_snapshots, clock)
+    started = start_script(service)
+
+    def fail(*_args, **_kwargs):
+        raise RuntimeError("snapshot pack unavailable")
+
+    monkeypatch.setattr(service._snapshots, "get_pack", fail)
+    with pytest.raises(RuntimeError, match="snapshot pack unavailable"):
+        service.confirm(started.review_id, "u_demo", confirmed())
+
+    restored = service.get(started.review_id, "u_demo")
+    assert restored.state is ReviewState.FAILED
+    assert restored.classification is None
+    assert restored.amount_options == []
+
+
+def test_upload_orchestration_failure_persists_failed_session(
+    stores, review_snapshots, clock, monkeypatch
+) -> None:
+    service = facade(stores, review_snapshots, clock)
+
+    def fail(*_args, **_kwargs):
+        raise RuntimeError("blob store unavailable")
+
+    monkeypatch.setattr(stores.blobs, "put", fail)
+    with pytest.raises(RuntimeError, match="blob store unavailable"):
+        start_script(service)
+
+    sessions = list(stores.review_sessions._items.values())
+    assert len(sessions) == 1
+    assert sessions[0].state is ReviewState.FAILED
+    assert service.get(sessions[0].review_id, "u_demo").failure_message
+
+
 def test_duplicate_confirmation_returns_existing_result_without_new_findings(
     stores, review_snapshots, clock
 ) -> None:

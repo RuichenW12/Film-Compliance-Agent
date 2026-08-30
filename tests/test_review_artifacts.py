@@ -1,8 +1,14 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 
-from core.errors import StateInvalidError
+from core.errors import (
+    ArtifactGenerationFailedError,
+    ArtifactUnavailableError,
+    StateInvalidError,
+)
 from core.llm import ScriptedLLM
 from core.review_facade import ReviewFacade
 from core.script_intake import SCRIPT_INTAKE_PROMPT_ID
@@ -78,7 +84,7 @@ def completed_script(service: ReviewFacade):
         StartReviewCommand(
             owner_uid="u_demo",
             source=UploadedScript(
-                filename="working-script.md",
+                filename="e2e-30min-public-security.md",
                 media_type="text/markdown",
                 content=SCRIPT.encode(),
             ),
@@ -103,8 +109,10 @@ def test_form_pdf_contains_confirmed_values_classification_and_placeholder(
     assert b"Project Review Form" in artifact.content
     assert b"English Working Title" in artifact.content
     assert b"Class 1" in artifact.content
-    assert b"at_or_above_upper" in artifact.content
     assert b"To be supplied by filing institution" in artifact.content
+    assert b"Routing authority" in artifact.content
+    assert b"Review preparation only" in artifact.content
+    assert b"at_or_above_upper" not in artifact.content
 
 
 def test_summary_pdf_contains_stable_risks_evidence_boundary_and_semantic_status(
@@ -125,6 +133,39 @@ def test_summary_pdf_contains_stable_risks_evidence_boundary_and_semantic_status
     assert b"Needs human review" in artifact.content
     assert b"Evidence boundary" in artifact.content
     assert b"Semantic status: Pending" in artifact.content
+    assert b"Counts by category" in artifact.content
+    assert b"Counts by status" in artifact.content
+    assert b"not legal advice" in artifact.content
+    assert b"external review status unknown" in artifact.content
+    assert b"public_security" not in artifact.content
+
+
+def test_demo_fixture_provenance_is_bound_to_checksum_not_filename(
+    stores, review_snapshots, clock
+) -> None:
+    service = facade(stores, review_snapshots, clock)
+    fixture = (
+        Path(__file__).parent
+        / "fixtures"
+        / "scripts"
+        / "e2e-30min-public-security.md"
+    )
+    started = service.start(
+        StartReviewCommand(
+            owner_uid="u_demo",
+            source=UploadedScript(
+                filename="renamed-demo.md",
+                media_type="text/markdown",
+                content=fixture.read_bytes(),
+            ),
+        )
+    )
+    completed = service.confirm(started.review_id, "u_demo", details())
+    summary = service.artifact(
+        completed.review_id, "u_demo", ReviewArtifactType.SUMMARY
+    )
+
+    assert b"Synthetic and externally unreviewed" in summary.content
 
 
 def test_annotated_script_preserves_every_source_line_and_adds_stable_notes(
@@ -144,6 +185,7 @@ def test_annotated_script_preserves_every_source_line_and_adds_stable_notes(
         assert line in rendered
     assert "<!-- RISK-001" in rendered
     assert "Needs human review" in rendered
+    assert "explanation=" in rendered
     assert rendered.index("A community police officer") < rendered.index(
         "<!-- RISK-001"
     )
@@ -160,7 +202,7 @@ def test_idea_review_generates_only_the_form(stores, review_snapshots, clock) ->
         review.review_id, "u_demo", ReviewArtifactType.FORM
     )
     assert form.content.startswith(b"%PDF-")
-    with pytest.raises(StateInvalidError):
+    with pytest.raises(ArtifactUnavailableError):
         service.artifact(
             review.review_id, "u_demo", ReviewArtifactType.SUMMARY
         )
@@ -186,7 +228,7 @@ def test_renderer_failure_does_not_corrupt_completed_session(
         raise RuntimeError("renderer unavailable")
 
     monkeypatch.setattr(service._artifact_composer, "compose", fail)
-    with pytest.raises(RuntimeError, match="renderer unavailable"):
+    with pytest.raises(ArtifactGenerationFailedError, match="could not generate"):
         service.artifact(
             review.review_id, "u_demo", ReviewArtifactType.FORM
         )

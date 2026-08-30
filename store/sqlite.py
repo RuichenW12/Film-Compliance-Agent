@@ -36,7 +36,7 @@ from schemas.common import AuditEntry, Fact, TimelineEvent
 from schemas.findings import Finding
 from schemas.forms import FormDraft
 from schemas.project import Project
-from schemas.reviews import ReviewSession
+from schemas.reviews import ReviewSession, ReviewState
 from schemas.workflow import (
     InstitutionReview,
     MockInstitution,
@@ -237,6 +237,34 @@ class SqliteReviewSessionStore:
 
     def get(self, review_id: str) -> ReviewSession | None:
         return self._c.get("", review_id)
+
+    def compare_and_put(
+        self, review_id: str, expected_state: ReviewState, session: ReviewSession
+    ) -> bool:
+        with self._c.db._lock:
+            connection = self._c.db._connection
+            connection.execute("BEGIN IMMEDIATE")
+            try:
+                row = connection.execute(
+                    "SELECT payload FROM documents WHERE collection = ? AND doc_key = ?",
+                    (self._c.name, review_id),
+                ).fetchone()
+                if row is None:
+                    connection.execute("ROLLBACK")
+                    return False
+                current = ReviewSession.model_validate_json(row["payload"])
+                if current.state is not expected_state:
+                    connection.execute("ROLLBACK")
+                    return False
+                connection.execute(
+                    "UPDATE documents SET payload = ? WHERE collection = ? AND doc_key = ?",
+                    (session.model_dump_json(), self._c.name, review_id),
+                )
+                connection.execute("COMMIT")
+                return True
+            except Exception:
+                connection.execute("ROLLBACK")
+                raise
 
 
 class SqliteFactStore:

@@ -8,10 +8,10 @@
 
 本设计已在 `codex/demo-ui-simplification-design` 实现。当前边界如下：
 
-- 已实现：安全上传与文本规范化、候选提取、显式可编辑确认闸门、确认后分类与场景风险分析、ReviewSession 的 Memory/SQLite 恢复、三个交付物和原始文件下载；
+- 已实现：有界上传与 DOCX 解压防护、文本规范化、候选提取、显式可编辑确认闸门、确认后的原子分析占位、分类与场景风险分析、ReviewSession 的 Memory/SQLite 恢复、三个交付物和带认证的原始文件下载；
 - 已实现：英文三屏 Creator UI、idea-only 手填分支、只保存 review ID 的 URL 恢复、精简 Creator 导航，以及非交互式 `Beyond this demo`；
-- 已验证：Python `761 passed, 3 skipped, 1 warning`；Web `35 passed`；TypeScript 和 Next.js production build 通过；
-- 已验证：合成 fixture 通过 ScriptedLLM adapter 和运行中的 FastAPI + Next.js，在 Chrome 的 1440、1024、768、390 CSS px 下完成 `5 passed` 的真实浏览器验收；
+- 已验证：Python `771 passed, 3 skipped, 1 warning`（`774 tests collected`）；Web `37 passed`；TypeScript 和 Next.js production build 通过；
+- 已验证：合成 fixture 通过 ScriptedLLM adapter 和运行中的 FastAPI + Next.js，在 Chrome 的 1440、1024、768、390 CSS px 下完成 `5 passed` 的真实浏览器验收；浏览器还校验了 4 个下载文件的文件名与内容标记；
 - 未验证：真实 Vertex/Gemini live smoke、云端部署、真实机构协作或政府备案；ScriptedLLM 结果不得表述为云端 LLM 已验证；
 - 保留但不进入 Demo：机构协作、备案、旧 collection/dashboard/admin/policy 页面均仍可通过直达路由访问。
 

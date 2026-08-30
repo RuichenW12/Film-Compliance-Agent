@@ -66,6 +66,8 @@ export interface ReviewFinding {
   risk_id: string;
   episode: number | null;
   scene: number | null;
+  line?: number | null;
+  match_lines?: number[];
   quote: string;
   category: string;
   status: string;
@@ -95,6 +97,7 @@ export interface ReviewView {
   classification: ReviewClassification | null;
   findings: ReviewFinding[];
   artifacts: ReviewArtifactLink[];
+  failure_message?: string | null;
 }
 
 
@@ -163,4 +166,30 @@ export function retryReviewIntake(reviewId: string): Promise<ReviewView> {
 
 export function reviewDownloadUrl(path: string): string {
   return `${API_BASE}${path}`;
+}
+
+export async function downloadReviewFile(
+  path: string,
+  filename: string
+): Promise<void> {
+  const response = await fetch(reviewDownloadUrl(path), {
+    headers: authHeaders(),
+    cache: "no-store",
+  });
+  if (!response.ok) {
+    let body: ApiErrorBody | null = null;
+    try { body = (await response.json()) as ApiErrorBody; } catch {}
+    throw new ApiError(
+      response.status,
+      body?.error.code ?? "UNKNOWN",
+      body?.error.message ?? response.statusText,
+      body?.error.details ?? {}
+    );
+  }
+  const objectUrl = URL.createObjectURL(await response.blob());
+  const link = document.createElement("a");
+  link.href = objectUrl;
+  link.download = filename;
+  link.click();
+  window.setTimeout(() => URL.revokeObjectURL(objectUrl), 0);
 }

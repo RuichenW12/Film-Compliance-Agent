@@ -9,8 +9,9 @@ from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, File, Form, Response, UploadFile, status
 
-from core.errors import ValidationFailedError
+from core.errors import ScriptTooLargeError, ValidationFailedError
 from core.review_facade import ReviewFacade
+from core.script_text import MAX_SCRIPT_BYTES
 from schemas.enums import Role
 from schemas.reviews import (
     ConfirmedReviewDetails,
@@ -80,10 +81,16 @@ async def create_review(
                 {"field": "script"},
             )
         filename = _safe_filename(script.filename or "script.md", "script.md")
+        content = await script.read(MAX_SCRIPT_BYTES + 1)
+        if len(content) > MAX_SCRIPT_BYTES:
+            raise ScriptTooLargeError(
+                "script exceeds the 5 MiB upload limit",
+                {"max_bytes": MAX_SCRIPT_BYTES},
+            )
         source = UploadedScript(
             filename=filename,
             media_type=script.content_type,
-            content=await script.read(),
+            content=content,
         )
     return facade.start(
         StartReviewCommand(owner_uid=principal.user_id, source=source)

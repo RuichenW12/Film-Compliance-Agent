@@ -267,6 +267,9 @@ describe("upload-first review flow", () => {
     expect(await screen.findByText("Class 1")).toBeInTheDocument();
     expect(screen.getByText("Co-review required")).toBeInTheDocument();
     expect(screen.getByText("Public security subject")).toBeInTheDocument();
+    expect(screen.getByText("Provincial radio television authority")).toBeInTheDocument();
+    expect(screen.getByText(/Policy snapshot v2/)).toBeInTheDocument();
+    expect(screen.getByText("nrta-order-16-article-5")).toBeInTheDocument();
     expect(screen.getByText(/semantic review is pending/i)).toBeInTheDocument();
     expect(screen.queryByText(/^Passed$/i)).not.toBeInTheDocument();
     expect(screen.getByText("RISK-001")).toBeInTheDocument();
@@ -300,5 +303,31 @@ describe("upload-first review flow", () => {
 
     const results = await screen.findByRole("heading", { name: "Review results" });
     await waitFor(() => expect(results).toHaveFocus());
+  });
+
+  it("polls a restored analyzing review until it completes", async () => {
+    vi.mocked(getReview)
+      .mockResolvedValueOnce({ ...CONFIRM_VIEW, state: "ANALYZING" })
+      .mockResolvedValueOnce({ ...CONFIRM_VIEW, state: "ANALYZING" })
+      .mockResolvedValueOnce(COMPLETE_VIEW);
+    render(<ReviewFlow initialReviewId="review_001" />);
+
+    expect(await screen.findByText("Class 1", {}, { timeout: 2500 })).toBeInTheDocument();
+    expect(getReview).toHaveBeenCalledTimes(3);
+  });
+
+  it("renders a safe recovery action for failed reviews", async () => {
+    vi.mocked(getReview).mockResolvedValue({
+      ...CONFIRM_VIEW,
+      state: "FAILED",
+      failure_message: "We couldn't complete this review. Start a new review and upload the source again.",
+    });
+    const user = userEvent.setup();
+    render(<ReviewFlow initialReviewId="review_001" />);
+
+    expect(await screen.findByRole("heading", { name: "Review could not be completed." })).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Start a new review" }));
+    expect(screen.getByRole("heading", { name: "Upload a script. Skip the questionnaire." })).toBeInTheDocument();
+    expect(window.location.search).toBe("");
   });
 });
