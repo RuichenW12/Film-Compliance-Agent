@@ -755,7 +755,8 @@ class WorkflowService:
                 {"project_id": project_id},
             )
 
-        data = self._stores.blobs.get(asset.storage_uri)
+        review_storage_uri = asset.text_storage_uri or asset.storage_uri
+        data = self._stores.blobs.get(review_storage_uri)
         if data is None:
             raise NotFoundError(
                 "the stored bytes are missing for the selected script",

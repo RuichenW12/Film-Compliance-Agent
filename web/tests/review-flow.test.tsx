@@ -303,6 +303,11 @@ describe("upload-first review flow", () => {
     for (const tab of screen.getAllByRole("tab")) {
       expect(tab).toBeDisabled();
     }
+    expect(screen.getByRole("form", { name: "Script upload" })).toHaveAttribute(
+      "aria-busy",
+      "true"
+    );
+    expect(screen.getByRole("status")).toHaveTextContent("Reading script…");
     finish?.(CONFIRM_VIEW);
     expect(await screen.findByLabelText("Project title")).toBeInTheDocument();
   });

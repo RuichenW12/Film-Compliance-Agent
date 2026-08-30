@@ -44,6 +44,8 @@ export function UploadStep({
 
       <form
         className={styles.uploadCard}
+        aria-label="Script upload"
+        aria-busy={busy}
         onSubmit={(event) => {
           event.preventDefault();
           if (file) void onUpload(file);
@@ -76,8 +78,12 @@ export function UploadStep({
           />
         </label>
         {file ? (
-          <p className={styles.selectedFile} aria-live="polite">
-            <span aria-hidden="true">✓</span> {file.name}
+          <p className={styles.selectedFile} role="status" aria-live="polite">
+            {busy ? (
+              <>Reading script… {file.name}</>
+            ) : (
+              <><span aria-hidden="true">✓</span> {file.name}</>
+            )}
           </p>
         ) : null}
         <button className={styles.primaryAction} type="submit" disabled={!file || busy}>

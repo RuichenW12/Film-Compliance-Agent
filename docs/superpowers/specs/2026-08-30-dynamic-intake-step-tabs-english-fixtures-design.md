@@ -247,8 +247,10 @@ The implemented manual demo selects the configured repository Vertex adapter
 when explicitly available, or the clearly named `local-content-aware-demo`
 fallback. The fallback is content-aware but fixture-bounded: it checks the
 normalized document SHA-256 plus prompt/version/schema, provides distinct
-intake and semantic responses for the four checked-in Chinese/English 30- and
-70-minute fixtures, and fails closed for an unknown document. It is not a
+intake responses for all four checked-in Chinese/English 30- and 70-minute
+fixtures, and fails closed for an unknown document. Its local semantic replies
+cover only the two English fixtures; the two Chinese fixtures rely on the
+governed deterministic Chinese rules for local subject findings. It is not a
 general local model and its results are not evidence of Vertex behavior.
 
 Completed-review edits now reuse the same review, project, uploaded asset, and
@@ -259,7 +261,7 @@ alone has no backend side effect, and there is no separate Back button.
 
 Fresh final verification produced:
 
-- Python: 900 tests collected, 897 passed, 3 skipped, with one existing
+- Python: 901 tests collected, 898 passed, 3 skipped, with one existing
   Starlette/httpx deprecation warning;
 - Web unit/component tests: 13 files and 49 tests passed;
 - TypeScript (`tsc --noEmit`) and the Next.js production build: exit 0;

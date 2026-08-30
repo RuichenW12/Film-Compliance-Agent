@@ -2,10 +2,12 @@ from __future__ import annotations
 
 from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
 from dataclasses import replace
+from io import BytesIO
 from pathlib import Path
 import threading
 
 import pytest
+from docx import Document
 
 from core.errors import ForbiddenError, StateInvalidError, UpstreamLLMError
 from core.jobs import idempotency_key
@@ -148,6 +150,21 @@ def start_semantic_script(service: ReviewFacade):
     )
 
 
+def docx_script_bytes() -> bytes:
+    document = Document()
+    for line in (
+        "# 《文档剧本》",
+        "- 目标时长：约 30 分钟",
+        "- 集数：1 集",
+        "### 第一集 场景一：派出所",
+        "公安人员帮助居民核实可疑来电。",
+    ):
+        document.add_paragraph(line)
+    output = BytesIO()
+    document.save(output)
+    return output.getvalue()
+
+
 def semantic_reply(reason: str | None = None) -> dict:
     return {
         "hits": [
@@ -236,6 +253,49 @@ def test_source_bytes_and_normalized_text_are_stored_separately(
     assert stores.blobs.get(asset.storage_uri) == SCRIPT.encode()
     assert asset.text_storage_uri != asset.storage_uri
     assert stores.blobs.get(asset.text_storage_uri).decode() == SCRIPT
+
+
+def test_docx_confirm_and_reanalysis_review_normalized_text(
+    stores, review_snapshots, clock
+) -> None:
+    llm = ScriptedLLM(
+        {
+            SCRIPT_INTAKE_PROMPT_ID: INTAKE_REPLY,
+            SCRIPT_REVIEW_PROMPT_ID: {"hits": []},
+        }
+    )
+    service = facade(stores, review_snapshots, clock, llm)
+    source_bytes = docx_script_bytes()
+    started = service.start(
+        StartReviewCommand(
+            owner_uid="u_demo",
+            source=UploadedScript(
+                filename="script.docx",
+                media_type=(
+                    "application/vnd.openxmlformats-officedocument."
+                    "wordprocessingml.document"
+                ),
+                content=source_bytes,
+            ),
+        )
+    )
+
+    first = service.confirm(started.review_id, "u_demo", confirmed())
+    rerun = service.reanalyze(
+        started.review_id,
+        "u_demo",
+        confirmed(title="文档剧本（复审版）"),
+    )
+
+    expected_line = "公安人员帮助居民核实可疑来电。"
+    assert {finding.category for finding in first.findings} == {"public_security"}
+    assert {finding.category for finding in rerun.findings} == {"public_security"}
+    review_calls = [
+        call for call in llm.calls if call.prompt_id == SCRIPT_REVIEW_PROMPT_ID
+    ]
+    assert len(review_calls) == 2
+    assert all(expected_line in call.document for call in review_calls)
+    assert service.source(started.review_id, "u_demo").content == source_bytes
 
 
 def test_source_download_returns_original_bytes_and_checks_owner(
