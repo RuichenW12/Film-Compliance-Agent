@@ -399,17 +399,24 @@ fixture through all three screens. Passing focused tests does not prove cloud de
 - changes to classification, policy, or Finding core semantics;
 - a complete localization project beyond English demo chrome.
 
-## 15. Legacy baseline note
+## 15. Baseline verification
 
-The isolated-worktree baseline run executed the current suite and reported 10 failures because
-the environment and `[project.optional-dependencies].test` omit `pytest-asyncio` while two policy
-test modules use `@pytest.mark.asyncio`. The remaining tests ran, with three skips.
+After installing `pytest-asyncio` in the shared local virtual environment, the isolated-worktree
+baseline was rerun with:
 
-This is unrelated to the upload-first UI design and must not block the design-only commit. Treat
-the existing full-suite invocation as legacy test-harness debt and a sunset candidate for this
-demo workflow. Do not delete the policy behavior tests on that basis: separately decide whether
-to add the missing dependency, replace the async test style, or move those suites to their owning
-policy verification job.
+```bash
+/Users/ruichenwang/Documents/ChatGPT/AllAgentic/.venv/bin/python -m pytest -q
+```
 
-The implementation plan must define a demo-specific verification command that does not silently
-claim these unrelated async tests passed.
+The suite collected 675 tests: 672 passed, 3 skipped, and 0 failed. The previous 10 async-test
+failures were therefore an environment dependency issue, not failing policy behavior and not a
+reason to sunset those tests or the full-suite baseline.
+
+The run emitted one non-blocking `StarletteDeprecationWarning`: the current FastAPI test client
+uses `httpx` and recommends migrating to `httpx2`. That migration is unrelated to this design and
+does not block implementation.
+
+Because `[project.optional-dependencies].test` still does not declare `pytest-asyncio`, the
+implementation plan must make the test environment reproducible before relying on this baseline
+in CI. It must also define focused demo verification while retaining the full suite as the
+regression baseline.
