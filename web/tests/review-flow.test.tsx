@@ -263,6 +263,7 @@ describe("upload-first review flow", () => {
     );
     expect(confirmReview).not.toHaveBeenCalled();
     expect(await screen.findByText("Class 1")).toBeInTheDocument();
+    expect(screen.getByText("Updated confirmed title")).toBeInTheDocument();
     expect(resultsTab).toHaveAttribute("aria-selected", "true");
     expect(screen.queryByRole("button", { name: /Back/i })).not.toBeInTheDocument();
   });
@@ -480,6 +481,23 @@ describe("upload-first review flow", () => {
     expect(await screen.findByLabelText("Project title")).toHaveValue("");
     expect(screen.getByText("Enter the essential details manually.")).toBeInTheDocument();
     expect(screen.queryByText(/source script structure/i)).not.toBeInTheDocument();
+  });
+
+  it("pluralizes a multi-episode source structure", async () => {
+    vi.mocked(getReview).mockResolvedValue({
+      ...CONFIRM_VIEW,
+      candidates: {
+        ...CONFIRM_VIEW.candidates!,
+        structure: {
+          source_episode_count: 7,
+          source_total_minutes: 70,
+          source_scene_count: 28,
+        },
+      },
+    });
+    render(<ReviewFlow initialReviewId="review_001" />);
+
+    expect(await screen.findByText("7 episodes · 70 min · 28 scenes")).toBeInTheDocument();
   });
 
   it("restores a completed review and states the semantic boundary", async () => {

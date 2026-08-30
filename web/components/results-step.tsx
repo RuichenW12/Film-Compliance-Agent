@@ -29,6 +29,9 @@ export function ResultsStep({ review, autoFocus = true }: { review: ReviewView; 
       <div className={styles.resultsHero}>
         <p className={styles.eyebrow}>Analysis complete</p>
         <h1 id="results-heading" ref={headingRef} tabIndex={-1}>Review results</h1>
+        {review.confirmed?.title ? (
+          <p><strong>{review.confirmed.title}</strong></p>
+        ) : null}
         <p>
           Routing support for pre-production review. This is not legal advice or approval.
         </p>

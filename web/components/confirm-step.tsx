@@ -102,7 +102,9 @@ export function ConfirmStep({ review, autoFocus = true, busy = false, onConfirm,
         <div className={styles.structureCard}>
           <span>Source script structure</span>
           <strong>
-            {structure.source_episode_count ?? "—"} episode · {structure.source_total_minutes ?? "—"} min · {structure.source_scene_count} scenes
+            {structure.source_episode_count ?? "—"}{" "}
+            {structure.source_episode_count === 1 ? "episode" : "episodes"} ·{" "}
+            {structure.source_total_minutes ?? "—"} min · {structure.source_scene_count} scenes
           </strong>
           <small>The adaptation suggestion below does not replace this source evidence.</small>
         </div>
