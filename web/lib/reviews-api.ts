@@ -157,6 +157,16 @@ export function confirmReview(
   );
 }
 
+export function reanalyzeReview(
+  reviewId: string,
+  details: ConfirmedReviewDetails
+): Promise<ReviewView> {
+  return reviewRequest<ReviewView>(
+    `/v1/reviews/${encodeURIComponent(reviewId)}/reanalyze`,
+    { method: "POST", body: JSON.stringify(details) }
+  );
+}
+
 export function retryReviewIntake(reviewId: string): Promise<ReviewView> {
   return reviewRequest<ReviewView>(
     `/v1/reviews/${encodeURIComponent(reviewId)}/retry-intake`,

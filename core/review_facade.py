@@ -231,9 +231,44 @@ class ReviewFacade:
                 "review confirmation is already being processed",
                 {"state": current.state.value},
             )
+        return self._analyze_claimed(session)
+
+    def reanalyze(
+        self,
+        review_id: str,
+        owner_uid: str,
+        details: ConfirmedReviewDetails,
+    ) -> ReviewView:
+        session = self._owned(review_id, owner_uid)
+        if session.state is not ReviewState.COMPLETE:
+            raise StateInvalidError(
+                "only a completed review can be reanalyzed",
+                {"state": session.state.value},
+            )
+        if session.confirmed == details:
+            return self._view(session)
+
+        analyzing = self._updated(
+            session,
+            state=ReviewState.ANALYZING,
+            confirmed=details,
+            semantic_status=None,
+        )
+        if not self._stores.review_sessions.compare_and_put(
+            review_id, ReviewState.COMPLETE, analyzing
+        ):
+            current = self._owned(review_id, owner_uid)
+            raise StateInvalidError(
+                "review reanalysis is already being processed",
+                {"state": current.state.value},
+            )
+        return self._analyze_claimed(analyzing)
+
+    def _analyze_claimed(self, session: ReviewSession) -> ReviewView:
         try:
+            assert session.confirmed is not None
             self._workflow.apply_review_confirmation(
-                session.project_id, session.mode, details
+                session.project_id, session.mode, session.confirmed
             )
             self._workflow.run_classification(session.project_id)
             semantic_status = None

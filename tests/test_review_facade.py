@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
 from pathlib import Path
+import threading
 
 import pytest
 
@@ -256,6 +258,218 @@ def test_different_confirmation_after_completion_is_a_state_conflict(
             "u_demo",
             confirmed(title="A different completed answer"),
         )
+
+
+def test_reanalyze_updates_completed_review_without_duplicate_identity_or_storage(
+    stores, review_snapshots, clock
+) -> None:
+    service = facade(stores, review_snapshots, clock)
+    started = start_script(service)
+    first = service.confirm(started.review_id, "u_demo", confirmed())
+    before = stores.review_sessions.get(started.review_id)
+    assert before is not None
+    counts = {
+        "projects": len(stores.projects.list_all()),
+        "assets": len(stores.assets.list(before.project_id)),
+        "sessions": len(stores.review_sessions._items),
+        "findings": len(stores.findings.list(before.project_id)),
+    }
+    edited = confirmed(
+        title="先挂电话（导演修订版）",
+        tags=["家庭", "反诈"],
+        synopsis="女儿和社区民警帮助父亲识破一通诈骗电话。",
+        episode_count=12,
+        episode_minutes=2,
+        amount_bracket=AmountBracket.BETWEEN,
+    )
+
+    result = service.reanalyze(started.review_id, "u_demo", edited)
+
+    after = stores.review_sessions.get(started.review_id)
+    assert after is not None
+    assert result.state is ReviewState.COMPLETE
+    assert result.review_id == first.review_id
+    assert result.confirmed == edited
+    assert result.source_filename == first.source_filename
+    assert result.source_sha256 == first.source_sha256
+    assert after.project_id == before.project_id
+    assert after.asset_version == before.asset_version
+    assert after.normalized_text_uri == before.normalized_text_uri
+    assert len(stores.projects.list_all()) == counts["projects"]
+    assert len(stores.assets.list(after.project_id)) == counts["assets"]
+    assert len(stores.review_sessions._items) == counts["sessions"]
+    assert len(stores.findings.list(after.project_id)) == counts["findings"]
+
+    project = stores.projects.get(after.project_id)
+    assert project is not None
+    assert project.title_working == edited.title
+    assert project.intent_profile.genre_keywords == edited.tags
+    assert project.intent_profile.synopsis == edited.synopsis
+    assert project.intent_profile.episode_count == edited.episode_count
+    assert project.intent_profile.episode_minutes == edited.episode_minutes
+    assert project.intent_profile.amount_bracket is edited.amount_bracket
+    assert project.classification is not None
+    assert result.classification is not None
+    assert stores.facts.get_by_key(after.project_id, "title").value == edited.title
+    form = stores.forms.latest(after.project_id)
+    assert form is not None
+    assert form.fields["title"].value == edited.title
+    assert form.fields["episode_count"].value == edited.episode_count
+    assert form.fields["episode_minutes"].value == edited.episode_minutes
+
+
+def test_reanalyze_identical_details_is_a_noop(
+    stores, review_snapshots, clock, monkeypatch
+) -> None:
+    service = facade(stores, review_snapshots, clock)
+    started = start_script(service)
+    first = service.confirm(started.review_id, "u_demo", confirmed())
+
+    def unexpected(*_args, **_kwargs):
+        raise AssertionError("identical details must not rerun analysis")
+
+    monkeypatch.setattr(service._workflow, "apply_review_confirmation", unexpected)
+
+    assert service.reanalyze(started.review_id, "u_demo", confirmed()) == first
+
+
+def test_reanalyze_rejects_non_complete_review_and_wrong_owner(
+    stores, review_snapshots, clock
+) -> None:
+    service = facade(stores, review_snapshots, clock)
+    awaiting = start_script(service, owner="u_owner")
+
+    with pytest.raises(StateInvalidError):
+        service.reanalyze(awaiting.review_id, "u_owner", confirmed())
+
+    service.confirm(awaiting.review_id, "u_owner", confirmed())
+    with pytest.raises(ForbiddenError):
+        service.reanalyze(
+            awaiting.review_id,
+            "u_other",
+            confirmed(title="Unauthorized edit"),
+        )
+
+
+def test_two_concurrent_reanalyses_only_one_claims_and_runs_analysis(
+    stores, review_snapshots, clock, monkeypatch
+) -> None:
+    service = facade(stores, review_snapshots, clock)
+    started = start_script(service)
+    service.confirm(started.review_id, "u_demo", confirmed())
+    edited = confirmed(title="Only one winner")
+    entered = threading.Event()
+    release = threading.Event()
+    calls = 0
+    calls_lock = threading.Lock()
+    original = service._workflow.apply_review_confirmation
+
+    def controlled(*args, **kwargs):
+        nonlocal calls
+        with calls_lock:
+            calls += 1
+        entered.set()
+        assert release.wait(timeout=5)
+        return original(*args, **kwargs)
+
+    monkeypatch.setattr(service._workflow, "apply_review_confirmation", controlled)
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        winner = pool.submit(
+            service.reanalyze, started.review_id, "u_demo", edited
+        )
+        assert entered.wait(timeout=5)
+        loser = pool.submit(
+            service.reanalyze, started.review_id, "u_demo", edited
+        )
+        with pytest.raises(StateInvalidError):
+            loser.result(timeout=5)
+        release.set()
+        assert winner.result(timeout=5).state is ReviewState.COMPLETE
+
+    assert calls == 1
+
+
+def test_sqlite_two_connections_allow_only_one_reanalysis_claim(
+    tmp_path, review_snapshots, clock, monkeypatch
+) -> None:
+    path = tmp_path / "review-reanalysis-race.db"
+    first_stores = SqliteStores.at(path)
+    second_stores = SqliteStores.at(path)
+    first = facade(first_stores, review_snapshots, clock)
+    second = facade(second_stores, review_snapshots, clock)
+    started = start_script(first)
+    first.confirm(started.review_id, "u_demo", confirmed())
+    edited = confirmed(title="SQLite winner")
+    barrier = threading.Barrier(2)
+    entered = threading.Event()
+    release = threading.Event()
+    calls = 0
+    calls_lock = threading.Lock()
+
+    def wrap(service):
+        original = service._workflow.apply_review_confirmation
+
+        def counted(*args, **kwargs):
+            nonlocal calls
+            with calls_lock:
+                calls += 1
+            entered.set()
+            assert release.wait(timeout=5)
+            return original(*args, **kwargs)
+
+        monkeypatch.setattr(service._workflow, "apply_review_confirmation", counted)
+
+    wrap(first)
+    wrap(second)
+
+    def run(service):
+        barrier.wait(timeout=5)
+        try:
+            return service.reanalyze(started.review_id, "u_demo", edited)
+        except StateInvalidError as exc:
+            return exc
+
+    try:
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            futures = [pool.submit(run, service) for service in (first, second)]
+            assert entered.wait(timeout=5)
+            done, _ = wait(futures, timeout=5, return_when=FIRST_COMPLETED)
+            assert len(done) == 1
+            release.set()
+            results = [future.result(timeout=5) for future in futures]
+        assert sum(isinstance(result, StateInvalidError) for result in results) == 1
+        assert sum(
+            getattr(result, "state", None) is ReviewState.COMPLETE
+            for result in results
+        ) == 1
+        assert calls == 1
+    finally:
+        first_stores.db.close()
+        second_stores.db.close()
+
+
+def test_failed_reanalysis_terminalizes_the_claimed_session(
+    stores, review_snapshots, clock, monkeypatch
+) -> None:
+    service = facade(stores, review_snapshots, clock)
+    started = start_script(service)
+    service.confirm(started.review_id, "u_demo", confirmed())
+
+    def fail(*_args, **_kwargs):
+        raise RuntimeError("private reanalysis worker detail")
+
+    monkeypatch.setattr(service._workflow, "run_classification", fail)
+    with pytest.raises(RuntimeError, match="private reanalysis worker detail"):
+        service.reanalyze(
+            started.review_id,
+            "u_demo",
+            confirmed(title="Failure-triggering edit"),
+        )
+
+    restored = service.get(started.review_id, "u_demo")
+    assert restored.state is ReviewState.FAILED
+    assert "private reanalysis" not in (restored.failure_message or "")
+    assert "Start a new review" in (restored.failure_message or "")
 
 
 def test_review_owner_isolated(stores, review_snapshots, clock) -> None:

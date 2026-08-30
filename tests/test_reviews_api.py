@@ -187,6 +187,82 @@ def test_get_confirm_validation_state_and_owner_errors(client) -> None:
     assert conflict.json()["error"]["code"] == "STATE_INVALID"
 
 
+def test_reanalyze_completed_review_updates_details_and_reuses_storage(
+    client, stores
+) -> None:
+    review_id, completed = complete_review(client)
+    session = stores.review_sessions.get(review_id)
+    assert session is not None
+    project_id = session.project_id
+    counts = (
+        len(stores.projects.list_all()),
+        len(stores.assets.list(project_id)),
+        len(stores.review_sessions._items),
+    )
+    edited = {
+        **CONFIRMED,
+        "title": "先挂电话（复核版）",
+        "synopsis": "一家人与社区民警共同识破诈骗电话。",
+        "episode_count": 12,
+        "episode_minutes": 2,
+        "amount_bracket": "between",
+    }
+
+    response = client.post(
+        f"/v1/reviews/{review_id}/reanalyze", json=edited
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["state"] == "COMPLETE"
+    assert body["review_id"] == completed["review_id"]
+    assert body["confirmed"] == edited
+    assert body["source_filename"] == completed["source_filename"]
+    assert body["source_sha256"] == completed["source_sha256"]
+    after = stores.review_sessions.get(review_id)
+    assert after is not None
+    assert after.project_id == project_id
+    assert after.asset_version == session.asset_version
+    assert (
+        len(stores.projects.list_all()),
+        len(stores.assets.list(project_id)),
+        len(stores.review_sessions._items),
+    ) == counts
+
+
+def test_reanalyze_route_maps_validation_state_owner_and_role_errors(client) -> None:
+    awaiting = upload_review(client).json()["review_id"]
+    premature = client.post(
+        f"/v1/reviews/{awaiting}/reanalyze", json=CONFIRMED
+    )
+    assert premature.status_code == 409
+    assert premature.json()["error"]["code"] == "STATE_INVALID"
+
+    review_id, _ = complete_review(client)
+    invalid = client.post(
+        f"/v1/reviews/{review_id}/reanalyze",
+        json={**CONFIRMED, "amount_bracket": "unknown"},
+    )
+    assert invalid.status_code == 422
+    assert invalid.json()["error"]["code"] == "VALIDATION_ERROR"
+
+    wrong_owner = client.post(
+        f"/v1/reviews/{review_id}/reanalyze",
+        json={**CONFIRMED, "title": "Other owner"},
+        headers={"X-User-Id": "u_other"},
+    )
+    assert wrong_owner.status_code == 403
+    assert wrong_owner.json()["error"]["code"] == "FORBIDDEN"
+
+    wrong_role = client.post(
+        f"/v1/reviews/{review_id}/reanalyze",
+        json={**CONFIRMED, "title": "Institution edit"},
+        headers={"X-Mock-Role": "institution"},
+    )
+    assert wrong_role.status_code == 403
+    assert wrong_role.json()["error"]["code"] == "FORBIDDEN"
+
+
 def test_retry_intake_route_preserves_confirmation_step(
     stores, review_snapshots, clock
 ) -> None:

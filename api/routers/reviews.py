@@ -118,6 +118,17 @@ def confirm_review(
     return facade.confirm(review_id, principal.user_id, body)
 
 
+@router.post("/{review_id}/reanalyze", response_model=ReviewView)
+def reanalyze_review(
+    review_id: str,
+    body: ConfirmedReviewDetails,
+    principal: Principal = Depends(get_principal),
+    facade: ReviewFacade = Depends(get_review_facade),
+) -> ReviewView:
+    principal.require(Role.CREATOR)
+    return facade.reanalyze(review_id, principal.user_id, body)
+
+
 @router.post("/{review_id}/retry-intake", response_model=ReviewView)
 def retry_intake(
     review_id: str,

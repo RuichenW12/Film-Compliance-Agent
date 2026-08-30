@@ -5,7 +5,9 @@ import {
   createIdeaReview,
   createScriptReview,
   getReview,
+  reanalyzeReview,
 } from "@/lib/reviews-api";
+import { ApiError } from "@/lib/api";
 
 
 const VIEW = {
@@ -99,5 +101,72 @@ describe("reviews API client", () => {
     expect((confirm[1]?.headers as Record<string, string>)["Content-Type"]).toBe(
       "application/json"
     );
+  });
+
+  it("posts edited confirmation details to an encoded reanalysis URL", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(json({ ...VIEW, state: "COMPLETE" }));
+    vi.stubGlobal("fetch", fetchMock);
+    const details = {
+      title: "Edited",
+      tags: ["family"],
+      synopsis: "An edited synopsis.",
+      episode_count: 12,
+      episode_minutes: 2,
+      amount_bracket: "between" as const,
+    };
+
+    await reanalyzeReview("review/with space", details);
+
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe(
+      "http://localhost:8080/v1/reviews/review%2Fwith%20space/reanalyze"
+    );
+    expect(init.method).toBe("POST");
+    expect(JSON.parse(String(init.body))).toEqual(details);
+    expect((init.headers as Record<string, string>)["Content-Type"]).toBe(
+      "application/json"
+    );
+  });
+
+  it("decodes the stable error envelope for reanalysis", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            error: {
+              code: "STATE_INVALID",
+              message: "review is not complete",
+              details: { state: "ANALYZING" },
+            },
+          }),
+          {
+            status: 409,
+            statusText: "Conflict",
+            headers: { "Content-Type": "application/json" },
+          }
+        )
+      )
+    );
+    const details = {
+      title: "Edited",
+      tags: ["family"],
+      synopsis: "An edited synopsis.",
+      episode_count: 12,
+      episode_minutes: 2,
+      amount_bracket: "between" as const,
+    };
+
+    const error = await reanalyzeReview("review_001", details).catch(
+      (caught: unknown) => caught
+    );
+
+    expect(error).toBeInstanceOf(ApiError);
+    expect(error).toMatchObject({
+      status: 409,
+      code: "STATE_INVALID",
+      message: "review is not complete",
+      details: { state: "ANALYZING" },
+    });
   });
 });
