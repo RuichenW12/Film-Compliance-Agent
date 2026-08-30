@@ -14,6 +14,10 @@
   color: var(--ink);
 }
 
+.flowShell label span {
+  min-width: 0;
+}
+
 .progress {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));

@@ -2,33 +2,33 @@ import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import Link from "next/link";
 
-import { RoleSwitcher } from "../components/RoleSwitcher";
-import { t } from "../lib/i18n";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Film Compliance Agent",
+  title: "Film Compliance · AI micro-drama review",
   description:
-    "Pre-shoot compliance workflow for micro-dramas: classification, evidence-linked review, filing preparation, and policy administration."
+    "Upload a micro-drama script, confirm extracted project details, and prepare a risk review package."
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en">
       <body>
-        <header className="topbar">
-          <strong>{t("app.title")}</strong>
-          <nav>
-            <Link href="/wizard">{t("nav.wizard")}</Link>
-            <Link href="/collection">{t("nav.collection")}</Link>
-            <Link href="/institution">{t("nav.institution")}</Link>
-            <Link href="/dashboard">{t("nav.dashboard")}</Link>
-            <Link href="/admin/policy">{t("nav.admin")}</Link>
-          </nav>
-          <RoleSwitcher />
+        <header className="demo-topbar">
+          <Link className="demo-brand" href="/" aria-label="Film Compliance home">
+            <span className="demo-brand-mark" aria-hidden="true">FC</span>
+            <span>
+              <strong>Film Compliance</strong>
+              <small>AI micro-drama review</small>
+            </span>
+          </Link>
+          <span className="demo-context">Pre-production demo</span>
         </header>
-        <main>{children}</main>
-        <footer className="disclaimer">{t("app.disclaimer")}</footer>
+        <main className="demo-main">{children}</main>
+        <footer className="demo-footer">
+          <span>Review preparation only</span>
+          <span>Not legal advice · Nothing is filed on your behalf</span>
+        </footer>
       </body>
     </html>
   );
