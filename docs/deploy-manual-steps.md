@@ -261,34 +261,65 @@ permanently in March 2026.
 
 ### Do this
 
-Open the service's Security tab:
+Two parts. The first is console, the second is a command you run rather than me,
+because it carries a client secret.
 
-<https://console.cloud.google.com/run/detail/us-east1/api/security?project=film-compliance-agent>
+**1 — create the OAuth client**
 
-Under **Identity-Aware Proxy**, follow the prompts. If it walks you through
-creating the OAuth client, you are done. If it asks for a client ID and secret
-you do not have, make one first:
+<https://console.cloud.google.com/auth/clients?project=film-compliance-agent>
 
-1. <https://console.cloud.google.com/apis/credentials?project=film-compliance-agent>
-   → **+ Create credentials** → **OAuth client ID** → **Web application**.
-2. Create it and copy the **client ID** and **client secret**.
-3. Reopen the client and add an **Authorized redirect URI**, substituting the
-   client ID you were just given:
+**Create client** → application type **Web application** → Create. Copy the
+**client ID** and **client secret** from the dialog.
 
-   ```
-   https://iap.googleapis.com/v1/oauth/clientIds/YOUR_CLIENT_ID:handleRedirect
-   ```
+Then reopen the client and add an **Authorized redirect URI**, substituting the
+client ID you were just given. The `:handleRedirect` suffix stays:
 
-4. Return to the Cloud Run Security tab and give IAP that client ID and secret.
+```
+https://iap.googleapis.com/v1/oauth/clientIds/YOUR_CLIENT_ID:handleRedirect
+```
 
-**Do not paste the client secret into chat or into any file in this
-repository.** The console is the only place it needs to exist.
+**2 — hand the client to IAP**
+
+There is no console page for this. It is the step that is easy to miss, because
+both the Cloud Run Security tab and the IAP page will happily show IAP as
+enabled and *Ready* while this is unset — and the service answers `502` with
+`x-goog-iap-generated-response: true`.
+
+Run this yourself. Outside the repository, so a file containing a secret cannot
+be committed:
+
+```powershell
+cd $env:TEMP
+@"
+access_settings:
+  oauth_settings:
+    client_id: PASTE_CLIENT_ID
+    client_secret: PASTE_CLIENT_SECRET
+"@ | Out-File -Encoding utf8 iap_settings.yaml
+
+gcloud iap settings set iap_settings.yaml --project=film-compliance-agent
+
+Remove-Item iap_settings.yaml
+```
+
+**Never paste the client secret into chat, or into any file under
+`D:epos\Film-Compliance-Agent`.**
 
 ### How you know it worked
 
 Open <https://api-827776020662.us-east1.run.app/privacy> in a browser. You
 should get a Google sign-in screen, and after signing in with any Google
-account, the privacy page. A 502 means IAP still has no usable OAuth client.
+account, the privacy page.
+
+A `502` means IAP still has no usable OAuth client. Console status is not
+evidence either way — it reported *Ready* throughout.
+
+### Source
+
+Google's own instructions for this case are at
+<https://docs.cloud.google.com/run/docs/securing/identity-aware-proxy-cloud-run>,
+under custom OAuth for projects without an organization. Worth reading before
+trusting anything above: none of it is discoverable from the console.
 
 ---
 
