@@ -542,6 +542,38 @@ class SqliteStores:
         self.notifications = SqliteNotificationStore(self.db)
         self.institutions = SqliteInstitutionRegistry(self.db)
 
+    def review_analysis_baseline(
+        self, project_id: str
+    ) -> tuple[Project, FormDraft | None]:
+        connection = self.db._connection
+        with self.db._lock:
+            connection.execute("BEGIN")
+            try:
+                project_row = connection.execute(
+                    "SELECT payload FROM documents "
+                    "WHERE collection = ? AND doc_key = ?",
+                    ("projects", project_id),
+                ).fetchone()
+                if project_row is None:
+                    raise KeyError(f"project not found: {project_id}")
+                form_row = connection.execute(
+                    "SELECT payload FROM documents "
+                    "WHERE collection = ? AND parent = ? "
+                    "ORDER BY ordinal DESC LIMIT 1",
+                    ("forms", project_id),
+                ).fetchone()
+                project = Project.model_validate_json(project_row["payload"])
+                form = (
+                    FormDraft.model_validate_json(form_row["payload"])
+                    if form_row is not None
+                    else None
+                )
+                connection.execute("COMMIT")
+                return project, form
+            except Exception:
+                connection.execute("ROLLBACK")
+                raise
+
     def publish_review_analysis(
         self, publication: ReviewAnalysisPublication
     ) -> bool:
@@ -559,9 +591,32 @@ class SqliteStores:
                     connection.execute("ROLLBACK")
                     return False
                 current = ReviewSession.model_validate_json(row["payload"])
+                project_row = connection.execute(
+                    "SELECT payload FROM documents "
+                    "WHERE collection = ? AND doc_key = ?",
+                    ("projects", project_id),
+                ).fetchone()
+                form_row = connection.execute(
+                    "SELECT payload FROM documents "
+                    "WHERE collection = ? AND parent = ? "
+                    "ORDER BY ordinal DESC LIMIT 1",
+                    ("forms", project_id),
+                ).fetchone()
+                live_project = (
+                    Project.model_validate_json(project_row["payload"])
+                    if project_row is not None
+                    else None
+                )
+                live_form = (
+                    FormDraft.model_validate_json(form_row["payload"])
+                    if form_row is not None
+                    else None
+                )
                 if (
                     current.state is not ReviewState.ANALYZING
                     or current.generation != publication.session.generation
+                    or live_project != publication.expected_project
+                    or live_form != publication.expected_form
                 ):
                     connection.execute("ROLLBACK")
                     return False

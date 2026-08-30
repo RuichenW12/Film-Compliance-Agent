@@ -111,6 +111,26 @@ class RecalcResult:
 
 
 class WorkflowService:
+    # A COMPLETE review package may be corrected even when its classification
+    # ended on an exit or human-review branch. Downstream filing states are
+    # deliberately absent: those packages have already crossed a lock boundary.
+    REANALYZABLE_REVIEW_STATES = frozenset(
+        {
+            ProjectState.CLASSIFIED,
+            ProjectState.ROADMAP_CONFIRMED,
+            ProjectState.COLLECTING_MATERIALS,
+            ProjectState.REVIEW_RUNNING,
+            ProjectState.REVISION_LOOP,
+            ProjectState.GATE_D3_PASSED,
+            ProjectState.NEEDS_HUMAN_SUBJECT,
+            ProjectState.NEEDS_HUMAN_FORMTYPE,
+            ProjectState.EXIT_NON_DRAMA,
+            ProjectState.EXIT_T2,
+            ProjectState.EXIT_T3,
+            ProjectState.EXIT_SISTER_PATH,
+        }
+    )
+
     def __init__(
         self,
         stores,
@@ -252,6 +272,27 @@ class WorkflowService:
             {"mode": mode.value, "answer_id": answer_id},
         )
         return project
+
+    def prepare_review_reanalysis(self, project_id: str) -> Project:
+        """Reset an isolated COMPLETE package to the normal intake baseline."""
+
+        project = self.get_project(project_id)
+        if project.state not in self.REANALYZABLE_REVIEW_STATES:
+            raise StateInvalidError(
+                "this project can no longer be reanalyzed in place",
+                {"state": project.state.value},
+            )
+        prepared = project.model_copy(
+            update={
+                "state": ProjectState.DRAFT,
+                "classification": None,
+                "roadmap": None,
+                "policy_stale": False,
+                "registration_number": None,
+                "updated_at": self._clock.now(),
+            }
+        )
+        return self._stores.projects.save(prepared)
 
     def record_review_event(
         self, project_id: str, event: str, detail: dict

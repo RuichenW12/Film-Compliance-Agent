@@ -160,6 +160,24 @@ def projection_snapshot(stores, project_id: str) -> dict:
     }
 
 
+class DelayedPublication:
+    """Pause a bundle publish after it has started reading staged data."""
+
+    def __init__(self, publication, entered: threading.Event, release: threading.Event):
+        self._publication = publication
+        self._entered = entered
+        self._release = release
+
+    @property
+    def facts(self):
+        self._entered.set()
+        assert self._release.wait(timeout=5)
+        return self._publication.facts
+
+    def __getattr__(self, name):
+        return getattr(self._publication, name)
+
+
 def confirmed(**updates) -> ConfirmedReviewDetails:
     values = {
         "title": "先挂电话（确认版）",
@@ -907,6 +925,7 @@ def test_reanalysis_replaces_then_hides_classification_alert_findings(
     [
         ProjectState.FORM_FROZEN,
         ProjectState.INSTITUTION_REVIEW,
+        ProjectState.INSTITUTION_RETURNED,
         ProjectState.READY_FOR_EXTERNAL_FILING,
         ProjectState.FILED,
         ProjectState.PRODUCTION,
@@ -1019,6 +1038,265 @@ def test_terminal_publication_failure_preserves_previous_complete_projection(
         and event.at > before["timeline"][-1].at
         for event in stores.timeline.list(session.project_id)
     )
+
+
+def test_memory_bundle_publish_serializes_unrelated_project_writes(
+    stores, review_snapshots, clock, monkeypatch
+) -> None:
+    service = facade(stores, review_snapshots, clock)
+    first = start_script(service)
+    service.confirm(first.review_id, "u_demo", confirmed())
+    second = start_script(service, owner="u_second")
+    service.confirm(second.review_id, "u_second", confirmed(title="Project B"))
+    second_session = stores.review_sessions.get(second.review_id)
+    second_project = stores.projects.get(second_session.project_id)
+
+    entered = threading.Event()
+    release = threading.Event()
+    write_entered = threading.Event()
+    original_publish = stores.publish_review_analysis
+
+    def delayed_publish(publication):
+        return original_publish(DelayedPublication(publication, entered, release))
+
+    def write_project():
+        write_entered.set()
+        return stores.projects.save(
+            second_project.model_copy(
+                update={"title_working": "Project B concurrent"}
+            )
+        )
+
+    monkeypatch.setattr(stores, "publish_review_analysis", delayed_publish)
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        publishing = pool.submit(
+            service.reanalyze,
+            first.review_id,
+            "u_demo",
+            confirmed(title="Project A reanalyzed"),
+        )
+        assert entered.wait(timeout=5)
+        writing = pool.submit(write_project)
+        assert write_entered.wait(timeout=5)
+        write_was_blocked = not writing.done()
+        release.set()
+        publishing.result(timeout=5)
+        writing.result(timeout=5)
+
+    assert write_was_blocked
+    assert stores.projects.get(second_session.project_id).title_working == (
+        "Project B concurrent"
+    )
+
+
+def test_memory_bundle_publish_blocks_aggregate_readers_until_complete(
+    stores, review_snapshots, clock, monkeypatch
+) -> None:
+    service = facade(stores, review_snapshots, clock)
+    started = start_script(service)
+    service.confirm(started.review_id, "u_demo", confirmed())
+    session = stores.review_sessions.get(started.review_id)
+    entered = threading.Event()
+    release = threading.Event()
+    read_entered = threading.Event()
+    original_publish = stores.publish_review_analysis
+
+    def delayed_publish(publication):
+        return original_publish(DelayedPublication(publication, entered, release))
+
+    def read_project():
+        read_entered.set()
+        return stores.projects.get(session.project_id)
+
+    monkeypatch.setattr(stores, "publish_review_analysis", delayed_publish)
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        publishing = pool.submit(
+            service.reanalyze,
+            started.review_id,
+            "u_demo",
+            confirmed(title="Reader atomicity"),
+        )
+        assert entered.wait(timeout=5)
+        reading = pool.submit(read_project)
+        assert read_entered.wait(timeout=5)
+        read_was_blocked = not reading.done()
+        release.set()
+        publishing.result(timeout=5)
+        assert reading.result(timeout=5).title_working == "Reader atomicity"
+
+    assert read_was_blocked
+
+
+@pytest.mark.parametrize(
+    "mutation", ["freeze", "submission", "form_update", "project_update"]
+)
+@pytest.mark.parametrize("backend", ["memory", "sqlite"])
+def test_reanalysis_publish_rejects_concurrent_lifecycle_change(
+    tmp_path, review_snapshots, clock, monkeypatch, backend, mutation
+) -> None:
+    if backend == "memory":
+        stores = InMemoryStores()
+        concurrent = stores
+    else:
+        path = tmp_path / f"review-lifecycle-{mutation}.sqlite3"
+        stores = SqliteStores.at(path)
+        concurrent = SqliteStores.at(path)
+    service = facade(stores, review_snapshots, clock)
+    started = start_script(service)
+    service.confirm(started.review_id, "u_demo", confirmed())
+    session = stores.review_sessions.get(started.review_id)
+    before_ready = len(
+        [
+            event
+            for event in stores.timeline.list(session.project_id)
+            if event.event == "review.package_ready"
+        ]
+    )
+    entered = threading.Event()
+    release = threading.Event()
+    original_publish = stores.publish_review_analysis
+
+    def pause_before_publish(publication):
+        entered.set()
+        assert release.wait(timeout=5)
+        return original_publish(publication)
+
+    monkeypatch.setattr(stores, "publish_review_analysis", pause_before_publish)
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        future = pool.submit(
+            service.reanalyze,
+            started.review_id,
+            "u_demo",
+            confirmed(title=f"Concurrent {mutation}"),
+        )
+        assert entered.wait(timeout=5)
+        live_project = concurrent.projects.get(session.project_id)
+        if mutation == "freeze":
+            concurrent.projects.save(
+                live_project.model_copy(update={"state": ProjectState.FORM_FROZEN})
+            )
+            live_form = concurrent.forms.latest(session.project_id)
+            concurrent.forms.put(
+                session.project_id,
+                live_form.model_copy(update={"frozen": True, "hash": "frozen-race"}),
+            )
+        elif mutation == "submission":
+            concurrent.projects.save(
+                live_project.model_copy(
+                    update={
+                        "state": ProjectState.INSTITUTION_REVIEW,
+                        "title_working": "Downstream submitted title",
+                    }
+                )
+            )
+        elif mutation == "form_update":
+            live_form = concurrent.forms.latest(session.project_id)
+            concurrent.forms.put(
+                session.project_id,
+                live_form.model_copy(update={"hash": "concurrent-form-update"}),
+            )
+        else:
+            concurrent.projects.save(
+                live_project.model_copy(
+                    update={"title_working": "Concurrent title update"}
+                )
+            )
+        release.set()
+        with pytest.raises(StateInvalidError):
+            future.result(timeout=5)
+
+    stored_project = stores.projects.get(session.project_id)
+    expected_state = {
+        "freeze": ProjectState.FORM_FROZEN,
+        "submission": ProjectState.INSTITUTION_REVIEW,
+        "form_update": ProjectState.CLASSIFIED,
+        "project_update": ProjectState.CLASSIFIED,
+    }[mutation]
+    assert stored_project.state is expected_state
+    if mutation == "freeze":
+        assert stores.forms.latest(session.project_id).frozen is True
+        assert stores.forms.latest(session.project_id).hash == "frozen-race"
+    elif mutation == "submission":
+        assert stored_project.title_working == "Downstream submitted title"
+    elif mutation == "form_update":
+        assert stores.forms.latest(session.project_id).hash == "concurrent-form-update"
+    else:
+        assert stored_project.title_working == "Concurrent title update"
+    assert stores.review_sessions.get(started.review_id).state is ReviewState.FAILED
+    assert len(
+        [
+            event
+            for event in stores.timeline.list(session.project_id)
+            if event.event == "review.package_ready"
+        ]
+    ) == before_ready
+    if backend == "sqlite":
+        concurrent.db.close()
+        stores.db.close()
+
+
+@pytest.mark.parametrize(
+    "project_state",
+    [
+        ProjectState.CLASSIFIED,
+        ProjectState.ROADMAP_CONFIRMED,
+        ProjectState.COLLECTING_MATERIALS,
+        ProjectState.REVIEW_RUNNING,
+        ProjectState.REVISION_LOOP,
+        ProjectState.GATE_D3_PASSED,
+        ProjectState.NEEDS_HUMAN_SUBJECT,
+        ProjectState.NEEDS_HUMAN_FORMTYPE,
+        ProjectState.EXIT_NON_DRAMA,
+        ProjectState.EXIT_T2,
+        ProjectState.EXIT_T3,
+        ProjectState.EXIT_SISTER_PATH,
+    ],
+)
+def test_complete_review_outcome_states_can_reanalyze_from_fresh_intake_baseline(
+    stores, review_snapshots, clock, project_state
+) -> None:
+    service = facade(stores, review_snapshots, clock)
+    started = start_script(service)
+    service.confirm(started.review_id, "u_demo", confirmed())
+    session = stores.review_sessions.get(started.review_id)
+    project = stores.projects.get(session.project_id)
+    stores.projects.save(project.model_copy(update={"state": project_state}))
+
+    result = service.reanalyze(
+        started.review_id,
+        "u_demo",
+        confirmed(title=f"Corrected from {project_state.value}"),
+    )
+
+    assert result.state is ReviewState.COMPLETE
+    stored = stores.projects.get(session.project_id)
+    assert stored.state is ProjectState.CLASSIFIED
+    assert stored.title_working == f"Corrected from {project_state.value}"
+
+
+def test_exit_duration_can_be_corrected_by_reanalysis(
+    stores, review_snapshots, clock
+) -> None:
+    service = facade(stores, review_snapshots, clock)
+    started = start_script(service)
+    service.confirm(
+        started.review_id,
+        "u_demo",
+        confirmed(episode_minutes=25),
+    )
+    session = stores.review_sessions.get(started.review_id)
+    assert stores.projects.get(session.project_id).state is ProjectState.EXIT_SISTER_PATH
+
+    corrected = service.reanalyze(
+        started.review_id,
+        "u_demo",
+        confirmed(title="Corrected duration", episode_minutes=3),
+    )
+
+    assert corrected.state is ReviewState.COMPLETE
+    stored = stores.projects.get(session.project_id)
+    assert stored.state is ProjectState.CLASSIFIED
+    assert stored.intent_profile.episode_minutes == 3
 
 
 def test_review_owner_isolated(stores, review_snapshots, clock) -> None:

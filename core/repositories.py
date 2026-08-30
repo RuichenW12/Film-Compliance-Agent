@@ -28,6 +28,8 @@ class ReviewAnalysisPublication:
     """One complete project-scoped review generation ready for atomic publish."""
 
     session: ReviewSession
+    expected_project: Project
+    expected_form: FormDraft | None
     project: Project
     facts: tuple[Fact, ...]
     findings: tuple[Finding, ...]

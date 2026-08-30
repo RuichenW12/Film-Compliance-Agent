@@ -21,7 +21,9 @@ from core.script_intake import ScriptIntakeAnalyzer
 from core.script_text import ParsedScript, parse_script
 from core.workflow_service import WorkflowService
 from schemas.enums import AssetKind, FieldStatus, FindingSeverity, Tier
+from schemas.forms import FormDraft
 from schemas.policy_snapshot import PackName
+from schemas.project import Project
 from schemas.reviews import (
     CandidateReviewDetails,
     ConfirmedReviewDetails,
@@ -216,6 +218,9 @@ class ReviewFacade:
                 "review details can only be confirmed at the confirmation step",
                 {"state": session.state.value},
             )
+        expected_project, expected_form = self._stores.review_analysis_baseline(
+            session.project_id
+        )
 
         session = self._updated(
             session,
@@ -236,7 +241,12 @@ class ReviewFacade:
                 "review confirmation is already being processed",
                 {"state": current.state.value},
             )
-        return self._analyze_claimed(session, force_script_review=False)
+        return self._analyze_claimed(
+            session,
+            force_script_review=False,
+            expected_project=expected_project,
+            expected_form=expected_form,
+        )
 
     def reanalyze(
         self,
@@ -250,10 +260,9 @@ class ReviewFacade:
                 "only a completed review can be reanalyzed",
                 {"state": session.state.value},
             )
-        project = self._workflow.get_project(session.project_id)
-        draft = self._stores.forms.latest(session.project_id)
+        project, draft = self._stores.review_analysis_baseline(session.project_id)
         if (
-            project.state not in WorkflowService.RECLASSIFIABLE_STATES
+            project.state not in WorkflowService.REANALYZABLE_REVIEW_STATES
             or (draft is not None and draft.frozen)
         ):
             raise StateInvalidError(
@@ -281,13 +290,20 @@ class ReviewFacade:
                 "review reanalysis is already being processed",
                 {"state": current.state.value},
             )
-        return self._analyze_claimed(analyzing, force_script_review=True)
+        return self._analyze_claimed(
+            analyzing,
+            force_script_review=True,
+            expected_project=project,
+            expected_form=draft,
+        )
 
     def _analyze_claimed(
         self,
         session: ReviewSession,
         *,
         force_script_review: bool,
+        expected_project: Project,
+        expected_form: FormDraft | None,
     ) -> ReviewView:
         try:
             assert session.confirmed is not None
@@ -300,6 +316,8 @@ class ReviewFacade:
                 self._workflow._video,
                 self._workflow._jobs,
             )
+            if force_script_review:
+                workflow.prepare_review_reanalysis(session.project_id)
             workflow.apply_review_confirmation(
                 session.project_id, session.mode, session.confirmed
             )
@@ -346,7 +364,12 @@ class ReviewFacade:
                     ),
                 },
             )
-            publication = review_analysis_publication(staged, complete)
+            publication = review_analysis_publication(
+                staged,
+                complete,
+                expected_project=expected_project,
+                expected_form=expected_form,
+            )
             if not self._stores.publish_review_analysis(publication):
                 raise StateInvalidError("review generation changed during analysis")
             return view

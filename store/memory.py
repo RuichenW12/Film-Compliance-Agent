@@ -6,6 +6,7 @@ from collections import defaultdict
 from copy import deepcopy
 from datetime import datetime, timezone
 from dataclasses import dataclass, field
+from functools import wraps
 import threading
 from typing import Protocol
 
@@ -350,6 +351,36 @@ class Stores(Protocol):
         self, publication: ReviewAnalysisPublication
     ) -> bool: ...
 
+    def review_analysis_baseline(
+        self, project_id: str
+    ) -> tuple[Project, FormDraft | None]: ...
+
+
+class _SynchronizedStore:
+    """Serialize every ordinary memory-store operation with bundle publication."""
+
+    def __init__(self, target, lock: threading.RLock) -> None:
+        object.__setattr__(self, "_target", target)
+        object.__setattr__(self, "_lock", lock)
+
+    def __getattr__(self, name):
+        value = getattr(self._target, name)
+        if not callable(value):
+            return value
+
+        @wraps(value)
+        def synchronized(*args, **kwargs):
+            with self._lock:
+                return value(*args, **kwargs)
+
+        return synchronized
+
+    def __setattr__(self, name, value) -> None:
+        if name in {"_target", "_lock"}:
+            object.__setattr__(self, name, value)
+            return
+        setattr(self._target, name, value)
+
 
 @dataclass
 class InMemoryStores:
@@ -378,56 +409,91 @@ class InMemoryStores:
     institutions: InMemoryInstitutionRegistry = field(
         default_factory=InMemoryInstitutionRegistry
     )
-    _review_publish_lock: threading.RLock = field(
+    _transaction_lock: threading.RLock = field(
         default_factory=threading.RLock,
         repr=False,
     )
+
+    def __post_init__(self) -> None:
+        for name in (
+            "projects",
+            "review_sessions",
+            "facts",
+            "findings",
+            "materials",
+            "assets",
+            "blobs",
+            "upload_tickets",
+            "tasks",
+            "timeline",
+            "audit",
+            "forms",
+            "institution_reviews",
+            "notifications",
+            "institutions",
+        ):
+            setattr(
+                self,
+                name,
+                _SynchronizedStore(getattr(self, name), self._transaction_lock),
+            )
+
+    def review_analysis_baseline(
+        self, project_id: str
+    ) -> tuple[Project, FormDraft | None]:
+        with self._transaction_lock:
+            project = self.projects._items.get(project_id)
+            if project is None:
+                raise KeyError(f"project not found: {project_id}")
+            drafts = self.forms._items[project_id]
+            return deepcopy(project), deepcopy(drafts[-1] if drafts else None)
 
     def publish_review_analysis(
         self, publication: ReviewAnalysisPublication
     ) -> bool:
         project_id = publication.project.project_id
-        with self._review_publish_lock, self.review_sessions._lock:
+        with self._transaction_lock, self.review_sessions._lock:
             current = self.review_sessions._items.get(publication.session.review_id)
+            live_project = self.projects._items.get(project_id)
+            live_forms = self.forms._items[project_id]
+            live_form = live_forms[-1] if live_forms else None
             if (
                 current is None
                 or current.state is not ReviewState.ANALYZING
                 or current.generation != publication.session.generation
+                or live_project != publication.expected_project
+                or live_form != publication.expected_form
             ):
                 return False
 
-            projects = dict(self.projects._items)
-            projects[project_id] = publication.project
-            facts = defaultdict(list, self.facts._items)
-            facts[project_id] = list(publication.facts)
-            findings = defaultdict(dict, self.findings._items)
-            findings[project_id] = {
+            facts = list(publication.facts)
+            findings = {
                 finding.finding_id: finding for finding in publication.findings
             }
-            forms = defaultdict(list, self.forms._items)
-            forms[project_id] = list(publication.forms)
-            tasks = {
-                task_id: task
-                for task_id, task in self.tasks._items.items()
-                if task.project_id != project_id
-            }
-            tasks.update({task.task_id: task for task in publication.tasks})
-            task_keys: dict[str, str] = {}
-            for task in tasks.values():
-                task_keys.setdefault(task.idempotency_key, task.task_id)
-            timeline = defaultdict(list, self.timeline._items)
-            timeline[project_id] = list(publication.timeline)
-            audit = defaultdict(list, self.audit._items)
-            audit[project_id] = list(publication.audit)
+            forms = list(publication.forms)
+            tasks = {task.task_id: task for task in publication.tasks}
+            timeline = list(publication.timeline)
+            audit = list(publication.audit)
 
-            self.projects._items = projects
-            self.facts._items = facts
-            self.findings._items = findings
-            self.forms._items = forms
-            self.tasks._items = tasks
-            self.tasks._by_key = task_keys
-            self.timeline._items = timeline
-            self.audit._items = audit
+            self.projects._items[project_id] = publication.project
+            self.facts._items[project_id] = facts
+            self.findings._items[project_id] = findings
+            self.forms._items[project_id] = forms
+            old_task_ids = {
+                task_id
+                for task_id, task in self.tasks._items.items()
+                if task.project_id == project_id
+            }
+            for task_id in old_task_ids:
+                self.tasks._items.pop(task_id, None)
+            for key, task_id in list(self.tasks._by_key.items()):
+                if task_id in old_task_ids:
+                    self.tasks._by_key.pop(key, None)
+            self.tasks._items.update(tasks)
+            for task in tasks.values():
+                self.tasks._by_key.setdefault(task.idempotency_key, task.task_id)
+            self.timeline._items[project_id] = timeline
+            self.audit._items[project_id] = audit
             self.review_sessions._items[publication.session.review_id] = (
                 publication.session
             )
@@ -438,43 +504,50 @@ def stage_review_analysis(stores: Stores, project_id: str) -> InMemoryStores:
     """Copy one project aggregate so analysis cannot mutate the live package."""
 
     staged = InMemoryStores()
-    project = stores.projects.get(project_id)
-    if project is None:
-        raise KeyError(f"project not found: {project_id}")
-    staged.projects.create(deepcopy(project))
-    for fact in stores.facts.list(project_id):
-        staged.facts.add(project_id, deepcopy(fact))
-    for finding in stores.findings.list(project_id):
-        staged.findings.add(project_id, deepcopy(finding))
-    for form in stores.forms.list(project_id):
-        staged.forms.put(project_id, deepcopy(form))
-    for task in stores.tasks.list(project_id):
-        staged.tasks.add(deepcopy(task))
-    for event in stores.timeline.list(project_id):
-        staged.timeline.add(project_id, deepcopy(event))
-    for entry in stores.audit.list(project_id):
-        staged.audit.add(project_id, deepcopy(entry))
-    for asset in stores.assets.list(project_id):
-        copied = deepcopy(asset)
-        staged.assets.add(project_id, copied)
-        for uri in (copied.storage_uri, copied.text_storage_uri):
-            if not uri:
-                continue
-            content = stores.blobs.get(uri)
-            if content is not None:
-                staged.blobs.put(uri, content)
+    lock = getattr(stores, "_transaction_lock", threading.RLock())
+    with lock:
+        project = stores.projects.get(project_id)
+        if project is None:
+            raise KeyError(f"project not found: {project_id}")
+        staged.projects.create(deepcopy(project))
+        for fact in stores.facts.list(project_id):
+            staged.facts.add(project_id, deepcopy(fact))
+        for finding in stores.findings.list(project_id):
+            staged.findings.add(project_id, deepcopy(finding))
+        for form in stores.forms.list(project_id):
+            staged.forms.put(project_id, deepcopy(form))
+        for task in stores.tasks.list(project_id):
+            staged.tasks.add(deepcopy(task))
+        for event in stores.timeline.list(project_id):
+            staged.timeline.add(project_id, deepcopy(event))
+        for entry in stores.audit.list(project_id):
+            staged.audit.add(project_id, deepcopy(entry))
+        for asset in stores.assets.list(project_id):
+            copied = deepcopy(asset)
+            staged.assets.add(project_id, copied)
+            for uri in (copied.storage_uri, copied.text_storage_uri):
+                if not uri:
+                    continue
+                content = stores.blobs.get(uri)
+                if content is not None:
+                    staged.blobs.put(uri, content)
     return staged
 
 
 def review_analysis_publication(
     staged: InMemoryStores,
     session: ReviewSession,
+    *,
+    expected_project: Project,
+    expected_form: FormDraft | None,
 ) -> ReviewAnalysisPublication:
     project = staged.projects.get(session.project_id)
     if project is None:
         raise KeyError(f"project not found: {session.project_id}")
     return ReviewAnalysisPublication(
         session=session,
+        expected_project=expected_project,
+        expected_form=expected_form,
         project=project,
         facts=tuple(staged.facts.list(session.project_id)),
         findings=tuple(staged.findings.list(session.project_id)),
