@@ -26,6 +26,25 @@ Planned document groups include:
 - [Policy loop Gate 5-a snapshot bridge design](superpowers/specs/2026-08-24-policy-loop-gate5a-snapshot-bridge-design.md)
 - [Implementation status by owner (2026-08-24)](technical/implementation-status-2026-08-24.md)
 - [Manual test guide](manual-test-guide.md)
+- [Illustrated walkthrough](walkthrough.html) — architecture, the classification
+  mechanism, the lifecycle, the policy loop, current status, and a worked
+  end-to-end run
+
+### About `walkthrough.html`
+
+It is the source of a published page:
+<https://claude.ai/code/artifact/2983067b-2a58-4d8a-9cb8-41c19b789ef2>
+
+The file is deliberately a **fragment** — no `<!doctype>`, `<html>`, `<head>`
+or `<body>`, because the publisher supplies those. Keep it that way so the file
+stays republishable to the same URL unchanged. Browsers render it correctly
+from disk regardless.
+
+Its last three sections (*Start it*, *Nine projects*, *Run one project all the
+way through*) cover the same ground as [`manual-test-guide.md`](manual-test-guide.md).
+**The Markdown guide is canonical** — it is the one kept current against a live
+API and the one a test run should follow. When the two disagree, the Markdown
+is right and the HTML needs updating.
 
 Documentation must distinguish proposed design, local verification, deployed verification, and unresolved assumptions.
 

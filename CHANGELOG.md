@@ -22,6 +22,77 @@ Conventions:
 
 ## 2026-08-29
 
+### A — the illustrated walkthrough is in the repository
+
+`docs/walkthrough.html` — twelve sections covering the architecture, the
+repository map, how a project gets classified, the lifecycle, the policy loop,
+scope, current status, and a worked end-to-end run, with hand-authored SVG
+diagrams.
+
+It existed only as a published artifact and one file in a session-scoped temp
+directory. Nine of its twelve sections have no equivalent anywhere else in the
+repository, so that directory being wiped would have lost them.
+
+Committed **whole**, not trimmed. Its last three sections do overlap
+`manual-test-guide.md`, and two copies of the same nine scenarios can drift —
+which is the exact failure the guide rewrite above was fixing. Handled by
+naming one of them canonical rather than by deleting content: `docs/README.md`
+now says the Markdown guide is the one kept current against a live API, and
+that the HTML follows it when they disagree.
+
+The file is kept as a **fragment** — no `<!doctype>`, `<html>`, `<head>` or
+`<body>`, because the artifact publisher wraps it. Adding a doctype would break
+republishing to the same URL, and browsers render it from disk either way. The
+URL is recorded in `docs/README.md`.
+
+### A — the manual test guide describes the product that exists
+
+`docs/manual-test-guide.md` had drifted far enough to be misleading rather than
+merely stale: it told a tester to expect snapshot `v1`, an "AI generated
+content" checkbox, a "band C" dropdown, an empty material-card list, and an
+in-memory store that loses projects on restart. Every one of those is wrong
+after D-053 through D-057, and a guide that asserts wrong expectations turns a
+correct run into a reported bug.
+
+Rewritten against a live API rather than from the diff. What is now in it:
+
+- **Start** — `STORE_BACKEND=sqlite`, `--env-file .env`, and the `localhost`
+  vs `127.0.0.1` trap that costs ten minutes each time. The healthz block
+  explains what `llm_available: True` versus `False` changes about the
+  expectations further down, because half the semantic checks read as failures
+  if you do not know which mode you are in.
+- **Nine numbered scenarios** with the exact expected class, authority and
+  flags, including the pair that matters most: the same under-¥300,000 budget
+  gives Class 3 for an ordinary subject and Class 1 for a special one.
+- The two **exit** cases the length slider produces (25 min → web film, one
+  episode → not a series), which the old guide never mentioned because the
+  fields were number boxes nobody dragged.
+- The **budget comparison table** checks, including that the class-2 deadline
+  column must read `待补充` — a number appearing there is the invented fact this
+  guide exists to catch.
+- The **scene checklist** at the finished-production stage, and the explicit
+  rule that it must not imply anything watched the footage.
+- The **return-and-revise** round trip, absent from the old guide because it
+  did not work when the guide was written.
+- A seventh entry in *What to report*: raw identifiers shown to a person. That
+  defect has been fixed on five separate surfaces and keeps returning.
+
+Verified, not assumed. Every expectation in sections 4 and 5 came from a run
+against `uvicorn api.main:app --env-file .env` on a scratch sqlite store:
+healthz (`v2` / `vertex` / `sqlite`), an idea-stage project (`T2`, provisional,
+`provincial`, flags `amount_required, budget_unknown, clause_not_yet_in_force,
+script_verify`), its gate (`facts_missing` naming title / investment /
+applicant, `materials_unvalidated` naming the two required cards), its form
+(episode fields already `filled` with `answer_id: intent.*`, the other three
+`pending`), its six material cards, and its `T2_5steps` roadmap with three
+creator-owned steps of five — which is what the comparison table's "3 of 5"
+claims. `python -m pytest` → 672 passed, 3 skipped.
+
+Three decision citations in the first draft pointed at the wrong entries
+(D-050 for the revision loop, D-055 for the length picker, D-051 for the
+stale-notice bug). Corrected to D-051, D-054/D-057, and no citation
+respectively — the stale-notice fix has no decision entry.
+
 ### A — a raw-identifier sweep across every screen
 
 Walked each page in the browser with a regex for snake_case identifiers, bare
