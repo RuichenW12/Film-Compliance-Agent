@@ -1,0 +1,114 @@
+from __future__ import annotations
+
+import hashlib
+from pathlib import Path
+
+from core.llm import ScriptedLLM
+from core.review_facade import ReviewFacade
+from core.script_intake import SCRIPT_INTAKE_PROMPT_ID
+from schemas.enums import AmountBracket
+from schemas.reviews import (
+    ConfirmedReviewDetails,
+    ReviewState,
+    StartReviewCommand,
+    UploadedScript,
+)
+
+
+FIXTURE = (
+    Path(__file__).parent / "fixtures" / "scripts" / "e2e-30min-public-security.md"
+)
+
+INTAKE_REPLY = {
+    "tags": {
+        "value": ["public security", "family drama"],
+        "origin": "suggested",
+        "explanation": "The story combines scam prevention and family repair.",
+    },
+    "synopsis": {
+        "value": "A family turns an almost-successful scam call into a public warning.",
+        "origin": "suggested",
+        "explanation": "This condenses the uploaded story.",
+    },
+    "episode_count": {
+        "value": 10,
+        "origin": "suggested",
+        "explanation": "Ten episodes preserve the thirty-minute source duration.",
+    },
+    "episode_minutes": {
+        "value": 3,
+        "origin": "suggested",
+        "explanation": "Three minutes per episode preserves the total duration.",
+    },
+    "amount_bracket": {
+        "value": "at_or_above_upper",
+        "origin": "suggested",
+        "explanation": "A user-editable planning estimate from the supplied ranges.",
+    },
+}
+
+
+def test_public_security_fixture_reaches_confirmed_risk_package(
+    stores, review_snapshots, clock
+) -> None:
+    raw = FIXTURE.read_bytes()
+    service = ReviewFacade(
+        stores=stores,
+        snapshots=review_snapshots,
+        clock=clock,
+        llm=ScriptedLLM({SCRIPT_INTAKE_PROMPT_ID: INTAKE_REPLY}),
+    )
+
+    started = service.start(
+        StartReviewCommand(
+            owner_uid="u_demo",
+            source=UploadedScript(
+                filename=FIXTURE.name,
+                media_type="text/markdown",
+                content=raw,
+            ),
+        )
+    )
+
+    assert started.source_sha256 == hashlib.sha256(raw).hexdigest()
+    assert started.candidates.title.value == "先挂电话"
+    assert started.candidates.structure.source_episode_count == 1
+    assert started.candidates.structure.source_total_minutes == 30
+    assert started.candidates.structure.source_scene_count == 15
+    assert started.candidates.episode_count.value == 10
+    assert started.candidates.episode_minutes.value == 3
+
+    result = service.confirm(
+        started.review_id,
+        "u_demo",
+        ConfirmedReviewDetails(
+            title="先挂电话",
+            tags=["公安", "家庭现实"],
+            synopsis="社区民警在派出所帮助居民识别可疑来电，修复父女关系。",
+            episode_count=10,
+            episode_minutes=3,
+            amount_bracket=AmountBracket.AT_OR_ABOVE_UPPER,
+        ),
+    )
+
+    assert result.state is ReviewState.COMPLETE
+    assert result.classification.class_name == "Class 1"
+    assert result.classification.co_review_required is True
+    assert "Public security subject" in result.classification.subjects
+    located_scenes = {finding.scene for finding in result.findings}
+    assert {3, 4, 10, 11, 14} <= located_scenes
+    assert {finding.status for finding in result.findings} == {
+        "Needs human review"
+    }
+    assert not {
+        "political",
+        "military",
+        "diplomatic",
+        "national_security",
+        "united_front",
+        "ethnic",
+        "religious",
+        "judicial",
+    } & {finding.category for finding in result.findings}
+    assert result.semantic_status.value == "pending"
+    assert "clean pass" not in result.model_dump_json().lower()

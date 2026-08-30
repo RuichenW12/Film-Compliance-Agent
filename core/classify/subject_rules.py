@@ -71,18 +71,28 @@ def load_subject_rules(pack: dict) -> list[SubjectRule]:
         rules: list[SubjectRule] = []
         for index, raw in enumerate(explicit, start=1):
             category = str(raw.get("category", "unknown"))
+            expert_pending = bool(raw.get("expert_pending", False))
+            trigger_patterns = list(raw.get("trigger_patterns", ()))
+            if expert_pending:
+                # An explicit but still-unreviewed rule is not the wholesale
+                # partner replacement described above yet. Keep the checked-in
+                # operational vocabulary so synthetic fixture coverage does not
+                # collapse from "民警/派出所" to the single word "公安". Once the
+                # policy loop publishes expert_pending=false, only its reviewed
+                # trigger list is used.
+                trigger_patterns.extend(CATEGORY_KEYWORDS.get(category, ()))
             rules.append(
                 SubjectRule(
                     rule_id=str(raw.get("rule_id") or _rule_id_for(category, index)),
                     category=category,
-                    trigger_patterns=tuple(raw.get("trigger_patterns", ())),
+                    trigger_patterns=tuple(dict.fromkeys(trigger_patterns)),
                     is_edge_case=bool(raw.get("is_edge_case", False)),
                     tier_effect=str(raw.get("tier_effect", "T1_mandatory")),
                     dept_mapping=dict(
                         raw.get("dept_mapping") or CATEGORY_DEPT.get(category, {})
                     ),
                     clause_ref=str(raw.get("clause_ref") or DEFAULT_CLAUSE_REF),
-                    expert_pending=bool(raw.get("expert_pending", False)),
+                    expert_pending=expert_pending,
                 )
             )
         return rules

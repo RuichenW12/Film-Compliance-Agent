@@ -7,6 +7,7 @@ from enum import StrEnum
 from pydantic import AwareDatetime, Field, field_validator, model_validator
 
 from .common import DomainModel
+from .common import EvidenceRef
 from .enums import AmountBracket
 
 
@@ -171,3 +172,70 @@ class ReviewSession(DomainModel):
         if self.state is ReviewState.COMPLETE and self.confirmed is None:
             raise ValueError("complete sessions require confirmed details")
         return self
+
+
+class UploadedScript(DomainModel):
+    filename: str
+    media_type: str | None = None
+    content: bytes
+
+
+class IdeaOnly(DomainModel):
+    pass
+
+
+StartReviewSource = UploadedScript | IdeaOnly
+
+
+class StartReviewCommand(DomainModel):
+    owner_uid: str
+    source: StartReviewSource
+
+
+class ReviewClassificationView(DomainModel):
+    class_name: str
+    co_review_required: bool
+    subjects: list[str] = Field(default_factory=list)
+    snapshot_version: str
+    evidence_refs: list[EvidenceRef] = Field(default_factory=list)
+    route: dict | None = None
+
+
+class ReviewFindingView(DomainModel):
+    risk_id: str
+    episode: int | None = None
+    scene: int | None = None
+    quote: str
+    category: str
+    status: str
+    evidence_refs: list[EvidenceRef] = Field(default_factory=list)
+    explanation: str | None = None
+    suggestion: str | None = None
+
+
+class ReviewArtifactLink(DomainModel):
+    artifact_type: ReviewArtifactType
+    filename: str
+    download_url: str
+
+
+class GeneratedArtifact(DomainModel):
+    filename: str
+    media_type: str
+    content: bytes
+
+
+class ReviewView(DomainModel):
+    review_id: str
+    state: ReviewState
+    mode: ReviewMode
+    candidates: CandidateReviewDetails | None = None
+    confirmed: ConfirmedReviewDetails | None = None
+    intake_status: IntakeStatus
+    semantic_status: SemanticStatus | None = None
+    source_filename: str | None = None
+    source_sha256: str | None = None
+    source_download_url: str | None = None
+    classification: ReviewClassificationView | None = None
+    findings: list[ReviewFindingView] = Field(default_factory=list)
+    artifacts: list[ReviewArtifactLink] = Field(default_factory=list)

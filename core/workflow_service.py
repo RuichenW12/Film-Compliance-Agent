@@ -247,6 +247,14 @@ class WorkflowService:
         )
         return project
 
+    def record_review_event(
+        self, project_id: str, event: str, detail: dict
+    ) -> TimelineEvent:
+        """Record review orchestration metadata without exposing store internals."""
+
+        self.get_project(project_id)
+        return self._record_event(project_id, Actor.SYSTEM, event, detail)
+
     def submit_channels(self, project_id: str, patch: dict) -> Project:
         """S2. Enabling the US track is a channel fact, not an LLM decision."""
 
@@ -1851,7 +1859,12 @@ class WorkflowService:
         )
         return self._stores.upload_tickets.add(ticket)
 
-    def complete_upload(self, ticket_id: str, data: bytes) -> AssetVersion:
+    def complete_upload(
+        self,
+        ticket_id: str,
+        data: bytes,
+        text_storage_uri: str | None = None,
+    ) -> AssetVersion:
         """Write the bytes, then the immutable version record that names them."""
 
         if not data:
@@ -1873,6 +1886,7 @@ class WorkflowService:
             version_id=new_id("asset"),
             kind=ticket.kind,
             storage_uri=ticket.storage_uri,
+            text_storage_uri=text_storage_uri,
             sha256=hashlib.sha256(data).hexdigest(),
             parent_version=self._latest_version_of(ticket.project_id, ticket.kind),
             uploaded_by=ticket.issued_to,
