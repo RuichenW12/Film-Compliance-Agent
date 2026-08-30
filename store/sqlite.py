@@ -31,6 +31,7 @@ from typing import Iterable, TypeVar
 
 from pydantic import BaseModel
 
+from core.repositories import ReviewAnalysisPublication
 from schemas.assets import AssetVersion, MaterialCard, UploadTicket
 from schemas.common import AuditEntry, Fact, TimelineEvent
 from schemas.findings import Finding
@@ -412,6 +413,9 @@ class SqliteFormStore:
         drafts = self._c.list(project_id)
         return drafts[-1] if drafts else None
 
+    def list(self, project_id: str) -> list[FormDraft]:
+        return self._c.list(project_id)
+
 
 class SqliteInstitutionReviewStore:
     def __init__(self, db: Database) -> None:
@@ -537,6 +541,61 @@ class SqliteStores:
         self.institution_reviews = SqliteInstitutionReviewStore(self.db)
         self.notifications = SqliteNotificationStore(self.db)
         self.institutions = SqliteInstitutionRegistry(self.db)
+
+    def publish_review_analysis(
+        self, publication: ReviewAnalysisPublication
+    ) -> bool:
+        project_id = publication.project.project_id
+        connection = self.db._connection
+        with self.db._lock:
+            connection.execute("BEGIN IMMEDIATE")
+            try:
+                row = connection.execute(
+                    "SELECT payload FROM documents "
+                    "WHERE collection = ? AND doc_key = ?",
+                    ("review_sessions", publication.session.review_id),
+                ).fetchone()
+                if row is None:
+                    connection.execute("ROLLBACK")
+                    return False
+                current = ReviewSession.model_validate_json(row["payload"])
+                if (
+                    current.state is not ReviewState.ANALYZING
+                    or current.generation != publication.session.generation
+                ):
+                    connection.execute("ROLLBACK")
+                    return False
+
+                self.projects.save(publication.project)
+                for collection in ("facts", "findings", "forms", "timeline", "audit"):
+                    connection.execute(
+                        "DELETE FROM documents WHERE collection = ? AND parent = ?",
+                        (collection, project_id),
+                    )
+                for fact in publication.facts:
+                    self.facts.add(project_id, fact)
+                for finding in publication.findings:
+                    self.findings.save(project_id, finding)
+                for form in publication.forms:
+                    self.forms.put(project_id, form)
+                for event in publication.timeline:
+                    self.timeline.add(project_id, event)
+                for entry in publication.audit:
+                    self.audit.add(project_id, entry)
+
+                for task in self.tasks.list(project_id):
+                    connection.execute(
+                        "DELETE FROM documents WHERE collection = ? AND doc_key = ?",
+                        ("tasks", task.task_id),
+                    )
+                for task in publication.tasks:
+                    self.tasks.save(task)
+                self.review_sessions.put(publication.session)
+                connection.execute("COMMIT")
+                return True
+            except Exception:
+                connection.execute("ROLLBACK")
+                raise
 
     @classmethod
     def at(cls, path: str | Path) -> "SqliteStores":

@@ -173,10 +173,10 @@ def test_a_queued_review_has_not_written_findings_yet(queued_client):
     """The API answered; the work has not happened. That must be visible."""
 
     project_id, _ = project_with_script(queued_client)
-    body = queued_client.post(f"/v1/projects/{project_id}/review", headers=OWNER).json()
+    response = queued_client.post(f"/v1/projects/{project_id}/review", headers=OWNER)
 
-    assert body["findings"] == []
-    assert body["backend"] == "queued"
+    assert response.status_code == 409
+    assert response.json()["error"]["code"] == "STATE_INVALID"
     assert (
         queued_client.get(f"/v1/projects/{project_id}/findings", headers=OWNER).json()
         == []

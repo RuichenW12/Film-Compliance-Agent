@@ -6,12 +6,13 @@ import threading
 
 import pytest
 
-from core.errors import ForbiddenError, StateInvalidError
+from core.errors import ForbiddenError, StateInvalidError, UpstreamLLMError
 from core.llm import ScriptedLLM, UnavailableLLM
 from core.review import SCRIPT_REVIEW_PROMPT_ID
 from core.review_facade import ReviewFacade
 from core.script_intake import SCRIPT_INTAKE_PROMPT_ID
-from schemas.enums import AmountBracket, ProductionStage
+from core.workflow_service import WorkflowService
+from schemas.enums import AmountBracket, ProductionStage, ProjectState
 from schemas.policy_snapshot import PackName
 from schemas.reviews import (
     ConfirmedReviewDetails,
@@ -35,6 +36,12 @@ SCRIPT = """# 《先挂电话》
 
 ### 第一集 场景一：派出所
 社区民警帮助居民核实一通可疑来电。
+"""
+
+SEMANTIC_SCRIPT = """# 《便利店》
+
+### 第一集 场景一：便利店
+顾客买水。
 """
 
 INTAKE_REPLY = {
@@ -114,6 +121,43 @@ def start_script(service: ReviewFacade, owner: str = "u_demo"):
             ),
         )
     )
+
+
+def start_semantic_script(service: ReviewFacade):
+    return service.start(
+        StartReviewCommand(
+            owner_uid="u_demo",
+            source=UploadedScript(
+                filename="semantic.md",
+                media_type="text/markdown",
+                content=SEMANTIC_SCRIPT.encode(),
+            ),
+        )
+    )
+
+
+def semantic_reply(reason: str | None = None) -> dict:
+    return {
+        "hits": [
+            {
+                "category": "public_security",
+                "quote": "顾客买水。",
+                "reason": reason,
+            }
+        ]
+    }
+
+
+def projection_snapshot(stores, project_id: str) -> dict:
+    return {
+        "project": stores.projects.get(project_id),
+        "facts": stores.facts.list(project_id),
+        "findings": stores.findings.list(project_id),
+        "form": stores.forms.latest(project_id),
+        "tasks": stores.tasks.list(project_id),
+        "timeline": stores.timeline.list(project_id),
+        "audit": stores.audit.list(project_id),
+    }
 
 
 def confirmed(**updates) -> ConfirmedReviewDetails:
@@ -215,7 +259,7 @@ def test_failed_confirmation_exposes_safe_recovery_copy(
     def fail(*_args, **_kwargs):
         raise RuntimeError("private renderer hostname and stack detail")
 
-    monkeypatch.setattr(service._workflow, "apply_review_confirmation", fail)
+    monkeypatch.setattr(WorkflowService, "apply_review_confirmation", fail)
     with pytest.raises(RuntimeError):
         service.confirm(started.review_id, "u_demo", confirmed())
 
@@ -330,7 +374,13 @@ def test_reanalyze_updates_completed_review_without_duplicate_identity_or_storag
     assert len(stores.projects.list_all()) == counts["projects"]
     assert len(stores.assets.list(after.project_id)) == counts["assets"]
     assert len(stores.review_sessions._items) == counts["sessions"]
-    assert len(stores.findings.list(after.project_id)) == counts["findings"]
+    assert len(
+        [
+            finding
+            for finding in stores.findings.list(after.project_id)
+            if finding.active
+        ]
+    ) == counts["findings"]
 
     project = stores.projects.get(after.project_id)
     assert project is not None
@@ -394,17 +444,17 @@ def test_two_concurrent_reanalyses_only_one_claims_and_runs_analysis(
     release = threading.Event()
     calls = 0
     calls_lock = threading.Lock()
-    original = service._workflow.apply_review_confirmation
+    original = WorkflowService.apply_review_confirmation
 
-    def controlled(*args, **kwargs):
+    def controlled(workflow, *args, **kwargs):
         nonlocal calls
         with calls_lock:
             calls += 1
         entered.set()
         assert release.wait(timeout=5)
-        return original(*args, **kwargs)
+        return original(workflow, *args, **kwargs)
 
-    monkeypatch.setattr(service._workflow, "apply_review_confirmation", controlled)
+    monkeypatch.setattr(WorkflowService, "apply_review_confirmation", controlled)
     with ThreadPoolExecutor(max_workers=2) as pool:
         winner = pool.submit(
             service.reanalyze, started.review_id, "u_demo", edited
@@ -438,21 +488,17 @@ def test_sqlite_two_connections_allow_only_one_reanalysis_claim(
     calls = 0
     calls_lock = threading.Lock()
 
-    def wrap(service):
-        original = service._workflow.apply_review_confirmation
+    original = WorkflowService.apply_review_confirmation
 
-        def counted(*args, **kwargs):
-            nonlocal calls
-            with calls_lock:
-                calls += 1
-            entered.set()
-            assert release.wait(timeout=5)
-            return original(*args, **kwargs)
+    def counted(workflow, *args, **kwargs):
+        nonlocal calls
+        with calls_lock:
+            calls += 1
+        entered.set()
+        assert release.wait(timeout=5)
+        return original(workflow, *args, **kwargs)
 
-        monkeypatch.setattr(service._workflow, "apply_review_confirmation", counted)
-
-    wrap(first)
-    wrap(second)
+    monkeypatch.setattr(WorkflowService, "apply_review_confirmation", counted)
 
     def run(service):
         barrier.wait(timeout=5)
@@ -490,7 +536,7 @@ def test_failed_reanalysis_terminalizes_the_claimed_session(
     def fail(*_args, **_kwargs):
         raise RuntimeError("private reanalysis worker detail")
 
-    monkeypatch.setattr(service._workflow, "run_classification", fail)
+    monkeypatch.setattr(WorkflowService, "run_classification", fail)
     with pytest.raises(RuntimeError, match="private reanalysis worker detail"):
         service.reanalyze(
             started.review_id,
@@ -595,7 +641,7 @@ def test_late_failure_from_old_generation_cannot_overwrite_newer_completion(
         assert release.wait(timeout=5)
         raise RuntimeError("old generation failed late")
 
-    monkeypatch.setattr(service._workflow, "run_classification", fail_late)
+    monkeypatch.setattr(WorkflowService, "run_classification", fail_late)
     with ThreadPoolExecutor(max_workers=1) as pool:
         old = pool.submit(
             service.reanalyze,
@@ -662,6 +708,148 @@ def test_same_asset_reanalysis_calls_semantic_review_again(
     assert sum(call.prompt_id == SCRIPT_REVIEW_PROMPT_ID for call in llm.calls) == 2
 
 
+def test_reanalysis_hit_to_no_hit_hides_prior_script_finding(
+    stores, review_snapshots, clock
+) -> None:
+    llm = ScriptedLLM(
+        {
+            SCRIPT_INTAKE_PROMPT_ID: INTAKE_REPLY,
+            SCRIPT_REVIEW_PROMPT_ID: semantic_reply("initial reason"),
+        }
+    )
+    service = facade(stores, review_snapshots, clock, llm)
+    started = start_semantic_script(service)
+    first = service.confirm(started.review_id, "u_demo", confirmed())
+    assert len(first.findings) == 1
+
+    llm._replies[SCRIPT_REVIEW_PROMPT_ID] = {"hits": []}
+    rerun = service.reanalyze(
+        started.review_id,
+        "u_demo",
+        confirmed(title="No semantic hit"),
+    )
+
+    assert rerun.findings == []
+    session = stores.review_sessions.get(started.review_id)
+    historical = [
+        finding
+        for finding in stores.findings.list(session.project_id)
+        if finding.asset_version != "intent_profile"
+    ]
+    assert len(historical) == 1
+    assert historical[0].analysis_generation == 1
+    assert historical[0].active is False
+
+
+def test_reanalysis_changed_hit_replaces_visible_script_finding(
+    stores, review_snapshots, clock
+) -> None:
+    llm = ScriptedLLM(
+        {
+            SCRIPT_INTAKE_PROMPT_ID: INTAKE_REPLY,
+            SCRIPT_REVIEW_PROMPT_ID: semantic_reply("first suggestion"),
+        }
+    )
+    service = facade(stores, review_snapshots, clock, llm)
+    started = start_semantic_script(service)
+    service.confirm(started.review_id, "u_demo", confirmed())
+    llm._replies[SCRIPT_REVIEW_PROMPT_ID] = semantic_reply("revised suggestion")
+
+    rerun = service.reanalyze(
+        started.review_id,
+        "u_demo",
+        confirmed(title="Changed semantic hit"),
+    )
+
+    assert len(rerun.findings) == 1
+    assert rerun.findings[0].suggestion == "revised suggestion"
+    session = stores.review_sessions.get(started.review_id)
+    historical = [
+        finding
+        for finding in stores.findings.list(session.project_id)
+        if finding.asset_version != "intent_profile"
+    ]
+    assert len(historical) == 2
+    assert [(item.analysis_generation, item.active) for item in historical] == [
+        (1, False),
+        (2, True),
+    ]
+
+
+def test_reanalysis_new_hit_appears_once_without_duplicate_on_next_generation(
+    stores, review_snapshots, clock
+) -> None:
+    llm = ScriptedLLM(
+        {
+            SCRIPT_INTAKE_PROMPT_ID: INTAKE_REPLY,
+            SCRIPT_REVIEW_PROMPT_ID: {"hits": []},
+        }
+    )
+    service = facade(stores, review_snapshots, clock, llm)
+    started = start_semantic_script(service)
+    first = service.confirm(started.review_id, "u_demo", confirmed())
+    assert first.findings == []
+    llm._replies[SCRIPT_REVIEW_PROMPT_ID] = semantic_reply("new hit")
+
+    second = service.reanalyze(
+        started.review_id,
+        "u_demo",
+        confirmed(title="New hit"),
+    )
+    third = service.reanalyze(
+        started.review_id,
+        "u_demo",
+        confirmed(title="Same hit next generation"),
+    )
+
+    assert len(second.findings) == 1
+    assert len(third.findings) == 1
+    session = stores.review_sessions.get(started.review_id)
+    active = [
+        finding
+        for finding in stores.findings.list(session.project_id)
+        if finding.asset_version != "intent_profile" and finding.active
+    ]
+    assert len(active) == 1
+    assert active[0].analysis_generation == 3
+
+
+def test_script_review_task_failure_terminalizes_without_false_semantic_success(
+    stores, review_snapshots, clock, monkeypatch
+) -> None:
+    llm = ScriptedLLM(
+        {
+            SCRIPT_INTAKE_PROMPT_ID: INTAKE_REPLY,
+            SCRIPT_REVIEW_PROMPT_ID: {"hits": []},
+        }
+    )
+    service = facade(stores, review_snapshots, clock, llm)
+    started = start_semantic_script(service)
+    service.confirm(started.review_id, "u_demo", confirmed())
+    session = stores.review_sessions.get(started.review_id)
+    before = projection_snapshot(stores, session.project_id)
+    original = llm.structured
+
+    def fail_script_review(request):
+        if request.prompt_id == SCRIPT_REVIEW_PROMPT_ID:
+            raise RuntimeError("private semantic worker crash")
+        return original(request)
+
+    monkeypatch.setattr(llm, "structured", fail_script_review)
+
+    with pytest.raises(UpstreamLLMError):
+        service.reanalyze(
+            started.review_id,
+            "u_demo",
+            confirmed(title="Task failure"),
+        )
+
+    restored = service.get(started.review_id, "u_demo")
+    assert restored.state is ReviewState.FAILED
+    assert restored.semantic_status is None
+    assert projection_snapshot(stores, session.project_id) == before
+
+
 def test_reanalysis_replaces_then_hides_classification_alert_findings(
     stores, review_snapshots, clock
 ) -> None:
@@ -712,6 +900,125 @@ def test_reanalysis_replaces_then_hides_classification_alert_findings(
     stored = stores.findings.list(session.project_id)
     assert len([finding for finding in stored if finding.alert is not None]) == 1
     assert next(finding for finding in stored if finding.alert is not None).active is False
+
+
+@pytest.mark.parametrize(
+    "project_state",
+    [
+        ProjectState.FORM_FROZEN,
+        ProjectState.INSTITUTION_REVIEW,
+        ProjectState.READY_FOR_EXTERNAL_FILING,
+        ProjectState.FILED,
+        ProjectState.PRODUCTION,
+    ],
+)
+def test_reanalysis_rejects_frozen_or_submitted_project_before_any_write(
+    stores, review_snapshots, clock, project_state
+) -> None:
+    service = facade(stores, review_snapshots, clock)
+    started = start_script(service)
+    service.confirm(started.review_id, "u_demo", confirmed())
+    session = stores.review_sessions.get(started.review_id)
+    project = stores.projects.get(session.project_id)
+    stores.projects.save(project.model_copy(update={"state": project_state}))
+    if project_state is ProjectState.FORM_FROZEN:
+        draft = stores.forms.latest(session.project_id)
+        stores.forms.put(
+            session.project_id,
+            draft.model_copy(update={"frozen": True, "hash": "frozen-hash"}),
+        )
+    before_session = stores.review_sessions.get(started.review_id)
+    before = projection_snapshot(stores, session.project_id)
+
+    with pytest.raises(StateInvalidError):
+        service.reanalyze(
+            started.review_id,
+            "u_demo",
+            confirmed(title=f"Rejected in {project_state.value}"),
+        )
+
+    assert stores.review_sessions.get(started.review_id) == before_session
+    assert projection_snapshot(stores, session.project_id) == before
+
+
+@pytest.mark.parametrize("boundary", ["classification", "finding", "form", "event"])
+def test_reanalysis_failure_boundaries_preserve_previous_complete_projection(
+    stores, review_snapshots, clock, monkeypatch, boundary
+) -> None:
+    service = facade(stores, review_snapshots, clock)
+    started = start_script(service)
+    service.confirm(started.review_id, "u_demo", confirmed())
+    session = stores.review_sessions.get(started.review_id)
+    before = projection_snapshot(stores, session.project_id)
+
+    def fail(*_args, **_kwargs):
+        raise RuntimeError(f"{boundary} staging failure")
+
+    if boundary == "classification":
+        monkeypatch.setattr(WorkflowService, "run_classification", fail)
+    elif boundary == "finding":
+        monkeypatch.setattr(WorkflowService, "run_script_review", fail)
+    elif boundary == "form":
+        monkeypatch.setattr(WorkflowService, "form_draft", fail)
+    else:
+        original = WorkflowService.record_review_event
+
+        def fail_package_event(self, project_id, event, detail):
+            if event == "review.package_ready":
+                raise RuntimeError("event staging failure")
+            return original(self, project_id, event, detail)
+
+        monkeypatch.setattr(
+            WorkflowService,
+            "record_review_event",
+            fail_package_event,
+        )
+
+    with pytest.raises(RuntimeError, match=f"{boundary} staging failure"):
+        service.reanalyze(
+            started.review_id,
+            "u_demo",
+            confirmed(title=f"Failure at {boundary}"),
+        )
+
+    assert service.get(started.review_id, "u_demo").state is ReviewState.FAILED
+    assert projection_snapshot(stores, session.project_id) == before
+    assert not any(
+        event.event == "review.package_ready"
+        and event.detail.get("state") == ReviewState.COMPLETE.value
+        and event.at > before["timeline"][-1].at
+        for event in stores.timeline.list(session.project_id)
+    )
+
+
+def test_terminal_publication_failure_preserves_previous_complete_projection(
+    stores, review_snapshots, clock, monkeypatch
+) -> None:
+    service = facade(stores, review_snapshots, clock)
+    started = start_script(service)
+    service.confirm(started.review_id, "u_demo", confirmed())
+    session = stores.review_sessions.get(started.review_id)
+    before = projection_snapshot(stores, session.project_id)
+    monkeypatch.setattr(
+        stores,
+        "publish_review_analysis",
+        lambda _publication: False,
+        raising=False,
+    )
+
+    with pytest.raises(StateInvalidError):
+        service.reanalyze(
+            started.review_id,
+            "u_demo",
+            confirmed(title="Lost terminal publication"),
+        )
+
+    assert projection_snapshot(stores, session.project_id) == before
+    assert not any(
+        event.event == "review.package_ready"
+        and event.at > before["timeline"][-1].at
+        for event in stores.timeline.list(session.project_id)
+    )
 
 
 def test_review_owner_isolated(stores, review_snapshots, clock) -> None:

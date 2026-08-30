@@ -62,6 +62,7 @@ from .errors import (
     ForbiddenError,
     NotFoundError,
     StateInvalidError,
+    UpstreamLLMError,
     ValidationFailedError,
 )
 from .forms import build_fields, deferred_keys, draft_hash, pending_keys
@@ -71,7 +72,12 @@ from .jobs import InlineRunner, JobOutcome, JobRunner, idempotency_key
 from .ids import new_id
 from .llm import LLMClient
 from .materials import build_material_cards
-from .review import SCRIPT_REVIEW_PROMPT_VERSION, evidence_for, review_script
+from .review import (
+    SCRIPT_REVIEW_PROMPT_VERSION,
+    ReviewResult,
+    evidence_for,
+    review_script,
+)
 from .roadmap import build_roadmap
 from .teaser import PENDING_FLAG as TEASER_PENDING
 from .teaser import PROMPT_VERSION as TEASER_PROMPT_VERSION
@@ -544,6 +550,7 @@ class WorkflowService:
         project_id: str,
         *,
         analysis_generation: int | None = None,
+        force: bool = False,
     ):
         """C1-a over the latest script version, recorded as a review task.
 
@@ -576,7 +583,10 @@ class WorkflowService:
         holder: list = []
 
         def work() -> JobOutcome:
-            project, written, result = self._review_now(project_id)
+            project, written, result = self._review_now(
+                project_id,
+                analysis_generation=analysis_generation,
+            )
             holder.append((project, written, result))
             return JobOutcome(
                 result={
@@ -591,11 +601,12 @@ class WorkflowService:
             )
 
         job_asset_version = asset.version_id
-        if analysis_generation is not None:
+        if force:
+            assert analysis_generation is not None
             job_asset_version = (
                 f"{asset.version_id}:analysis-generation:{analysis_generation}"
             )
-        self._run_job(
+        task, outcome, _ = self._run_job(
             project_id,
             task_type,
             job_asset_version,
@@ -611,19 +622,36 @@ class WorkflowService:
         )
         if holder:
             return holder[0]
-        # Queued, or replayed: report the project and the findings as they stand.
-        return (
-            self.get_project(project_id),
-            [],
-            self._empty_review(),
+        if task.status is TaskStatus.FAILED:
+            raise UpstreamLLMError(
+                "script review analysis failed",
+                {"task_id": task.task_id},
+            )
+        if task.status is TaskStatus.QUEUED:
+            raise StateInvalidError(
+                "script review analysis is still queued",
+                {"task_id": task.task_id, "status": task.status.value},
+            )
+        if outcome is None and task.result is None:
+            raise UpstreamLLMError(
+                "script review analysis produced no result",
+                {"task_id": task.task_id},
+            )
+        result = ReviewResult(
+            discarded=list((task.result or {}).get("discarded") or []),
+            pending_flags=[task.error]
+            if task.status is TaskStatus.NEEDS_HUMAN and task.error
+            else [],
+            backend=str((task.result or {}).get("backend") or "rules"),
         )
+        return self.get_project(project_id), [], result
 
-    def _empty_review(self):
-        from .review import ReviewResult
-
-        return ReviewResult(pending_flags=[], backend="queued")
-
-    def _review_now(self, project_id: str):
+    def _review_now(
+        self,
+        project_id: str,
+        *,
+        analysis_generation: int | None = None,
+    ):
 
         project = self.get_project(project_id)
         asset = self._latest_script(project_id)
@@ -647,13 +675,26 @@ class WorkflowService:
         )
         result = review_script(document, rules, self._llm)
 
-        # Carry decisions across versions: a scene the creator already judged is
-        # not re-litigated, and a scene they removed is marked self-fixed rather
-        # than left open against a script that no longer contains it.
-        carried, self_fixed = self._carry_findings_forward(
-            project_id, asset.version_id, document
-        )
-        existing = carried
+        self_fixed = 0
+        if analysis_generation is None:
+            # Carry decisions across source versions for the normal review API.
+            existing, self_fixed = self._carry_findings_forward(
+                project_id, asset.version_id, document
+            )
+        else:
+            # A completed-review generation is a fresh conclusion over the same
+            # source. Prior generations remain stored but are no longer current.
+            existing = set()
+            for finding in self._stores.findings.list(project_id):
+                if (
+                    finding.alert is None
+                    and finding.asset_version == asset.version_id
+                    and finding.active
+                ):
+                    self._stores.findings.save(
+                        project_id,
+                        finding.model_copy(update={"active": False}),
+                    )
 
         written: list[Finding] = []
         for proposed in result.findings:
@@ -681,6 +722,8 @@ class WorkflowService:
                         suggestion=proposed.suggestion,
                         prompt_version=SCRIPT_REVIEW_PROMPT_VERSION,
                         snapshot_version=version,
+                        analysis_generation=analysis_generation,
+                        active=True,
                         created_at=self._clock.now(),
                     ),
                 )
@@ -745,6 +788,8 @@ class WorkflowService:
         seen: set[tuple[str, str]] = set()
         self_fixed = 0
         for finding in self._stores.findings.list(project_id):
+            if not finding.active:
+                continue
             if finding.asset_version == version_id:
                 seen.add((finding.category, finding.locator.quote))
                 continue
@@ -1617,7 +1662,11 @@ class WorkflowService:
         )
 
     def _review_outcome(self, task: WorkflowTask) -> JobOutcome:
-        _, written, result = self._review_now(task.project_id)
+        generation = task.payload.get("analysis_generation")
+        _, written, result = self._review_now(
+            task.project_id,
+            analysis_generation=int(generation) if generation is not None else None,
+        )
         return JobOutcome(
             result={
                 "finding_count": len(written),
@@ -2063,6 +2112,12 @@ class WorkflowService:
                     project.project_id,
                     existing.model_copy(update={"active": False}),
                 )
+                self._record_event(
+                    project.project_id,
+                    Actor.SYSTEM,
+                    "finding.alert_deactivated",
+                    {"finding_id": existing.finding_id},
+                )
 
         existing = self._stores.findings.get(project.project_id, finding_id)
         if outcome.alert is None:
@@ -2075,6 +2130,12 @@ class WorkflowService:
                             "analysis_generation": analysis_generation,
                         }
                     ),
+                )
+                self._record_event(
+                    project.project_id,
+                    Actor.SYSTEM,
+                    "finding.alert_deactivated",
+                    {"finding_id": existing.finding_id},
                 )
             return
 
@@ -2124,7 +2185,11 @@ class WorkflowService:
         self._record_event(
             project.project_id,
             Actor.SYSTEM,
-            "finding.alert_created",
+            (
+                "finding.alert_created"
+                if existing is None
+                else "finding.alert_replaced"
+            ),
             {"finding_id": finding.finding_id, "category": finding.category},
         )
 

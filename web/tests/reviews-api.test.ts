@@ -169,4 +169,37 @@ describe("reviews API client", () => {
       details: { state: "ANALYZING" },
     });
   });
+
+  it("falls back safely when an error response is a malformed JSON object", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(JSON.stringify({ unexpected: true }), {
+          status: 502,
+          statusText: "Bad Gateway",
+          headers: { "Content-Type": "application/json" },
+        })
+      )
+    );
+    const details = {
+      title: "Edited",
+      tags: ["family"],
+      synopsis: "An edited synopsis.",
+      episode_count: 12,
+      episode_minutes: 2,
+      amount_bracket: "between" as const,
+    };
+
+    const error = await reanalyzeReview("review_001", details).catch(
+      (caught: unknown) => caught
+    );
+
+    expect(error).toBeInstanceOf(ApiError);
+    expect(error).toMatchObject({
+      status: 502,
+      code: "UNKNOWN",
+      message: "Bad Gateway",
+      details: {},
+    });
+  });
 });

@@ -42,6 +42,7 @@ from schemas.reviews import (
     UploadedScript,
 )
 from schemas.snapshot import SnapshotService
+from store.memory import review_analysis_publication, stage_review_analysis
 
 
 _CLASS_NAMES = {
@@ -249,6 +250,16 @@ class ReviewFacade:
                 "only a completed review can be reanalyzed",
                 {"state": session.state.value},
             )
+        project = self._workflow.get_project(session.project_id)
+        draft = self._stores.forms.latest(session.project_id)
+        if (
+            project.state not in WorkflowService.RECLASSIFIABLE_STATES
+            or (draft is not None and draft.frozen)
+        ):
+            raise StateInvalidError(
+                "this project can no longer be reanalyzed in place",
+                {"state": project.state.value},
+            )
         if session.confirmed == details:
             return self._view(session)
 
@@ -280,30 +291,38 @@ class ReviewFacade:
     ) -> ReviewView:
         try:
             assert session.confirmed is not None
-            self._workflow.apply_review_confirmation(
+            staged = stage_review_analysis(self._stores, session.project_id)
+            workflow = WorkflowService(
+                staged,
+                self._snapshots,
+                self._clock,
+                self._llm,
+                self._workflow._video,
+                self._workflow._jobs,
+            )
+            workflow.apply_review_confirmation(
                 session.project_id, session.mode, session.confirmed
             )
-            self._workflow.run_classification(
+            workflow.run_classification(
                 session.project_id,
                 analysis_generation=session.generation,
             )
             semantic_status = None
             if session.mode is ReviewMode.SCRIPT:
-                _, _, result = self._workflow.run_script_review(
+                _, _, result = workflow.run_script_review(
                     session.project_id,
-                    analysis_generation=(
-                        session.generation if force_script_review else None
-                    ),
+                    analysis_generation=session.generation,
+                    force=force_script_review,
                 )
                 semantic_status = (
                     SemanticStatus.PENDING
                     if "script_semantic_check_pending" in result.pending_flags
                     else SemanticStatus.COMPLETE
                 )
-            draft = self._workflow.form_draft(session.project_id)
+            draft = workflow.form_draft(session.project_id)
             applicant = draft.fields.get("applicant_entity")
             if applicant is not None and applicant.status is FieldStatus.PENDING:
-                self._workflow.defer_form_field(
+                workflow.defer_form_field(
                     session.project_id,
                     "applicant_entity",
                     "To be supplied by filing institution",
@@ -313,14 +332,22 @@ class ReviewFacade:
                 state=ReviewState.COMPLETE,
                 semantic_status=semantic_status,
             )
-            view = self._view(complete)
-            self._record(complete.project_id, "review.package_ready", complete)
-            if not self._stores.review_sessions.compare_and_put(
-                complete.review_id,
-                ReviewState.ANALYZING,
-                complete,
-                expected_generation=session.generation,
-            ):
+            view = self._view(complete, workflow=workflow, stores=staged)
+            workflow.record_review_event(
+                complete.project_id,
+                "review.package_ready",
+                {
+                    "review_id": complete.review_id,
+                    "state": complete.state.value,
+                    **(
+                        {"sha256": complete.source_sha256}
+                        if complete.source_sha256
+                        else {}
+                    ),
+                },
+            )
+            publication = review_analysis_publication(staged, complete)
+            if not self._stores.publish_review_analysis(publication):
                 raise StateInvalidError("review generation changed during analysis")
             return view
         except Exception as exc:
@@ -505,7 +532,13 @@ class ReviewFacade:
             return f"CNY {lower:,}–{upper:,}"
         return f"CNY {upper:,} or above"
 
-    def _view(self, session: ReviewSession) -> ReviewView:
+    def _view(
+        self,
+        session: ReviewSession,
+        *,
+        workflow: WorkflowService | None = None,
+        stores=None,
+    ) -> ReviewView:
         if session.state is ReviewState.FAILED:
             return ReviewView(
                 review_id=session.review_id,
@@ -532,11 +565,13 @@ class ReviewFacade:
                     "upload the source again."
                 ),
             )
-        project = self._workflow.get_project(session.project_id)
+        workflow = workflow or self._workflow
+        stores = stores or self._stores
+        project = workflow.get_project(session.project_id)
         findings = sorted(
             (
                 finding
-                for finding in self._stores.findings.list(session.project_id)
+                for finding in stores.findings.list(session.project_id)
                 if finding.active
             ),
             key=lambda item: (

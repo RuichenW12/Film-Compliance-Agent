@@ -121,9 +121,9 @@ async function reviewRequest<T>(path: string, init: RequestInit = {}): Promise<T
     }
     throw new ApiError(
       response.status,
-      body?.error.code ?? "UNKNOWN",
-      body?.error.message ?? response.statusText,
-      body?.error.details ?? {}
+      body?.error?.code ?? "UNKNOWN",
+      body?.error?.message ?? response.statusText,
+      body?.error?.details ?? {}
     );
   }
   return (await response.json()) as T;
@@ -191,9 +191,9 @@ export async function downloadReviewFile(
     try { body = (await response.json()) as ApiErrorBody; } catch {}
     throw new ApiError(
       response.status,
-      body?.error.code ?? "UNKNOWN",
-      body?.error.message ?? response.statusText,
-      body?.error.details ?? {}
+      body?.error?.code ?? "UNKNOWN",
+      body?.error?.message ?? response.statusText,
+      body?.error?.details ?? {}
     );
   }
   const objectUrl = URL.createObjectURL(await response.blob());

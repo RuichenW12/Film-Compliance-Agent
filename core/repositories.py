@@ -6,6 +6,7 @@ used by tests and the Firestore store used on Cloud Run stay interchangeable.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import Protocol
 
 from schemas.assets import AssetVersion, MaterialCard, UploadTicket
@@ -20,6 +21,20 @@ from schemas.workflow import (
     Notification,
     WorkflowTask,
 )
+
+
+@dataclass(frozen=True)
+class ReviewAnalysisPublication:
+    """One complete project-scoped review generation ready for atomic publish."""
+
+    session: ReviewSession
+    project: Project
+    facts: tuple[Fact, ...]
+    findings: tuple[Finding, ...]
+    forms: tuple[FormDraft, ...]
+    tasks: tuple[WorkflowTask, ...]
+    timeline: tuple[TimelineEvent, ...]
+    audit: tuple[AuditEntry, ...]
 
 
 class ProjectStore(Protocol):
@@ -129,6 +144,8 @@ class FormStore(Protocol):
     def get(self, project_id: str, draft_id: str) -> FormDraft | None: ...
 
     def latest(self, project_id: str) -> FormDraft | None: ...
+
+    def list(self, project_id: str) -> list[FormDraft]: ...
 
 
 class InstitutionReviewStore(Protocol):
