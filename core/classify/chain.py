@@ -262,13 +262,19 @@ def classify(
     if future:
         flags.add("clause_not_yet_in_force")
 
-    # Article 12 puts the one-class filing *before* shooting. Someone already
-    # shooting or finished has passed that step, and handing them a roadmap that
-    # opens with it would read as advice when it is a problem. Reported, not
-    # decided: the tier does not change, and no state moves.
-    if classification.tier is Tier.T1 and intent.production_stage in (
-        ProductionStage.SHOOTING,
-        ProductionStage.FINISHED,
+    # Article 12 puts the one-class filing *before* production. Someone whose
+    # work is already made has passed that step, and handing them a roadmap
+    # that opens with it would read as advice when it is a problem. Reported,
+    # not decided: the tier does not change, and no state moves.
+    #
+    # There is no separate "shooting" stage any more -- an AI micro-drama is
+    # generated rather than shot, so the moment article 12 points at is when
+    # production begins, and the only stage past it is PRODUCTION_COMPLETE.
+    # The flag keeps its name: renaming it would move a string that the e2e,
+    # the copy bundle and `SPEAKABLE_FLAGS` all key off, for no gain.
+    if (
+        classification.tier is Tier.T1
+        and intent.production_stage is ProductionStage.PRODUCTION_COMPLETE
     ):
         flags.add("filing_due_before_shooting")
 
@@ -326,7 +332,10 @@ def _classify(
             if form_decision.outcome == "exit_non_drama"
             else ExitKind.EXIT_SISTER_PATH
         )
-        obligations = ["ai_labeling"] if intent.is_ai_generated else []
+        # Every project here is an AI micro-drama, so the labelling duty
+        # always applies. It used to hang off the checkbox that no longer
+        # exists; making it conditional on a constant would only hide it.
+        obligations = ["ai_labeling"]
         obligations.append("platform_rules")
         return ClassificationOutcome(
             classification=Classification(
@@ -427,7 +436,6 @@ def _classify(
         pack3,
         thresholds_published,
         investment_amount_rmb=intent.investment_amount_rmb,
-        is_ai_generated=intent.is_ai_generated,
         platform_promoted=intent.platform_promoted,
         voluntary_key_declaration=intent.voluntary_key_declaration,
     )

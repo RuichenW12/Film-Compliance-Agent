@@ -68,6 +68,10 @@ export interface ProjectResponse {
   project: Record<string, unknown> & {
     state?: string;
     policy_stale?: boolean;
+    /** What the creator said about how far along the work is. Read by the
+     *  collection page to decide whether a finished cut exists to check
+     *  findings against. */
+    intent_profile?: { production_stage?: string };
     classification: {
       tier?: string;
       tier_provisional?: boolean;
@@ -515,4 +519,25 @@ export async function reclassifyProject(
   projectId: string
 ): Promise<{ classification: { tier: string } | null; state: string }> {
   return apiFetch(`/v1/projects/${projectId}/reclassify`, { method: "POST" });
+}
+
+/** One budget band and what it would mean, read from the pinned snapshot.
+ *
+ *  `statutory_deadline_key` is null for the two classes whose deadline the
+ *  regulation does not state — two-class has none, and three-class is platform
+ *  self-review rather than an administrative approval. Null means "not stated",
+ *  never "fast": rendering it as a blank is the honest reading. */
+export interface BudgetBand {
+  tier: string;
+  amount_bracket: string;
+  lower_rmb: number;
+  upper_rmb: number;
+  authority: string;
+  pre_shoot_filing: string;
+  blocks_release: boolean;
+  steps_yours: number;
+  steps_total: number;
+  statutory_deadline_key: string | null;
+  deadline_clause: string | null;
+  clause_refs: string[];
 }

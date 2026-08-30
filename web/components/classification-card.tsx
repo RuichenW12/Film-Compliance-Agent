@@ -3,7 +3,8 @@
 import type { Ref } from "react";
 
 import { PolicyVerificationBanner } from "@/components/policy-verification-banner";
-import type { PolicyVerificationStatus } from "@/lib/api";
+import type { BudgetBand, PolicyVerificationStatus } from "@/lib/api";
+import { BudgetComparison } from "@/components/budget-comparison";
 import { format, t } from "@/lib/i18n";
 
 export interface ClassifyResult {
@@ -31,6 +32,7 @@ export interface ClassifyResult {
   exit: { kind: string; obligations: string[]; card_key: string } | null;
   roadmap_preview: { template?: string } | null;
   state: string;
+  budget_comparison?: BudgetBand[] | null;
 }
 
 /**
@@ -46,7 +48,6 @@ const SPEAKABLE_FLAGS = [
   "clause_not_yet_in_force",
   "threshold_boundary_disputed",
   "budget_unknown",
-  "generation_mode_required",
   "thresholds_unavailable",
   "amount_required",
   "amount_official",
@@ -110,6 +111,12 @@ export function ClassificationCard({
 
   const route = c.filing_route;
   const flags = c.pending_flags.filter((flag) => SPEAKABLE_FLAGS.includes(flag));
+  /* Worth showing while the budget is still open, or when the subject has
+     fixed the class regardless — both are moments where the bands tell a
+     creator something they can act on. Once a budget has settled the class,
+     the answer above already says it. */
+  const showComparison =
+    c.special_subject_hit || c.pending_flags.includes("budget_unknown");
 
   return (
     <section className="card result-card" ref={sectionRef}>
@@ -181,6 +188,18 @@ export function ClassificationCard({
           carries its evidence; it does not say the evidence has to be the
           first thing a creator reads — nor that it has to be shown as the
           identifiers we happen to store it under. */}
+      {/* Shown when the budget has not settled the class — which is exactly
+          when a creator is deciding one, and when the thresholds are worth
+          more as a plan than as a question. A special subject locks the class
+          whatever the spend, so the table says that instead. */}
+      {result.budget_comparison && showComparison ? (
+        <BudgetComparison
+          bands={result.budget_comparison}
+          currentTier={c.tier}
+          locked={c.special_subject_hit}
+        />
+      ) : null}
+
       <details className="result-why">
         <summary>{t("result.why")}</summary>
         {c.matched_rules.length ? (

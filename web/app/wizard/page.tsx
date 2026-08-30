@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { FieldHelp } from "../../components/field-help";
 import { ClassificationCard } from "../../components/classification-card";
 import { GenrePicker } from "../../components/genre-picker";
+import { LengthPicker } from "../../components/length-picker";
 import { PolicyVerificationBanner } from "../../components/policy-verification-banner";
 import {
   ApiError,
@@ -47,19 +48,29 @@ interface ClassifyResponse {
 
 
 
-type ProductionStage = "idea" | "script_ready" | "shooting" | "finished" | "unknown";
+type ProductionStage =
+  | "idea"
+  | "script_ready"
+  | "production_complete"
+  | "unknown";
+/* Ordered as the work actually progresses, with the honest non-answer last.
+   "shooting" is gone: an AI micro-drama is generated rather than shot, so
+   there is no state between having a script and having a finished work. */
 const STAGES: ProductionStage[] = [
-  "unknown",
   "idea",
   "script_ready",
-  "shooting",
-  "finished"
+  "production_complete",
+  "unknown"
 ];
 
 export default function WizardPage() {
   const [title, setTitle] = useState("");
   const [synopsis, setSynopsis] = useState("");
-  const [stage, setStage] = useState<ProductionStage>("unknown");
+  const [stage, setStage] = useState<ProductionStage>("idea");
+  /* "Just an idea" and "not sure yet" are the two answers that mean the scale
+     questions have no answer yet. Everything past them implies a script, and a
+     script implies episodes and running time. */
+  const earlyStage = stage === "idea" || stage === "unknown";
   const [genres, setGenres] = useState("");
   const [episodeCount, setEpisodeCount] = useState("24");
   const [episodeMinutes, setEpisodeMinutes] = useState("3");
@@ -74,7 +85,11 @@ export default function WizardPage() {
   // needed. The state stays so the POST body keeps the field -- the API
   // contract is unchanged, and the form-freeze stage will supply it. See D-038.
   const [investmentAmount] = useState("");
-  const [isAiGenerated, setIsAiGenerated] = useState(true);
+  /* No longer asked. The product classifies AI micro-dramas only, so the
+     answer is a constant -- but the field stays on the wire because the
+     regulation genuinely distinguishes the two and the snapshot still carries
+     both threshold sets. See the plan note on D-026. */
+  const isAiGenerated = true;
   // 广电办发〔2024〕35号: platform promotion and voluntary declaration each make
   // a project 重点微短剧 on their own, whatever the investment amount says.
   const [platformPromoted, setPlatformPromoted] = useState(false);
@@ -142,10 +157,69 @@ export default function WizardPage() {
     }
   }
 
+  /* Length, adjusted rather than typed. Article 2 defines a micro-drama by
+     episode length, so these cannot be skipped -- but a number box asks a
+     creator at the idea stage to commit to a figure they have not decided,
+     and folding it away just submitted the default invisibly. A suggestion
+     that shows its consequence as you move it is neither. */
+  const lengthFields = (
+    <LengthPicker
+      episodeCount={episodeCount}
+      episodeMinutes={episodeMinutes}
+      onCountChange={setEpisodeCount}
+      onMinutesChange={setEpisodeMinutes}
+    />
+  );
+
+  /* The budget genuinely has no answer at the idea stage, and unlike length
+     the chain does not need one -- an unanswered budget produces an honest
+     provisional class plus the comparison table. So this is the field that
+     folds. */
+  const budgetField = (
+    <>
+      <label>
+        <span>{t("wizard.amount_bracket")}</span>
+        <FieldHelp field="amount_bracket" label="Budget range" />
+        <select
+          value={amountBracket}
+          onChange={(event) =>
+            setAmountBracket(event.target.value as AmountBracket)
+          }
+        >
+          {AMOUNT_BRACKETS.map((bracket) => (
+            <option key={bracket} value={bracket}>
+              {bracket === "unknown"
+                ? t("amount_bracket.unknown")
+                : BRACKET_LABELS[bracket]}
+            </option>
+          ))}
+        </select>
+      </label>
+      <p className="muted">{t("wizard.amount_bracket.hint")}</p>
+    </>
+  );
+
   return (
     <section>
       <h1>{t("wizard.intent.title")}</h1>
+      <p className="page-intro">{t("wizard.intent.intro")}</p>
       <form onSubmit={onSubmit} className="card">
+        {/* Asked first because it decides what else is worth asking. */}
+        <label>
+          <span>{t("wizard.production_stage")}</span>
+          <FieldHelp field="production_stage" label="How far along it is" />
+          <select
+            value={stage}
+            onChange={(event) => setStage(event.target.value as ProductionStage)}
+          >
+            {STAGES.map((value) => (
+              <option key={value} value={value}>
+                {t(`production_stage.${value}`)}
+              </option>
+            ))}
+          </select>
+        </label>
+        <p className="muted">{t(`wizard.stage_hint.${stage}`)}</p>
         <label>
           <span>{t("wizard.title")}</span>
           <FieldHelp field="title" label="Title" />
@@ -169,75 +243,22 @@ export default function WizardPage() {
             rows={4}
           />
         </label>
-        <label>
-          <span>{t("wizard.production_stage")}</span>
-          <FieldHelp field="production_stage" label="How far along it is" />
-          <select
-            value={stage}
-            onChange={(event) => setStage(event.target.value as ProductionStage)}
-          >
-            {STAGES.map((value) => (
-              <option key={value} value={value}>
-                {t(`production_stage.${value}`)}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
-          <span>AI generated content</span>
-          <FieldHelp field="is_ai_generated" label="AI generated content" />
-          <input
-            type="checkbox"
-            checked={isAiGenerated}
-            onChange={(event) => setIsAiGenerated(event.target.checked)}
-          />
-        </label>
-        <label>
-          <span>{t("wizard.amount_bracket")}</span>
-          <FieldHelp field="amount_bracket" label="Budget range" />
-          <select
-            value={amountBracket}
-            onChange={(event) =>
-              setAmountBracket(event.target.value as AmountBracket)
-            }
-          >
-            {AMOUNT_BRACKETS.map((bracket) => (
-              <option key={bracket} value={bracket}>
-                {bracket === "unknown"
-                  ? t("amount_bracket.unknown")
-                  : /* The figures follow the AI checkbox: the same range means
-                       a different tier, and showing live-action numbers to
-                       someone making an AI drama would be worse than showing
-                       none. */
-                    BRACKET_LABELS[isAiGenerated ? "ai" : "live_action"][
-                      bracket
-                    ]}
-              </option>
-            ))}
-          </select>
-        </label>
-        <p className="muted">{t("wizard.amount_bracket.hint")}</p>
-        <label>
-          <span>Episodes</span>
-          <FieldHelp field="episode_count" label="Episodes" />
-          <input
-            type="number"
-            min={1}
-            value={episodeCount}
-            onChange={(event) => setEpisodeCount(event.target.value)}
-          />
-        </label>
-        <label>
-          <span>Minutes per episode</span>
-          <FieldHelp field="episode_minutes" label="Minutes per episode" />
-          <input
-            type="number"
-            min={0.5}
-            step={0.5}
-            value={episodeMinutes}
-            onChange={(event) => setEpisodeMinutes(event.target.value)}
-          />
-        </label>
+        {/* The scale questions. At the idea stage a creator has a premise and
+            nothing else -- no budget, no episode count, no running time -- so
+            asking outright produced a form demanding answers nobody at that
+            stage has. They are folded away instead of removed: somebody who
+            does know can still say so, and the backend has always accepted
+            "unknown" for all three. */}
+        {lengthFields}
+        {earlyStage ? (
+          <details className="if-you-know">
+            <summary>{t("wizard.if_you_know")}</summary>
+            <p className="muted">{t("wizard.if_you_know.hint")}</p>
+            {budgetField}
+          </details>
+        ) : (
+          budgetField
+        )}
         {/* Neither is answerable at intake: platform promotion is settled
             after the film exists, and declaring voluntarily is a strategic
             choice. Kept, because deleting them would let a platform-featured

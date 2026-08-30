@@ -92,3 +92,30 @@ the product asks a creator to make a judgement rather than reporting one, which
 makes it either the most interesting screen to show or a distraction from the
 straight-through story. I did not build it unasked because it is a new
 user-facing surface with real wording implications, not a fix.
+
+---
+
+## Q-6 · Targeted video checking — your idea, and what it needs
+
+Your proposal: instead of analysing a whole video, use the script pre-check to
+find the passages worth attention and look only at those. That is a better
+design than the one the non-goal was written against, and it removes the cost
+objection — four scenes rather than four hours.
+
+**Half of it is built.** Findings carry an episode and a scene, so a finished
+project now gets a numbered list of exactly where to look, with the script's
+own line. That needed no new capability.
+
+**The other half needs two things I cannot give myself:**
+
+1. A change to `CLAUDE.md`'s "no video-frame analysis" non-goal. I could not
+   find the reasoning behind it — the TDD it cites is not in the repo, only
+   `docs/technical/policy-loop-v1-tdd.md`, whose section 11 is about
+   `policy.updated` consumption. So I have no original argument to weigh your
+   idea against, only a guess that it was about cost and scope.
+2. A vision model on the project. The Veo flag is generation, not analysis.
+
+**What I need from you:** whether to change that non-goal. If yes I will write
+the superseding decision and say plainly that the reasoning for the original
+could not be found.
+

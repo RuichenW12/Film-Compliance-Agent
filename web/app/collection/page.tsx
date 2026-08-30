@@ -34,9 +34,10 @@ import {
 import { FilingForm } from "../../components/filing-form";
 import { FilingSubmission } from "../../components/filing-submission";
 import { PolicyStaleNotice } from "../../components/policy-stale-notice";
+import { SceneChecklist } from "../../components/scene-checklist";
 import { PolicyVerificationBanner } from "../../components/policy-verification-banner";
 import { latestAssetOfKind } from "../../lib/assets";
-import { t } from "../../lib/i18n";
+import { format, t } from "../../lib/i18n";
 
 const KINDS = [
   "script",
@@ -106,6 +107,10 @@ export default function CollectionPage() {
      returned with comments, accepted, or filed. */
   const [projectState, setProjectState] = useState<string | null>(null);
   const [policyStale, setPolicyStale] = useState(false);
+  /* The checklist is for someone with a finished cut to check against. Read
+     from the project's own intent rather than its workflow state, which tracks
+     the filing rather than the work. */
+  const [stageIsComplete, setStageIsComplete] = useState(false);
   const [tier, setTier] = useState<string | null>(null);
 
   const [kind, setKind] = useState("script");
@@ -144,6 +149,10 @@ export default function CollectionPage() {
     );
     setProjectState(nextProject.project.state ?? null);
     setPolicyStale(nextProject.project.policy_stale ?? false);
+    setStageIsComplete(
+      nextProject.project.intent_profile?.production_stage ===
+        "production_complete"
+    );
     setTier(nextProject.project.classification?.tier ?? null);
     setLoaded(true);
   }, []);
@@ -178,8 +187,24 @@ export default function CollectionPage() {
     }
     await guard("upload", async () => {
       const ticket = await requestUploadUrl(projectId, kind, file.name);
-      await uploadBytes(ticket.upload_url, file);
+      const asset = await uploadBytes(ticket.upload_url, file);
       setFile(null);
+
+      /* Read the file rather than asking the same questions again. The
+         episode count, running time and title are in the script; making
+         someone type them a second time is work the product should be doing.
+         Extraction keeps only what the document backs verbatim, so this fills
+         nothing in that the file does not actually say.
+
+         Best-effort: an upload that succeeded must not report as failed
+         because the reading stumbled, and the button is still there. */
+      if (asset?.version_id) {
+        try {
+          setExtraction(await extractFacts(projectId, asset.version_id));
+        } catch {
+          setExtraction(null);
+        }
+      }
       await refresh(projectId);
     });
   }
@@ -327,9 +352,24 @@ export default function CollectionPage() {
             {extraction ? (
               <>
                 <Flags flags={extraction.pending_flags} />
+                {extraction.facts.length ? (
+                  <p className="alert">
+                    {format("collection.read_from_file", {
+                      fields: extraction.facts
+                        .map((fact) => t(`field.${fact.key}`))
+                        .join(", ")
+                    })}
+                  </p>
+                ) : (
+                  <p className="muted">{t("collection.read_nothing")}</p>
+                )}
                 {extraction.discarded.length ? (
                   <p className="muted">
-                    {t("collection.discarded")}: {extraction.discarded.join(", ")}
+                    {format("collection.discarded_because", {
+                      fields: extraction.discarded
+                        .map((key) => t(`field.${key}`))
+                        .join(", ")
+                    })}
                   </p>
                 ) : null}
               </>
@@ -564,13 +604,21 @@ export default function CollectionPage() {
               <ul>
                 {findings.map((finding) => (
                   <li key={finding.finding_id}>
-                    <span className="chip">{finding.severity}</span>{" "}
-                    <strong>{finding.category}</strong>
+                    <span className="chip">
+                      {t(`severity.${finding.severity}`)}
+                    </span>{" "}
+                    <strong>{t(`category.${finding.category}`)}</strong>
                     {finding.locator.episode ? (
                       <span className="muted">
-                        {" "}
-                        · ep {finding.locator.episode}
-                        {finding.locator.scene ? ` sc ${finding.locator.scene}` : ""}
+                        {" · "}
+                        {finding.locator.scene
+                          ? format("scenes.at", {
+                              episode: finding.locator.episode,
+                              scene: finding.locator.scene
+                            })
+                          : format("scenes.at_episode", {
+                              episode: finding.locator.episode
+                            })}
                       </span>
                     ) : null}
                     <div>“{finding.locator.quote}”</div>
@@ -583,8 +631,8 @@ export default function CollectionPage() {
                     ) : null}
                     <div className="muted">
                       {finding.evidence_refs
-                        .map((ref) => `${ref.clause_id} @ ${ref.snapshot_version}`)
-                        .join(", ")}
+                        .map((ref) => t(`clause.${ref.clause_id}`))
+                        .join("; ")}
                     </div>
                   </li>
                 ))}
@@ -605,6 +653,10 @@ export default function CollectionPage() {
             }}
             onError={setError}
           />
+          {projectState === "PRODUCTION_COMPLETE" ||
+          stageIsComplete ? (
+            <SceneChecklist findings={findings} />
+          ) : null}
           <FilingSubmission
             projectId={projectId}
             frozen={form?.frozen ?? false}

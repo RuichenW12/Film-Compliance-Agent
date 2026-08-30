@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Request, Response, status
 
+from core.comparison import budget_comparison
 from core.errors import ForbiddenError
 from core.workflow_service import WorkflowService
 from schemas.enums import FindingSeverity, MaterialStatus, Role
@@ -137,12 +138,26 @@ def _classify_response(
             obligations=outcome.exit.obligations,
             card_key=outcome.exit.card_key,
         )
+    # Built against the version this project is pinned to, not the newest one,
+    # so the comparison a creator plans against is the same policy their
+    # classification was decided under.
+    context = get_context(request)
+    pinned = (
+        outcome.classification.policy_snapshot_version
+        if outcome.classification is not None
+        else None
+    )
+    comparison = (
+        budget_comparison(context.snapshots, pinned) if pinned else None
+    )
+
     return ClassifyResponse(
         classification=outcome.classification,
         exit=exit_response,
         roadmap_preview=outcome.roadmap_preview,
         state=project.state,
         alert_finding_id=alert_finding_id,
+        budget_comparison=comparison,
     )
 
 

@@ -368,7 +368,6 @@ class WorkflowService:
             pack3,
             self._thresholds_published(snapshot_version),
             investment_amount_rmb=project.intent_profile.investment_amount_rmb,
-            is_ai_generated=project.intent_profile.is_ai_generated,
         )
         changed = (
             decision.tier != classification.tier

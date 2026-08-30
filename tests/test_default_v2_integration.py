@@ -51,9 +51,12 @@ def test_default_mock_v2_reaches_gate_and_frozen_form(monkeypatch) -> None:
                 "synopsis": "两位创业者共同完成一部作品。",
                 "episode_count": 20,
                 "episode_minutes": 3,
+                # 500,000 sits inside the `between` bracket on the AI
+                # figures (300,000-800,000). It read 1,500,000 before, which
+                # against those figures is the top bracket -- the fixture and
+                # its own bracket disagreed.
                 "amount_bracket": "between",
-                "investment_amount_rmb": 1_500_000,
-                "is_ai_generated": False,
+                "investment_amount_rmb": 500_000,
             },
             headers=OWNER,
         )

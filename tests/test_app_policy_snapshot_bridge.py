@@ -26,9 +26,10 @@ ROMANCE_INTENT = {
     "synopsis": "总裁与实习生在职场相遇，逐渐走到一起的爱情故事。",
     "episode_count": 30,
     "episode_minutes": 2,
-    "amount_bracket": "below_lower",
-    "investment_amount_rmb": 1_500_000,
-    "is_ai_generated": None,
+    # No budget answer of any kind, which is what keeps the tier provisional
+    # now. It used to be provisional because the generation mode was
+    # unanswered -- a gate that cannot exist with one threshold set.
+    "amount_bracket": "unknown",
 }
 
 
@@ -65,7 +66,9 @@ def create_provisional_romance(client: TestClient) -> str:
     )
     assert classified.status_code == 200
     classification = classified.json()["classification"]
-    assert classification["tier"] == "T3"
+    # With no budget answer the stricter tier is assumed, and assuming is
+    # exactly what "provisional" records.
+    assert classification["tier"] == "T2"
     assert classification["tier_provisional"] is True
     assert classification["policy_snapshot_version"] == "v2"
     return project_id
@@ -116,7 +119,7 @@ def test_publish_v3_then_product_recalc_reads_the_same_repository(
         )
         assert recalculated.status_code == 200
         assert recalculated.json() == {
-            "tier": "T3",
+            "tier": "T2",
             "tier_provisional": True,
             "changed": False,
         }

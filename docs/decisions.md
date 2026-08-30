@@ -1851,3 +1851,148 @@ what it set up.
 acknowledgement is the subscriber's, and this class is replaced rather than
 adapted — but the ordering it encodes is the same one that transport requires.
 
+---
+
+## D-053
+
+**The product classifies AI micro-dramas only** · Area: Shared · Status: Accepted · 2026-08-29 · Supersedes [D-026](#d-026)
+
+The owner narrowed the product to AI micro-dramas, so the checkbox that chose a
+threshold set is gone and the AI set is always read: T1 ≥ 800,000, T2 ≥ 300,000.
+
+**`is_ai_generated` stays in the schema and on the wire, defaulted true.**
+总局令第16号 genuinely distinguishes the two and the snapshot still carries both
+sets with their different effective dates. Deleting the live-action figures
+would put a hole in our record of the regulation to save a few lines, and
+classifying live-action work again is now one constant in `core/classify/d1c.py`.
+
+**D-026 is superseded.** It required "an exact amount, a known generation mode,
+and a usable published threshold set" for a final tier. The middle condition
+cannot fail with one set, so `generation_mode_required` can never fire and is
+deleted along with its copy.
+
+**A bug fixed on the way.** The platform-promotion short circuit hardcoded the
+live-action clause ref, so an AI project promoted to key-drama cited
+`tier-live-action-2026` — a decision that never consults the amount at all,
+pointing at the wrong instrument.
+
+**The AI labelling duty becomes unconditional.** It hung off the checkbox; with
+every project AI, making it conditional on a constant would only hide it.
+
+## D-054
+
+**The stage decides what the form asks, and length is not negotiable** · Area: A · Status: Accepted · 2026-08-29
+
+"How far along it is" affected nothing. Picking "just an idea" still demanded a
+budget, an episode count and a running time. The backend has always accepted
+unknown for all three, so it was the form asking anyway.
+
+`ProductionStage` loses `SHOOTING` — an AI micro-drama is generated, not shot,
+so there is no state between having a script and having a finished work — and
+`FINISHED` becomes `PRODUCTION_COMPLETE`. The stage question moves first,
+because it decides what else is worth asking.
+
+**Only the budget folds, and the reason matters.** The first attempt folded
+episodes and running time too, which did not stop them being submitted: the
+wizard defaults them to 24 and 3, so a creator who never saw the fields still
+had those values recorded as their answer. That is inventing two facts and
+hiding them, which is worse than asking for them.
+
+They cannot be dropped either. Article 2 defines a micro-drama *by* episode
+length, under twenty minutes, so without them the chain cannot tell a
+micro-drama from a web film and `classify` returns 409 naming them. So length
+stays at every stage with "an estimate is fine", and the budget — which the
+chain does not need, and which produces an honest provisional class when
+unanswered — is the field that folds.
+
+## D-055
+
+**At the idea stage, the thresholds are a plan rather than a question** · Area: A · Status: Accepted · 2026-08-29
+
+Asking a creator with a premise for a budget gets a worse answer than not
+asking. `core/comparison.py` turns it round: what each level would commit you
+to, so the thresholds become something to plan against.
+
+Every column is read from the pinned snapshot — boundaries from the threshold
+set, authority and filing duty from the filing routes, and "steps you do
+yourself" counted from each class's process template by owner (5 of 7, 3 of 5,
+2 of 4). Nothing is scored.
+
+**The deadline column is empty for two of three classes, on purpose.** Article
+20 states twenty days for a one-class decision including ten for expert review.
+The regulation says nothing about two-class, and three-class is platform
+self-review rather than an administrative approval. Those cells read "no stated
+deadline" rather than a dash, because a dash reads as "none" and an estimate is
+a number somebody would build a schedule around. The owner asked for a rough
+time estimate; this is the version of that which does not require inventing one.
+
+**The table is all-or-nothing.** `budget_comparison` returns None rather than a
+partial table when the snapshot cannot support every column, for the same
+reason `filing_route` does: a comparison with invented boundaries would be
+planned against exactly as readily as a real one.
+
+**Revisit when** a two-class review period is sourced — recorded in
+`MISSING.md` as a question for the industry contact.
+
+## D-056
+
+**A finished project is told which scenes to watch, not scored on its footage** · Area: A · Status: Accepted · 2026-08-29
+
+The owner's proposal: rather than analysing a whole video, use the script
+pre-check to locate the passages worth attention and look only at those. That
+sidesteps the cost objection behind the video-frame non-goal.
+
+`Locator` already carries an episode and a scene, so **the locating half needs
+no new capability** and is built: at `PRODUCTION_COMPLETE`, findings render as a
+numbered list of places to look, ordered as the work plays, each with the
+script's own line.
+
+It stops there and says so. We read the script, not the footage. Where to look
+and what the script said is knowable; whether the finished scene is a problem is
+a judgement only someone watching can make, and claiming otherwise would assert
+a conclusion from evidence we do not have.
+
+**The automated half needs two things we do not have** — a change to the
+video-frame non-goal in `CLAUDE.md`, and a vision model. Recorded in
+`QUESTIONS-FOR-MAXINE.md` rather than half-built.
+
+---
+
+## D-057
+
+**Length is adjusted and watched, not typed** · Area: A · Status: Accepted · 2026-08-29 · Refines [D-054](#d-054)
+
+D-054 kept the episode count and running time on the form as number boxes,
+because article 2 defines a micro-drama by episode length and the chain cannot
+work without them. The owner pushed back with a better answer than either of
+mine: do not ask the creator to type a figure they have not decided — suggest
+one, let them move it and see what changes, and let the moving be the answer.
+
+That resolves the objection I had raised rather than overriding it. My concern
+was inventing facts, and the invention was never the presence of a default: it
+was that a folded field submitted its default where nobody could see it. **A
+value someone looks at and adjusts is their answer. A value hidden from them is
+ours.**
+
+So episode length is a slider with a live verdict beneath it. Below twenty
+minutes it says this is a micro-drama; at twenty it says the work becomes a web
+film, a different set of rules and not the ones this tool checks. The boundary
+is visible before it is crossed, which a number box cannot do.
+
+**Two figures, two different standings, and the interface separates them.**
+Twenty minutes is article 2 and lives in the snapshot as
+`episode_max_minutes_exclusive`. The three-episode minimum is **not** in the
+regulation — article 2 says 剧集, a series, without giving a number — and is a
+fallback in `core/classify/d1a.py`. The copy says so rather than presenting our
+reading as law.
+
+**The classification is still made server-side.** The slider draws the line for
+the creator; it does not decide anything, and the twenty in the component is
+there to render a boundary rather than to apply one.
+
+**Found while testing:** the web-film exit card listed `obligation.ai_labeling`
+and `obligation.platform_rules` as raw keys — on the one screen a creator
+reaches by discovering their project is not what they thought. Copy added, and
+`test_result_copy.py` now walks the obligations in `chain.py` so a new one
+cannot ship without words.
+
