@@ -20,7 +20,191 @@ Conventions:
 
 ---
 
-## 2026-08-29
+## 2026-08-30
+
+### Shared — a deployment reference the other workstream can act on
+
+**`docs/deployment.md`.** The deployment had been recorded as a personal
+checklist (`deploy-manual-steps.md`, "the parts that need you") and as commit
+messages. Neither answers the question the other workstream actually has:
+*what do I have to know before I change product code?*
+
+So the two files now split by audience. `deploy-manual-steps.md` keeps only
+what a person does by hand. `deployment.md` is the reference: topology and why
+the browser never calls the API directly, the exact environment of both
+services, build and deploy and rollback commands, storage backends and how to
+run the conformance suite against Firestore, how access works, troubleshooting,
+and an honest list of what is not built.
+
+The section that matters most to someone who did not build this is **§3, things
+that behave differently in the cloud** — every item is a *silent* failure:
+
+- `/healthz` is answered by Google's front end and never reaches the container;
+- `PORT` must be honoured or the revision never receives traffic;
+- uploads are capped at 700 KB until Cloud Storage lands;
+- console status is not evidence — IAP read *enabled* and *Ready* for hours
+  while the service returned 502;
+- there is no `web/public`, so the first static asset added will 404 silently.
+
+**§10 is four rules for product code**: call the API through `/v1/*` on the
+app's own origin, go through the ports in `core/repositories.py`, use `/health`,
+and keep secrets out of the repository. Nothing else about writing product code
+changes because it is deployed.
+
+`CLAUDE.md` now points at it, so an agent reading the working agreements finds
+the deployment constraints without being told they exist.
+
+### A — Firestore, and a front end wired to the API
+
+**`store/firestore.py`** — the fourteen ports again, on Firestore. Cloud Run
+replaces containers freely and runs several at once, so a SQLite file on a
+container filesystem is invisible to the next instance and gone at the next
+revision. The API now runs `STORE_BACKEND=firestore` (revision
+`api-00005-phq`); projects survive a deploy.
+
+Shape follows `store.sqlite` exactly -- a `parent` per project, a monotonic
+`ordinal` for insertion order -- so the three backends are genuinely
+interchangeable. Two choices worth knowing:
+
+- **Ordering happens in Python, not in the query.** Ordering in Firestore would
+  need a composite index per collection, which must be deployed before the code
+  needing it and fails confusingly when absent. At tens of documents per
+  project, sorting locally costs nothing and removes a class of deployment
+  mistake.
+- **`FirestoreBlobStore` is a stopgap and says so.** Bytes go base64 into a
+  document, refused above 700 KB with a message naming the real answer. Cloud
+  Storage is where uploads belong (5b).
+
+**Verified against a real database, not just an emulator.** The Firestore
+emulator needs a JRE and this machine's Oracle `java` is a broken stub -- the
+shims exist, the runtime is gone, `java -version` exits 9 silently. Rather than
+install one, the conformance fixture now also accepts `FIRESTORE_TEST_PROJECT`
+and runs against the real database under a per-test collection prefix, deleting
+only its own namespace afterwards. **77 passed** in that file (25 conformance
+tests × 3 backends, plus 2), and the database was left with no collections at
+all. Full suite: 699 passed, 3 skipped.
+
+**Front end deployed and connected.** `web` is live at
+<https://web-827776020662.us-east1.run.app>, behind the same Google sign-in.
+
+The connection is the interesting part. A browser on the web host calling the
+API host fails twice: CORS (`WEB_ORIGINS` lists localhost only) and IAP (its
+cookie is scoped to one service, so a `fetch` gets a sign-in redirect rather
+than data). **`web/app/v1/[...path]/route.ts`** relays server-side instead, so
+the browser only ever talks to the origin it loaded from. A `next.config`
+rewrite would have been less code but cannot work: rewrites forward the request
+untouched, and IAP rejects a request with no credential. The handler mints an
+identity token from the Cloud Run metadata server, with the IAP **OAuth client
+ID** as the audience -- a token minted for the service URL is refused.
+
+**Merge safety:** everything above is new files plus small edits to
+`api/deps/services.py`, `api/settings.py`, `store/__init__.py`, and the
+conformance fixture. `web/` gained two new files and no page, component or
+stylesheet was touched.
+
+One failure worth recording because the design worked: deploying
+`STORE_BACKEND=firestore` onto the previous image failed to start with
+`unknown STORE_BACKEND 'firestore'; expected 'memory' or 'sqlite'` -- that image
+predated the adapter. It refused to boot rather than silently falling back to
+memory, and Cloud Run kept the old revision serving. Nothing was down.
+
+### A — the deployed API is live behind Google sign-in
+
+<https://api-827776020662.us-east1.run.app> — any Google account signs in, no
+allow-list, no shared secret, and no application code involved in the gate.
+
+Five things are required and all five are now set. Recorded together because
+four of them look sufficient on their own and the service still fails:
+
+1. IAP enabled on the Cloud Run service (`--iap`);
+2. the IAP service agent granted `roles/run.invoker` on the service;
+3. `allAuthenticatedUsers` granted `roles/iap.httpsResourceAccessor`;
+4. the Cloud Run invoker IAM check left **on**;
+5. **a custom OAuth client handed to IAP via `gcloud iap settings set`** — no
+   console page exposes this, and it is required for any project outside an
+   Organization.
+
+Number 5 cost most of the afternoon. Both places a person would look — the
+Cloud Run Security tab and the IAP page — reported IAP *enabled* and *Ready*
+the whole time, while the service answered `502` with
+`x-goog-iap-generated-response: true`. Console status was not evidence of
+anything. The answer is in Google's Cloud Run IAP documentation, not in the
+console or in `gcloud --help`.
+
+Along the way the Cloud Run invoker IAM check was disabled to isolate a
+different failure — Cloud Run was rejecting browser requests with "Empty
+Authorization header value" before IAP could act. It has since been restored,
+and verified: an unauthenticated request returns `302` to
+`accounts.google.com` with `x-goog-iap-generated-response: true`.
+
+Decisions this settles: no shared access code, and no in-application identity.
+`api/deps/demo_auth.py` is untouched, so the role switcher behaves in the
+deployed environment exactly as it does locally — behind the Google sign-in.
+
+### A — the API runs on Cloud Run, and serves the two pages OAuth demands
+
+`api` is deployed in us-east1 on `film-compliance-agent` and answering: a
+`GET /v1/institutions` through the authenticated proxy returns 200 from the
+container.
+
+**New: `api/routers/public_pages.py`** — `/privacy` and `/terms`, plain HTML,
+mounted with one line. Google will not publish an external OAuth consent screen
+without both links, and it checks their domain, so these are a deployment
+dependency rather than a product feature. They are served by the API, not the
+web app, because the consent screen links straight at them and must not depend
+on the front end being up. `include_in_schema=False` keeps them out of the
+public contract, which a test confirms.
+
+Everything the privacy page claims is checkable against the code: what is
+collected, that it goes to Firestore and Cloud Storage in us-east1, that text
+reaches Vertex AI, and that nothing is filed with any authority. It also says
+plainly that this is a demo whose data may be deleted without notice, because
+that is true and a policy describing a system we do not run would be worse than
+none.
+
+Verified: `/privacy` and `/terms` both return 200 from the deployed revision.
+`python -m pytest` 673 passed, 3 skipped — one more case than before, from the
+route-enumeration test picking up the new pages.
+
+Still unexplained from the first deploy: `GET /healthz` returns 404 and never
+reaches the application, while `/zzz-not-a-route` reaches it and is logged.
+The service is private, so the authenticated proxy is not yet ruled out as the
+cause. It matters because the manual and `scripts/e2e_check.py` both use
+`/healthz`.
+
+### A — a runbook for the human half of the deployment
+
+`docs/deploy-manual-steps.md`. Deployment work is starting, and it splits into
+two piles: things an agent should do, and things it should not — an irreversible
+choice, an interactive login, a secret value. This file is only the second pile,
+so there is one place to look rather than a decision buried in chat scrollback.
+
+What it records, all verified on the machine today rather than assumed:
+
+- **The project already exists** — `film-compliance-agent`, number
+  `827776020662`, billing `01CE31-A7C20B-F215BA` (a free-credit account, not
+  the one the other projects use). It is empty: no database, no buckets, no
+  services.
+- **gcloud 582.0.0 was already installed** at `%LOCALAPPDATA%\Google\Cloud SDK`
+  and simply not on PATH, which is why it looked absent. Java is present, Docker
+  is not and is not needed.
+- Twelve APIs are enabled — eight of them enabled today: `firestore`, `run`,
+  `pubsub`, `cloudbuild`, `artifactregistry`, `secretmanager`, `cloudscheduler`,
+  `iamcredentials`.
+- `cloud-firestore-emulator` and `pubsub-emulator` installed, so phase 5a is
+  verifiable locally with no cloud resources. The install fails with exit 1
+  until `CLOUDSDK_PYTHON` points at gcloud's bundled interpreter; the workaround
+  is in the file.
+
+Two decisions are written down where the commands are, not just in chat:
+
+- **Creating the Firestore database is the only irreversible step**, because its
+  location is fixed forever. The file states the `us-east1` versus `nam5`
+  trade-off next to the command rather than presenting one as obvious.
+- A named gcloud configuration (`film`) is recommended, so working on this
+  project does not disturb the active config pointing at another one.
+
+Nothing here changes product behavior — no code, no schema, no contract.
 
 ### A — the illustrated walkthrough is in the repository
 

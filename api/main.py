@@ -45,6 +45,7 @@ from .routers import (
     materials,
     notifications,
     projects,
+    public_pages,
     review,
     reviews,
     teaser,
@@ -143,6 +144,10 @@ def create_app(
     app.include_router(notifications.router)
     app.include_router(internal.router)
     app.include_router(admin_policy_router)
+    # /privacy and /terms. Required by the OAuth consent screen the deployment
+    # sits behind, so they are served by the API rather than the web app: the
+    # consent screen links straight here and must not depend on the front end.
+    app.include_router(public_pages.router)
 
     @app.exception_handler(AppError)
     async def handle_app_error(_: Request, exc: AppError) -> JSONResponse:

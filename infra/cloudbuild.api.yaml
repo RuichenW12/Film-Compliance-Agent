@@ -1,0 +1,26 @@
+# Build the API image from the repository root.
+#
+# `gcloud run deploy --source` would be shorter, but it insists on a Dockerfile
+# at the repository root, and the Dockerfiles live in `infra/` so that the root
+# stays readable. This config keeps the build context at the root -- the image
+# needs `policy/`, `core/` and `schemas/` -- while pointing `-f` at infra/.
+#
+# Usage:
+#   gcloud builds submit --config infra/cloudbuild.api.yaml \
+#     --substitutions=_IMAGE=us-east1-docker.pkg.dev/PROJECT/app/api:TAG
+
+steps:
+  - name: gcr.io/cloud-builders/docker
+    args:
+      - build
+      - -t
+      - $_IMAGE
+      - -f
+      - infra/api.Dockerfile
+      - .
+
+images:
+  - $_IMAGE
+
+options:
+  logging: CLOUD_LOGGING_ONLY

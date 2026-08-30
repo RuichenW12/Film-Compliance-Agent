@@ -64,13 +64,18 @@ def build_llm(settings: Settings) -> LLMClient:
 
 
 def build_stores(settings: Settings) -> Stores:
-    """Memory by default; SQLite when asked for.
+    """Memory by default; SQLite or Firestore when asked for.
 
     The default stays memory so tests and a throwaway run keep their clean
-    slate. `STORE_BACKEND=sqlite` is what makes a demo survive a restart, which
-    is the only reason a second backend exists. An unknown value fails loudly
-    rather than falling back: silently running in memory when someone asked for
-    durability is exactly the surprise this is meant to remove.
+    slate. `STORE_BACKEND=sqlite` is what makes a local demo survive a restart.
+    `STORE_BACKEND=firestore` is the only one that survives Cloud Run, which
+    replaces containers freely and runs several at once -- a SQLite file lives
+    on a container filesystem and is gone at the next revision.
+
+    An unknown value fails loudly rather than falling back: silently running in
+    memory when someone asked for durability is exactly the surprise this is
+    meant to remove. Firestore is imported here rather than at module scope so
+    a machine without the cloud extra can still run everything else.
     """
 
     backend = (settings.store_backend or "memory").strip().lower()
@@ -78,8 +83,16 @@ def build_stores(settings: Settings) -> Stores:
         return InMemoryStores()
     if backend == "sqlite":
         return SqliteStores.at(settings.sqlite_file)
+    if backend == "firestore":
+        from store.firestore import FirestoreStores
+
+        return FirestoreStores.for_project(
+            project=settings.google_cloud_project or None,
+            database=settings.firestore_database or None,
+        )
     raise ValueError(
-        f"unknown STORE_BACKEND {backend!r}; expected 'memory' or 'sqlite'"
+        f"unknown STORE_BACKEND {backend!r}; "
+        "expected 'memory', 'sqlite' or 'firestore'"
     )
 
 

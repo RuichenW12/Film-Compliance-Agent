@@ -41,6 +41,15 @@ reading each other's diffs. So:
 
 FastAPI + Firestore + Pub/Sub + Next.js (App Router). All inference is Gemini on Vertex AI. UI is English only — no Chinese, not even as a gloss (D-039, reversing D-032's gloss half).
 
+## Deployed
+
+Live on Google Cloud Run at <https://web-827776020662.us-east1.run.app>, behind
+Google sign-in. Read [`docs/deployment.md`](docs/deployment.md) before changing
+anything that touches storage, the API base URL, or a health check — a few
+things behave differently in the cloud than on a laptop, and each one is a
+silent failure rather than a loud one. The four rules that affect product code
+are in its last section.
+
 ## Verify
 
 ```bash

@@ -228,13 +228,18 @@ def main() -> int:
     checker = Checker(args.base, args.internal_token, args.timeout)
 
     print("\n== 0. service is up ==")
+    # `/health`, not `/healthz`: on Cloud Run, Google's front end answers
+    # `/healthz` with a 404 of its own before the request reaches the
+    # container, so a run against a deployed service failed at step 0 while
+    # everything behind it was fine. Both paths are served and return the same
+    # payload; this one is the one that survives being deployed.
     try:
-        status, health, _ = checker.call("GET", "/healthz")
+        status, health, _ = checker.call("GET", "/health")
     except urllib.error.URLError as error:
         print(f"  cannot reach {args.base}: {error}")
         print("  start it with: python -m uvicorn api.main:app --port 8080")
         return 2
-    checker.check("healthz responds", status == 200)
+    checker.check("health responds", status == 200)
     checker.check(
         "snapshot is pinned", bool(health.get("snapshot_version")), health.get("snapshot_version", "")
     )

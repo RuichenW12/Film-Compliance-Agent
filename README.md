@@ -22,7 +22,7 @@ The test suite and the API run with no credentials, no emulator, and no network:
 ```bash
 pip install -e ".[test]"         # 1. install
 python -m pytest                 # 2. verify  (all green, no cloud access needed)
-uvicorn api.main:app --port 8080 # 3. run     (http://localhost:8080/healthz)
+uvicorn api.main:app --port 8080 # 3. run     (http://localhost:8080/health)
 ```
 
 With the API running, `python scripts/e2e_check.py` walks the golden path against the live service and prints, step by step, what works today and which task delivers each step that does not.
