@@ -9,6 +9,7 @@ import {
   createIdeaReview,
   createScriptReview,
   getReview,
+  reanalyzeReview,
 } from "@/lib/reviews-api";
 
 
@@ -20,6 +21,7 @@ vi.mock("@/lib/reviews-api", async (importOriginal) => {
     createIdeaReview: vi.fn(),
     createScriptReview: vi.fn(),
     getReview: vi.fn(),
+    reanalyzeReview: vi.fn(),
     retryReviewIntake: vi.fn(),
   };
 });
@@ -117,12 +119,12 @@ const COMPLETE_VIEW: ReviewView = {
   ...CONFIRM_VIEW,
   state: "COMPLETE",
   confirmed: {
-    title: "先挂电话",
+    title: "Confirmed script title",
     tags: ["公安", "家庭现实"],
     synopsis: "社区民警帮助居民识别可疑来电。",
-    episode_count: 10,
-    episode_minutes: 3,
-    amount_bracket: "at_or_above_upper",
+    episode_count: 12,
+    episode_minutes: 2.5,
+    amount_bracket: "between",
   },
   semantic_status: "pending",
   classification: {
@@ -178,6 +180,13 @@ describe("upload-first review flow", () => {
   it("starts with an accessible upload action and a secondary idea path", () => {
     render(<ReviewFlow />);
 
+    expect(screen.getByRole("tablist", { name: "Review progress" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: /Upload/ })).toHaveAttribute(
+      "aria-selected",
+      "true"
+    );
+    expect(screen.getByRole("tab", { name: /Confirm details/ })).toBeDisabled();
+    expect(screen.getByRole("tab", { name: /Review results/ })).toBeDisabled();
     expect(
       screen.getByRole("heading", { name: "Upload a script. Skip the questionnaire." })
     ).toBeInTheDocument();
@@ -194,6 +203,136 @@ describe("upload-first review flow", () => {
     expect(screen.queryByText(/production stage/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/project id/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/roadmap/i)).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Back/i })).not.toBeInTheDocument();
+  });
+
+  it("navigates visited tabs without requests and reanalyzes confirmed edits once", async () => {
+    vi.mocked(getReview).mockResolvedValue(COMPLETE_VIEW);
+    vi.mocked(reanalyzeReview).mockResolvedValue({
+      ...COMPLETE_VIEW,
+      confirmed: { ...COMPLETE_VIEW.confirmed!, title: "Updated confirmed title" },
+    });
+    const user = userEvent.setup();
+    render(<ReviewFlow initialReviewId="review_001" />);
+
+    expect(await screen.findByText("Class 1")).toBeInTheDocument();
+    const resultsTab = screen.getByRole("tab", { name: /Review results/ });
+    const confirmTab = screen.getByRole("tab", { name: /Confirm details/ });
+    const uploadTab = screen.getByRole("tab", { name: /Upload/ });
+    expect(resultsTab).toHaveAttribute("aria-selected", "true");
+    expect(confirmTab).toBeEnabled();
+    expect(uploadTab).toBeEnabled();
+
+    await user.click(confirmTab);
+    expect(screen.getByLabelText("Project title")).toHaveValue("Confirmed script title");
+    expect(screen.getByLabelText("Tags")).toHaveValue("公安, 家庭现实");
+    expect(screen.getByLabelText("Synopsis")).toHaveValue("社区民警帮助居民识别可疑来电。");
+    expect(screen.getByLabelText("Episode count")).toHaveValue(12);
+    expect(screen.getByLabelText("Minutes per episode")).toHaveValue(2.5);
+    expect(screen.getByLabelText("Investment band")).toHaveValue("between");
+    expect(screen.getAllByText("Last confirmed")).toHaveLength(6);
+    expect(screen.getByRole("button", { name: "Confirm changes & reanalyze" })).toBeInTheDocument();
+    expect(confirmReview).not.toHaveBeenCalled();
+    expect(reanalyzeReview).not.toHaveBeenCalled();
+
+    await user.click(resultsTab);
+    await user.click(uploadTab);
+    expect(screen.getByText("e2e-30min-public-security.md")).toBeInTheDocument();
+    expect(screen.getByText(/abc123/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Continue with current script" })).toBeInTheDocument();
+    expect(confirmReview).not.toHaveBeenCalled();
+    expect(reanalyzeReview).not.toHaveBeenCalled();
+
+    await user.click(screen.getByRole("button", { name: "Continue with current script" }));
+    expect(screen.getByText("Class 1")).toBeInTheDocument();
+    expect(resultsTab).toHaveAttribute("aria-selected", "true");
+    expect(confirmReview).not.toHaveBeenCalled();
+    expect(reanalyzeReview).not.toHaveBeenCalled();
+
+    await user.click(confirmTab);
+    const title = screen.getByLabelText("Project title");
+    await user.clear(title);
+    await user.type(title, "Updated confirmed title");
+    await user.click(screen.getByRole("button", { name: "Confirm changes & reanalyze" }));
+
+    expect(reanalyzeReview).toHaveBeenCalledTimes(1);
+    expect(reanalyzeReview).toHaveBeenCalledWith(
+      "review_001",
+      expect.objectContaining({ title: "Updated confirmed title" })
+    );
+    expect(confirmReview).not.toHaveBeenCalled();
+    expect(await screen.findByText("Class 1")).toBeInTheDocument();
+    expect(resultsTab).toHaveAttribute("aria-selected", "true");
+    expect(screen.queryByRole("button", { name: /Back/i })).not.toBeInTheDocument();
+  });
+
+  it("supports arrow-key navigation across visited progress tabs", async () => {
+    vi.mocked(getReview).mockResolvedValue(COMPLETE_VIEW);
+    const user = userEvent.setup();
+    render(<ReviewFlow initialReviewId="review_001" />);
+
+    const resultsTab = await screen.findByRole("tab", { name: /Review results/ });
+    const uploadTab = screen.getByRole("tab", { name: /Upload/ });
+    await waitFor(() => expect(resultsTab).toHaveAttribute("aria-selected", "true"));
+    resultsTab.focus();
+    await user.keyboard("{ArrowRight}");
+
+    expect(uploadTab).toHaveFocus();
+    expect(uploadTab).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("button", { name: "Continue with current script" })).toBeInTheDocument();
+    expect(confirmReview).not.toHaveBeenCalled();
+    expect(reanalyzeReview).not.toHaveBeenCalled();
+  });
+
+  it("disables every progress tab while a request is mutating the review", async () => {
+    let finish: ((view: ReviewView) => void) | undefined;
+    vi.mocked(createScriptReview).mockImplementation(
+      () => new Promise((resolve) => { finish = resolve; })
+    );
+    const user = userEvent.setup();
+    render(<ReviewFlow />);
+
+    await user.upload(
+      screen.getByLabelText("Choose a script"),
+      new File(["# Demo"], "demo.md", { type: "text/markdown" })
+    );
+    await user.click(screen.getByRole("button", { name: "Extract project details" }));
+
+    for (const tab of screen.getAllByRole("tab")) {
+      expect(tab).toBeDisabled();
+    }
+    finish?.(CONFIRM_VIEW);
+    expect(await screen.findByLabelText("Project title")).toBeInTheDocument();
+  });
+
+  it("starts a new session and resets future tab access when a replacement file is uploaded", async () => {
+    vi.mocked(getReview).mockResolvedValue(COMPLETE_VIEW);
+    vi.mocked(createScriptReview).mockResolvedValue({
+      ...CONFIRM_VIEW,
+      review_id: "review_002",
+      source_filename: "replacement.md",
+      source_sha256: "def456",
+    });
+    const user = userEvent.setup();
+    render(<ReviewFlow initialReviewId="review_001" />);
+
+    const uploadTab = await screen.findByRole("tab", { name: /Upload/ });
+    await waitFor(() => expect(screen.getByRole("tab", { name: /Review results/ })).toBeEnabled());
+    await user.click(uploadTab);
+    await user.upload(
+      screen.getByLabelText("Choose a script"),
+      new File(["# Replacement"], "replacement.md", { type: "text/markdown" })
+    );
+    await user.click(screen.getByRole("button", { name: "Extract project details" }));
+
+    expect(createScriptReview).toHaveBeenCalledTimes(1);
+    expect(await screen.findByLabelText("Project title")).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: /Confirm details/ })).toHaveAttribute(
+      "aria-selected",
+      "true"
+    );
+    expect(screen.getByRole("tab", { name: /Review results/ })).toBeDisabled();
+    expect(window.location.search).toBe("?review=review_002");
   });
 
   it("uploads first, then exposes editable candidates without analyzing early", async () => {

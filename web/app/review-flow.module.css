@@ -27,33 +27,57 @@
   border-top: 1px solid var(--line);
 }
 
-.progress li {
+.progress button {
+  position: relative;
   display: flex;
   gap: 10px;
   padding: 14px 4px 0;
   color: #8a928e;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
   font-size: 0.78rem;
   font-weight: 750;
   letter-spacing: 0.04em;
   text-transform: uppercase;
+  text-align: left;
 }
 
-.progress li::before {
+.progress button::before {
   position: absolute;
+  top: 0;
+  left: 4px;
   width: 0;
   height: 2px;
-  margin-top: -15px;
   content: "";
   background: var(--signal);
   transition: width 180ms ease;
 }
 
-.progress li.progressActive {
+.progress button.progressActive {
   color: var(--ink);
 }
 
-.progress li.progressActive::before {
+.progress button.progressActive::before {
   width: min(28%, 110px);
+}
+
+.progress button[aria-selected="true"] {
+  color: var(--signal-dark);
+}
+
+.progress button:focus-visible {
+  outline: 3px solid rgba(233, 95, 61, 0.24);
+  outline-offset: 7px;
+  border-radius: 4px;
+}
+
+.progress button:disabled {
+  cursor: not-allowed;
+}
+
+.progress button:not(.progressActive):disabled {
+  opacity: 0.55;
 }
 
 .progress span {
@@ -104,6 +128,58 @@
   border: 1px solid var(--line);
   border-radius: 24px;
   box-shadow: 0 28px 80px rgba(36, 44, 40, 0.09);
+}
+
+.currentSource {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 4px 18px;
+  align-items: center;
+  margin-bottom: 18px;
+  padding: 16px 18px;
+  background: var(--sage);
+  border-radius: 14px;
+}
+
+.currentSource > span {
+  color: #41614c;
+  font-size: 0.68rem;
+  font-weight: 850;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.currentSource > strong,
+.currentSource > small {
+  grid-column: 1;
+  overflow-wrap: anywhere;
+}
+
+.currentSource > small {
+  color: var(--quiet);
+}
+
+.currentSource > button {
+  grid-column: 2;
+  grid-row: 1 / span 3;
+  padding: 10px 14px;
+  color: var(--ink);
+  background: white;
+  border: 1px solid #b8cabd;
+  border-radius: 999px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.currentSource > button:hover:not(:disabled) {
+  border-color: var(--signal);
+}
+
+.currentSource > button:focus-visible {
+  outline: 3px solid rgba(233, 95, 61, 0.24);
+  outline-offset: 2px;
 }
 
 .filePicker {
@@ -357,6 +433,7 @@
 .extractedBadge,
 .suggestedBadge,
 .manualBadge,
+.confirmedBadge,
 .humanStatus {
   display: inline-flex;
   width: fit-content;
@@ -370,6 +447,7 @@
 .extractedBadge { color: #1f5b36; background: var(--sage); }
 .suggestedBadge { color: #764017; background: #f9e7d5; }
 .manualBadge { color: var(--quiet); background: #eef0ed; }
+.confirmedBadge { color: #315047; background: #dce8e5; }
 
 .confirmForm input,
 .confirmForm textarea,
@@ -646,11 +724,13 @@
 @media (max-width: 620px) {
   .flowShell { width: min(100% - 24px, 540px); padding-top: 20px; }
   .progress { margin-bottom: 36px; }
-  .progress li { gap: 5px; font-size: 0.64rem; }
-  .progress li span { display: none; }
+  .progress button { gap: 5px; font-size: 0.64rem; }
+  .progress button span { display: none; }
   .stepCopy h1 { font-size: clamp(2.6rem, 14vw, 4rem); }
   .uploadCard { padding: 16px; border-radius: 18px; }
   .filePicker { min-height: 220px; padding: 20px; }
+  .currentSource { grid-template-columns: 1fr; }
+  .currentSource > button { grid-column: 1; grid-row: auto; margin-top: 8px; }
   .secondaryPath { flex-direction: column; align-items: center; }
   .confirmForm { grid-template-columns: 1fr; padding: 18px; }
   .fieldWide, .confirmAction { grid-column: 1; }

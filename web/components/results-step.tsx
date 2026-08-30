@@ -13,14 +13,14 @@ function displayValue(value: unknown): string {
 }
 
 
-export function ResultsStep({ review }: { review: ReviewView }) {
+export function ResultsStep({ review, autoFocus = true }: { review: ReviewView; autoFocus?: boolean }) {
   const headingRef = useRef<HTMLHeadingElement>(null);
   const [downloadError, setDownloadError] = useState<string | null>(null);
   const result = review.classification;
 
   useEffect(() => {
-    headingRef.current?.focus();
-  }, []);
+    if (autoFocus) headingRef.current?.focus();
+  }, [autoFocus]);
 
   if (!result) return null;
 

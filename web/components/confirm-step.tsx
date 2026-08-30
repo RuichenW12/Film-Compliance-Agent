@@ -13,6 +13,7 @@ import type {
 
 interface ConfirmStepProps {
   review: ReviewView;
+  autoFocus?: boolean;
   onConfirm: (details: ConfirmedReviewDetails) => Promise<void>;
   onRetry: () => Promise<void>;
 }
@@ -30,7 +31,14 @@ function tagsValue(candidate: CandidateValue | null | undefined): string {
   return Array.isArray(candidate?.value) ? candidate.value.join(", ") : "";
 }
 
-function SourceBadge({ candidate }: { candidate: CandidateValue | null | undefined }) {
+function SourceBadge({
+  candidate,
+  confirmed,
+}: {
+  candidate: CandidateValue | null | undefined;
+  confirmed: boolean;
+}) {
+  if (confirmed) return <span className={styles.confirmedBadge}>Last confirmed</span>;
   if (!candidate) return <span className={styles.manualBadge}>Manual entry</span>;
   return (
     <span className={candidate.origin === "extracted" ? styles.extractedBadge : styles.suggestedBadge}>
@@ -40,21 +48,26 @@ function SourceBadge({ candidate }: { candidate: CandidateValue | null | undefin
 }
 
 
-export function ConfirmStep({ review, onConfirm, onRetry }: ConfirmStepProps) {
+export function ConfirmStep({ review, autoFocus = true, onConfirm, onRetry }: ConfirmStepProps) {
   const candidates = review.candidates;
-  const [title, setTitle] = useState(textValue(candidates?.title));
-  const [tags, setTags] = useState(tagsValue(candidates?.tags));
-  const [synopsis, setSynopsis] = useState(textValue(candidates?.synopsis));
-  const [episodeCount, setEpisodeCount] = useState(numberValue(candidates?.episode_count));
-  const [episodeMinutes, setEpisodeMinutes] = useState(numberValue(candidates?.episode_minutes));
+  const confirmed = review.confirmed;
+  const [title, setTitle] = useState(confirmed?.title ?? textValue(candidates?.title));
+  const [tags, setTags] = useState(confirmed?.tags.join(", ") ?? tagsValue(candidates?.tags));
+  const [synopsis, setSynopsis] = useState(confirmed?.synopsis ?? textValue(candidates?.synopsis));
+  const [episodeCount, setEpisodeCount] = useState(
+    confirmed ? String(confirmed.episode_count) : numberValue(candidates?.episode_count)
+  );
+  const [episodeMinutes, setEpisodeMinutes] = useState(
+    confirmed ? String(confirmed.episode_minutes) : numberValue(candidates?.episode_minutes)
+  );
   const [amountBracket, setAmountBracket] = useState(
-    textValue(candidates?.amount_bracket) as AmountBracket | ""
+    confirmed?.amount_bracket ?? textValue(candidates?.amount_bracket) as AmountBracket | ""
   );
   const titleRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    titleRef.current?.focus();
-  }, []);
+    if (autoFocus) titleRef.current?.focus();
+  }, [autoFocus]);
 
   const structure = candidates?.structure;
   const extractionNeedsHelp = ["unavailable", "partial"].includes(review.intake_status);
@@ -109,28 +122,28 @@ export function ConfirmStep({ review, onConfirm, onRetry }: ConfirmStepProps) {
         }}
       >
         <label className={styles.fieldWide}>
-          <span className={styles.fieldLabel}>Project title <SourceBadge candidate={candidates?.title} /></span>
+          <span className={styles.fieldLabel}>Project title <SourceBadge candidate={candidates?.title} confirmed={Boolean(confirmed)} /></span>
           <input ref={titleRef} aria-label="Project title" required maxLength={200} value={title} onChange={(event) => setTitle(event.target.value)} />
         </label>
         <label className={styles.fieldWide}>
-          <span className={styles.fieldLabel}>Tags <SourceBadge candidate={candidates?.tags} /></span>
+          <span className={styles.fieldLabel}>Tags <SourceBadge candidate={candidates?.tags} confirmed={Boolean(confirmed)} /></span>
           <input aria-label="Tags" required value={tags} onChange={(event) => setTags(event.target.value)} aria-describedby="tags-hint" />
           <small id="tags-hint">Separate up to eight tags with commas.</small>
         </label>
         <label className={styles.fieldWide}>
-          <span className={styles.fieldLabel}>Synopsis <SourceBadge candidate={candidates?.synopsis} /></span>
+          <span className={styles.fieldLabel}>Synopsis <SourceBadge candidate={candidates?.synopsis} confirmed={Boolean(confirmed)} /></span>
           <textarea aria-label="Synopsis" required rows={5} maxLength={4000} value={synopsis} onChange={(event) => setSynopsis(event.target.value)} />
         </label>
         <label>
-          <span className={styles.fieldLabel}>Episode count <SourceBadge candidate={candidates?.episode_count} /></span>
+          <span className={styles.fieldLabel}>Episode count <SourceBadge candidate={candidates?.episode_count} confirmed={Boolean(confirmed)} /></span>
           <input aria-label="Episode count" required type="number" min="1" max="500" value={episodeCount} onChange={(event) => setEpisodeCount(event.target.value)} />
         </label>
         <label>
-          <span className={styles.fieldLabel}>Minutes per episode <SourceBadge candidate={candidates?.episode_minutes} /></span>
+          <span className={styles.fieldLabel}>Minutes per episode <SourceBadge candidate={candidates?.episode_minutes} confirmed={Boolean(confirmed)} /></span>
           <input aria-label="Minutes per episode" required type="number" min="0.1" max="60" step="0.1" value={episodeMinutes} onChange={(event) => setEpisodeMinutes(event.target.value)} />
         </label>
         <label className={styles.fieldWide}>
-          <span className={styles.fieldLabel}>Investment band <SourceBadge candidate={candidates?.amount_bracket} /></span>
+          <span className={styles.fieldLabel}>Investment band <SourceBadge candidate={candidates?.amount_bracket} confirmed={Boolean(confirmed)} /></span>
           <select aria-label="Investment band" required value={amountBracket} onChange={(event) => setAmountBracket(event.target.value as AmountBracket | "")}>
             <option value="" disabled>Select an estimated investment band</option>
             {review.amount_options.map((option) => (
@@ -144,7 +157,9 @@ export function ConfirmStep({ review, onConfirm, onRetry }: ConfirmStepProps) {
             <strong>Nothing runs until you confirm.</strong>
             <span>You can edit every field above.</span>
           </div>
-          <button className={styles.primaryAction} type="submit">Confirm &amp; analyze risks</button>
+          <button className={styles.primaryAction} type="submit">
+            {review.state === "COMPLETE" ? "Confirm changes & reanalyze" : "Confirm & analyze risks"}
+          </button>
         </div>
       </form>
     </section>
