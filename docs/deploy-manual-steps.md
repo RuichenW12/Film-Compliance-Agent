@@ -161,7 +161,7 @@ Done — ADC is pointed at this project. I never handle passwords or run
 interactive logins, so if any of these are needed again, they are yours.
 
 **If application-default credentials expire** (symptom: local Vertex calls start
-failing, or `/healthz` reports `llm_available: false` on a machine where it
+failing, or `/health` reports `llm_available: false` on a machine where it
 previously worked):
 
 ```powershell
