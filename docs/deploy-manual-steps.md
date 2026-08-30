@@ -13,9 +13,9 @@ Related: [the design overview](https://claude.ai/code/artifact/746a003c-f4ea-4e1
 
 ## Where you are
 
-> ### ▶ Continue at [§4b — the IAP OAuth client](#4b-the-iap-oauth-client--console-only).
-> The consent screen is published. One console step is left before the
-> deployed service will let anyone in.
+> ### ▶ Nothing is waiting on you.
+> The deployed API is live behind Google sign-in. §5 (a budget alert) is
+> optional and can be done any time; §6 comes when there is more to look at.
 
 | Step | | Verified |
 |---|---|---|
@@ -23,12 +23,19 @@ Related: [the design overview](https://claude.ai/code/artifact/746a003c-f4ea-4e1
 | §2 Firestore database | **done** | `(default)` · `us-east1` · `FIRESTORE_NATIVE` — the irreversible one, and it landed correctly |
 | §3 Credentials | **done** | ADC quota project set to `film-compliance-agent` |
 | §4 OAuth consent screen | **done** | Branding saved, app **published** |
-| **§4b IAP OAuth client** | **← you are here** | console-only; the project is outside an Organization |
-| §5 Budget alert | optional | do it whenever; nothing depends on it |
+| §4b IAP OAuth client | **done** | Google sign-in works; the privacy page loads after signing in |
+| §5 Budget alert | **← the only thing left, and it is optional** | five-minute console click |
 | §6 Look at the deployed thing | later | I will ask, after the first deploy |
 
-After §4 there is nothing else for you until I have something deployed to look
-at. §5 is a five-minute console click you can do any time.
+**Live now:** <https://api-827776020662.us-east1.run.app> — sign in with any
+Google account. `/privacy` and `/terms` are served by the API itself.
+
+The working configuration, for whoever has to rebuild it: IAP enabled on the
+Cloud Run service, the IAP service agent holding `roles/run.invoker`,
+`allAuthenticatedUsers` granted `roles/iap.httpsResourceAccessor`, the Cloud Run
+invoker IAM check **on**, and a custom OAuth client handed to IAP by
+`gcloud iap settings set`. All five are needed. The last one is the one no
+console page exposes.
 
 ---
 
@@ -239,7 +246,7 @@ of who opened it, which a shared code could never give you.
 
 ---
 
-## 4b. The IAP OAuth client — console only  ·  ◀ DO THIS
+## 4b. The IAP OAuth client  ·  ✅ done
 
 **Where this stands.** IAP is enabled on the `api` service, its service agent
 holds `roles/run.invoker`, and access is granted to `allAuthenticatedUsers`.
@@ -303,7 +310,8 @@ Remove-Item iap_settings.yaml
 ```
 
 **Never paste the client secret into chat, or into any file under
-`D:epos\Film-Compliance-Agent`.**
+`D:
+epos\Film-Compliance-Agent`.**
 
 ### How you know it worked
 

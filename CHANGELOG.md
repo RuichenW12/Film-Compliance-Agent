@@ -22,6 +22,39 @@ Conventions:
 
 ## 2026-08-30
 
+### A — the deployed API is live behind Google sign-in
+
+<https://api-827776020662.us-east1.run.app> — any Google account signs in, no
+allow-list, no shared secret, and no application code involved in the gate.
+
+Five things are required and all five are now set. Recorded together because
+four of them look sufficient on their own and the service still fails:
+
+1. IAP enabled on the Cloud Run service (`--iap`);
+2. the IAP service agent granted `roles/run.invoker` on the service;
+3. `allAuthenticatedUsers` granted `roles/iap.httpsResourceAccessor`;
+4. the Cloud Run invoker IAM check left **on**;
+5. **a custom OAuth client handed to IAP via `gcloud iap settings set`** — no
+   console page exposes this, and it is required for any project outside an
+   Organization.
+
+Number 5 cost most of the afternoon. Both places a person would look — the
+Cloud Run Security tab and the IAP page — reported IAP *enabled* and *Ready*
+the whole time, while the service answered `502` with
+`x-goog-iap-generated-response: true`. Console status was not evidence of
+anything. The answer is in Google's Cloud Run IAP documentation, not in the
+console or in `gcloud --help`.
+
+Along the way the Cloud Run invoker IAM check was disabled to isolate a
+different failure — Cloud Run was rejecting browser requests with "Empty
+Authorization header value" before IAP could act. It has since been restored,
+and verified: an unauthenticated request returns `302` to
+`accounts.google.com` with `x-goog-iap-generated-response: true`.
+
+Decisions this settles: no shared access code, and no in-application identity.
+`api/deps/demo_auth.py` is untouched, so the role switcher behaves in the
+deployed environment exactly as it does locally — behind the Google sign-in.
+
 ### A — the API runs on Cloud Run, and serves the two pages OAuth demands
 
 `api` is deployed in us-east1 on `film-compliance-agent` and answering: a
