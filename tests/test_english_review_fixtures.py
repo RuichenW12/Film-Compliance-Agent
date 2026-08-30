@@ -5,11 +5,18 @@ import re
 
 import pytest
 
-from core.review import split_scenes
+from core.classify.subject_rules import load_subject_rules
+from core.llm import UnavailableLLM
+from core.review import review_script, split_scenes
 from core.script_text import parse_script
+from schemas.policy_snapshot import PackName
+from schemas.snapshot import FileSnapshotService
 
 
 FIXTURES = Path(__file__).parent / "fixtures" / "scripts"
+CURRENT_SEED = (
+    Path(__file__).resolve().parents[1] / "policy" / "seed-snapshot-v2.yaml"
+)
 MACHINE_TOKEN = re.compile(
     r"\b(?:[A-Z][A-Z0-9]*(?:-[A-Z0-9]+)+|"
     r"[a-z][a-z0-9]*(?:_[a-z0-9]+)+)\b"
@@ -71,6 +78,32 @@ def test_english_fixture_contract(
     assert "synthetic" in boundary
     assert "unreviewed" in boundary
     assert "not legal guidance" in boundary
+    assert "current governed seed uses chinese trigger phrases" in boundary
+    assert "deterministic english findings are not expected" in boundary
+    assert "script_semantic_check_pending" in boundary
+
+
+@pytest.mark.parametrize(
+    "name",
+    [
+        "e2e-30min-public-security-en.md",
+        "e2e-70min-judicial-long-context-en.md",
+    ],
+)
+def test_english_fixture_has_no_deterministic_seed_hits_and_stays_pending(
+    name: str,
+) -> None:
+    snapshots = FileSnapshotService(CURRENT_SEED)
+    rules = load_subject_rules(
+        snapshots.get_pack(PackName.P2_SUBJECT_RULES, snapshots.latest_version())
+    )
+
+    result = review_script(
+        (FIXTURES / name).read_text(encoding="utf-8"), rules, UnavailableLLM()
+    )
+
+    assert result.findings == []
+    assert result.pending_flags == ["script_semantic_check_pending"]
 
 
 @pytest.mark.parametrize(
@@ -94,7 +127,10 @@ def test_english_fixture_preserves_every_machine_token_and_appendix_item(
 
     source_tokens = set(MACHINE_TOKEN.findall(source))
     translation_tokens = set(MACHINE_TOKEN.findall(translation))
-    assert source_tokens <= translation_tokens, sorted(source_tokens - translation_tokens)
+    assert source_tokens == translation_tokens, {
+        "missing": sorted(source_tokens - translation_tokens),
+        "extra": sorted(translation_tokens - source_tokens),
+    }
 
     source_identifiers = set(BACKTICK_IDENTIFIER.findall(source))
     translation_identifiers = set(BACKTICK_IDENTIFIER.findall(translation))
@@ -171,8 +207,8 @@ def test_english_fixtures_preserve_reviewed_semantic_anchors() -> None:
         FIXTURES / "e2e-70min-judicial-long-context-en.md"
     ).read_text(encoding="utf-8")
 
-    assert "Expected deterministic findings: at least 5" in thirty
-    assert "deterministic findings are retained" in thirty
+    assert "Chinese-Source Deterministic Contract: At least 5" in thirty
+    assert "deterministic English findings are not expected" in thirty
     assert "Anticipated life" not in thirty
     assert "tweezers" in thirty
     assert "still needs a matching part" in thirty

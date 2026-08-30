@@ -84,6 +84,14 @@ def test_english_metadata_and_scene_headings_are_parsed(runtime_label: str) -> N
     assert parsed.structure.source_scene_count == 2
 
 
+def test_english_decimal_target_runtime_is_parsed() -> None:
+    document = "# Half Hour\n\n- Target runtime: 30.5 minutes\n"
+
+    parsed = parse_script("script.md", document.encode("utf-8"))
+
+    assert parsed.structure.source_total_minutes == 30.5
+
+
 def test_utf8_bom_is_removed_but_other_text_is_unchanged() -> None:
     parsed = parse_script("script.txt", b"\xef\xbb\xbfFirst line\nSecond line\n")
     assert parsed.text == "First line\nSecond line\n"

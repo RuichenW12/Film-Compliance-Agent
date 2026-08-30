@@ -8,13 +8,13 @@
 - Genre: Contemporary urban realism, single-episode complete story
 - Target runtime: 30 minutes
 - Episodes: 1
-- Core Purpose: Verify long Markdown upload, multi-scene parsing, explicit category hits, episode/scene positioning, deduplication of repeated hits, character relationship extraction, and cross-scene continuity
+- Core Purpose: Verify long Markdown upload, multi-scene parsing, Chinese-source category hits, episode/scene positioning, deduplication of repeated hits, character relationship extraction, and cross-scene continuity
 - Expected Hit Category: `public_security`
-- Expected deterministic findings: at least 5; the exact count depends on the rule snapshot used at runtime
-- Expected Locatable Scenes: The title lines of Scenes 3, 4, 10, 11, and 14 should carry at least the episode number and scene number
+- Chinese-Source Deterministic Contract: At least 5 findings; the exact count depends on the rule snapshot used at runtime
+- Chinese-Source Expected Locatable Scenes: The title lines of Scenes 3, 4, 10, 11, and 14 should carry at least the episode number and scene number
 - Should Not Report: `political`, `military`, `diplomatic`, `national_security`, `united_front`, `ethnic`, `religious`, `judicial`
-- Offline semantic-stage expectation: deterministic findings are retained while `script_semantic_check_pending` is also returned
-- Severity expectation: findings produced by the current placeholder glossary must remain `needs_human` and must not directly produce a blocking conclusion
+- English Runtime Contract: The current governed seed uses Chinese trigger phrases, so deterministic English findings are not expected. A configured semantic adapter backed by a real LLM is required; unavailable semantic review yields zero deterministic findings and `script_semantic_check_pending`.
+- Chinese-Source Severity Expectation: Findings produced by the current placeholder glossary must remain `needs_human` and must not directly produce a blocking conclusion
 - Sample Attributes: Synthetic, not reviewed by external personnel
 
 ## Logline
