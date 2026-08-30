@@ -22,6 +22,60 @@ Conventions:
 
 ## 2026-08-30
 
+### A — Firestore, and a front end wired to the API
+
+**`store/firestore.py`** — the fourteen ports again, on Firestore. Cloud Run
+replaces containers freely and runs several at once, so a SQLite file on a
+container filesystem is invisible to the next instance and gone at the next
+revision. The API now runs `STORE_BACKEND=firestore` (revision
+`api-00005-phq`); projects survive a deploy.
+
+Shape follows `store.sqlite` exactly -- a `parent` per project, a monotonic
+`ordinal` for insertion order -- so the three backends are genuinely
+interchangeable. Two choices worth knowing:
+
+- **Ordering happens in Python, not in the query.** Ordering in Firestore would
+  need a composite index per collection, which must be deployed before the code
+  needing it and fails confusingly when absent. At tens of documents per
+  project, sorting locally costs nothing and removes a class of deployment
+  mistake.
+- **`FirestoreBlobStore` is a stopgap and says so.** Bytes go base64 into a
+  document, refused above 700 KB with a message naming the real answer. Cloud
+  Storage is where uploads belong (5b).
+
+**Verified against a real database, not just an emulator.** The Firestore
+emulator needs a JRE and this machine's Oracle `java` is a broken stub -- the
+shims exist, the runtime is gone, `java -version` exits 9 silently. Rather than
+install one, the conformance fixture now also accepts `FIRESTORE_TEST_PROJECT`
+and runs against the real database under a per-test collection prefix, deleting
+only its own namespace afterwards. **77 passed** in that file (25 conformance
+tests × 3 backends, plus 2), and the database was left with no collections at
+all. Full suite: 699 passed, 3 skipped.
+
+**Front end deployed and connected.** `web` is live at
+<https://web-827776020662.us-east1.run.app>, behind the same Google sign-in.
+
+The connection is the interesting part. A browser on the web host calling the
+API host fails twice: CORS (`WEB_ORIGINS` lists localhost only) and IAP (its
+cookie is scoped to one service, so a `fetch` gets a sign-in redirect rather
+than data). **`web/app/v1/[...path]/route.ts`** relays server-side instead, so
+the browser only ever talks to the origin it loaded from. A `next.config`
+rewrite would have been less code but cannot work: rewrites forward the request
+untouched, and IAP rejects a request with no credential. The handler mints an
+identity token from the Cloud Run metadata server, with the IAP **OAuth client
+ID** as the audience -- a token minted for the service URL is refused.
+
+**Merge safety:** everything above is new files plus small edits to
+`api/deps/services.py`, `api/settings.py`, `store/__init__.py`, and the
+conformance fixture. `web/` gained two new files and no page, component or
+stylesheet was touched.
+
+One failure worth recording because the design worked: deploying
+`STORE_BACKEND=firestore` onto the previous image failed to start with
+`unknown STORE_BACKEND 'firestore'; expected 'memory' or 'sqlite'` -- that image
+predated the adapter. It refused to boot rather than silently falling back to
+memory, and Cloud Run kept the old revision serving. Nothing was down.
+
 ### A — the deployed API is live behind Google sign-in
 
 <https://api-827776020662.us-east1.run.app> — any Google account signs in, no

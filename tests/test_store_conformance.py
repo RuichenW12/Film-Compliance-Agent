@@ -8,13 +8,30 @@ discovers which of its guarantees were incidental.
 So these tests are parametrised over backends rather than written against one.
 Every assertion here is a promise `core/workflow_service.py` already relies on:
 list order, last-write-wins on facts, first-writer-wins on idempotency keys,
-a spent ticket that cannot be spent twice. A Firestore adapter added later
-passes this file or it is not finished.
+a spent ticket that cannot be spent twice.
+
+The Firestore backend runs here too, but never by default: it needs either an
+emulator or a real database, and a test run should not silently reach for
+either. Two ways to switch it on.
+
+    # against the emulator -- needs a working JRE
+    gcloud emulators firestore start --host-port=localhost:8791
+    $env:FIRESTORE_EMULATOR_HOST = "localhost:8791"
+
+    # or against a real database, which needs credentials
+    $env:FIRESTORE_TEST_PROJECT = "film-compliance-agent"
+
+Either way every bundle gets a collection-name prefix unique to the test, so
+runs cannot see each other's documents and nothing here can touch a collection
+the product uses. Without one of those variables the Firestore cases skip, and
+pytest reports the skip: a backend that never runs is not a verified backend.
 """
 
 from __future__ import annotations
 
+import os
 from datetime import datetime, timedelta, timezone
+from uuid import uuid4
 
 import pytest
 
@@ -38,18 +55,52 @@ from store.sqlite import SqliteStores
 
 NOW = datetime(2026, 8, 28, 12, 0, tzinfo=timezone.utc)
 
+EMULATOR = os.getenv("FIRESTORE_EMULATOR_HOST", "")
+LIVE_PROJECT = os.getenv("FIRESTORE_TEST_PROJECT", "")
 
-@pytest.fixture(params=["memory", "sqlite"])
+
+@pytest.fixture(params=["memory", "sqlite", "firestore"])
 def stores(request, tmp_path):
     """One bundle per backend. SQLite gets a real file, not `:memory:`.
 
     A file is the point: `:memory:` would test the code and not the storage,
     and the durability tests below have to be able to reopen the database.
+
+    Firestore gets a namespace unique to the test, because one emulator is
+    shared by the whole session and these tests assert on list contents. The
+    namespace is what keeps them independent without a teardown that could
+    itself fail and leave the next test reading someone else's documents.
     """
 
     if request.param == "memory":
-        return InMemoryStores()
-    return SqliteStores.at(tmp_path / "conformance.db")
+        yield InMemoryStores()
+        return
+    if request.param == "sqlite":
+        yield SqliteStores.at(tmp_path / "conformance.db")
+        return
+
+    if not (EMULATOR or LIVE_PROJECT):
+        pytest.skip(
+            "set FIRESTORE_EMULATOR_HOST (emulator) or FIRESTORE_TEST_PROJECT "
+            "(real database) to run the Firestore backend"
+        )
+    from store.firestore import FirestoreStores
+
+    namespace = f"t{uuid4().hex}_"
+    bundle = FirestoreStores.for_project(
+        project=LIVE_PROJECT or "conformance", namespace=namespace
+    )
+    yield bundle
+    # Only ever deletes inside this test's own namespace.
+    if LIVE_PROJECT:
+        for name in (
+            "projects", "facts", "findings", "materials", "assets", "tasks",
+            "timeline", "audit", "forms", "institution_reviews",
+            "notifications", "institutions", "upload_tickets", "blobs",
+            "_counters",
+        ):
+            for doc in bundle.db.collection(name).stream():
+                doc.reference.delete()
 
 
 def _project(project_id: str = "proj_1") -> Project:

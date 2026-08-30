@@ -1,0 +1,26 @@
+# Build the web image.
+#
+# The build context is the repository root, not `web/`, for the same reason as
+# the API build: the Dockerfiles live in `infra/` and `gcloud run deploy
+# --source` would insist on one at the root. The Dockerfile copies only `web/`.
+#
+# Usage:
+#   gcloud builds submit --config infra/cloudbuild.web.yaml \
+#     --substitutions=_IMAGE=us-east1-docker.pkg.dev/PROJECT/app/web:TAG
+
+steps:
+  - name: gcr.io/cloud-builders/docker
+    args:
+      - build
+      - -t
+      - $_IMAGE
+      - -f
+      - infra/web.Dockerfile
+      - .
+
+images:
+  - $_IMAGE
+
+options:
+  logging: CLOUD_LOGGING_ONLY
+  machineType: E2_HIGHCPU_8
