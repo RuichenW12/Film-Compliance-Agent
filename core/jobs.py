@@ -52,6 +52,8 @@ class JobPublisher(Protocol):
 
 
 class JobRunner(Protocol):
+    synchronous_results: bool
+
     def run(
         self, task: WorkflowTask, work: Callable[[], JobOutcome]
     ) -> tuple[WorkflowTask, JobOutcome | None]: ...
@@ -61,6 +63,7 @@ class InlineRunner:
     """Run the work now. The task is still recorded, exactly as if queued."""
 
     name = "inline"
+    synchronous_results = True
 
     def run(
         self, task: WorkflowTask, work: Callable[[], JobOutcome]
@@ -89,6 +92,7 @@ class QueuedRunner:
     """Publish and return. A worker runs the job and updates the task."""
 
     name = "queued"
+    synchronous_results = False
 
     def __init__(self, publisher: JobPublisher) -> None:
         self._publisher = publisher

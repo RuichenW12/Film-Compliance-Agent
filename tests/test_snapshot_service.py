@@ -39,6 +39,40 @@ def test_subject_pack_normalizes_into_matchable_rules(snapshots):
     assert all(rule.expert_pending for rule in rules)
 
 
+def test_explicit_pending_rule_keeps_operational_placeholder_vocabulary():
+    rules = load_subject_rules(
+        {
+            "subject_rules": [
+                {
+                    "rule_id": "SR-PENDING",
+                    "category": "public_security",
+                    "trigger_patterns": ["公安"],
+                    "expert_pending": True,
+                }
+            ]
+        }
+    )
+    assert "公安" in rules[0].trigger_patterns
+    assert "民警" in rules[0].trigger_patterns
+    assert "派出所" in rules[0].trigger_patterns
+
+
+def test_explicit_confirmed_rule_uses_only_its_published_vocabulary():
+    rules = load_subject_rules(
+        {
+            "subject_rules": [
+                {
+                    "rule_id": "SR-CONFIRMED",
+                    "category": "public_security",
+                    "trigger_patterns": ["公安"],
+                    "expert_pending": False,
+                }
+            ]
+        }
+    )
+    assert rules[0].trigger_patterns == ("公安",)
+
+
 def test_packs_are_copies_so_callers_cannot_mutate_policy(snapshots):
     pack = snapshots.get_pack(PackName.P1_FORM_DEFINITION)
     pack["episode_max_minutes_exclusive"] = 1

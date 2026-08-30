@@ -12,6 +12,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 
 from fastapi import FastAPI, Request
+from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -46,6 +47,7 @@ from .routers import (
     projects,
     public_pages,
     review,
+    reviews,
     teaser,
 )
 from .settings import Settings
@@ -135,6 +137,7 @@ def create_app(
     app.include_router(assets.router)
     app.include_router(materials.router)
     app.include_router(review.router)
+    app.include_router(reviews.router)
     app.include_router(forms.router)
     app.include_router(institution.router)
     app.include_router(teaser.router)
@@ -177,7 +180,12 @@ def create_app(
                 "error": {
                     "code": ErrorCode.VALIDATION_ERROR.value,
                     "message": "request validation failed",
-                    "details": {"errors": exc.errors()},
+                    "details": {
+                        "errors": jsonable_encoder(
+                            exc.errors(),
+                            custom_encoder={Exception: str},
+                        )
+                    },
                 }
             },
         )

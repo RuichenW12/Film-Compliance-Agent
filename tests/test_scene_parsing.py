@@ -13,8 +13,8 @@ from pathlib import Path
 import pytest
 
 from core.classify.subject_rules import load_subject_rules
-from core.llm import UnavailableLLM
-from core.review import review_script, split_scenes
+from core.llm import ScriptedLLM, UnavailableLLM
+from core.review import SCRIPT_REVIEW_PROMPT_ID, review_script, split_scenes
 from schemas.policy_snapshot import PackName
 from schemas.snapshot import FileSnapshotService
 
@@ -73,6 +73,80 @@ def test_a_plain_script_with_no_episode_headings_is_reviewed_whole():
     assert all(scene.episode is None for scene in scenes)
 
 
+def test_chinese_prose_scene_reference_does_not_hide_earlier_content(rules):
+    document = (
+        "法院走廊里两人交谈。\n"
+        "旁白引用第一集 场景一，但这不是标题。\n"
+    )
+
+    result = review_script(document, rules, UnavailableLLM())
+
+    assert len(result.findings) == 1
+    assert result.findings[0].category == "judicial"
+    assert result.findings[0].scene.quote == "法院走廊里两人交谈。"
+    assert result.findings[0].scene.episode is None
+    assert result.findings[0].scene.scene is None
+
+
+def test_english_episode_scene_headings_locate_body_and_stop_at_appendix():
+    scenes = split_scenes(
+        "# The Blank Byline\n"
+        "\n"
+        "### Episode 1 Scene 1: Rehearsal Hall\n"
+        "\n"
+        "Lin Xia circles a line in red.\n"
+        "\n"
+        "### Episode 7 Scene 4: Opening Night\n"
+        "\n"
+        "The old stage clock starts moving.\n"
+        "\n"
+        "## Appendix: Continuity Notes\n"
+        "\n"
+        "The judge's costume remains unchanged.\n"
+    )
+
+    body = [scene for scene in scenes if not scene.quote.startswith("###")]
+    assert [(scene.episode, scene.scene) for scene in body] == [(1, 1), (7, 4)]
+    assert all("Appendix" not in scene.quote for scene in scenes)
+    assert all("judge" not in scene.quote for scene in scenes)
+
+
+def test_english_prose_and_references_do_not_change_scene_coordinates():
+    scenes = split_scenes(
+        "## Episode 1: Opening\n"
+        "### Episode 1 Scene 1: Rehearsal Hall\n"
+        "Episode 3 was difficult.\n"
+        "This draft refers to Episode 2 Scene 4 without opening it.\n"
+        "The rehearsal continues.\n"
+    )
+
+    body = [scene for scene in scenes if not scene.quote.startswith("#")]
+    assert [scene.quote for scene in body] == [
+        "Episode 3 was difficult.",
+        "This draft refers to Episode 2 Scene 4 without opening it.",
+        "The rehearsal continues.",
+    ]
+    assert {(scene.episode, scene.scene) for scene in body} == {(1, 1)}
+
+
+def test_complete_english_headings_with_titles_are_supported():
+    scenes = split_scenes(
+        "## Episode 2: A Difficult Return\n"
+        "### Episode 2 Scene 4: Back Room\n"
+        "The rehearsal continues.\n"
+    )
+
+    body = [scene for scene in scenes if scene.quote == "The rehearsal continues."]
+    assert [(scene.episode, scene.scene) for scene in body] == [(2, 4)]
+
+
+def test_bare_english_scene_heading_with_trailing_colon_is_supported():
+    scenes = split_scenes("### Episode 1 Scene 1:\nBody")
+
+    body = [scene for scene in scenes if scene.quote == "Body"]
+    assert [(scene.episode, scene.scene) for scene in body] == [(1, 1)]
+
+
 # ------------------------------------------------------- what must not be reviewed
 
 
@@ -128,6 +202,117 @@ def test_an_appendix_is_not_filed_under_the_last_episode(rules):
     )
     result = review_script(document, rules, UnavailableLLM())
     assert result.findings == []
+
+
+def test_semantic_request_contains_only_reviewable_scene_content(rules):
+    document = (
+        "# Front Matter Court\n"
+        "> Blockquote judge note.\n"
+        "## Episode 1: Opening\n"
+        "### Episode 1 Scene 1: Rehearsal Hall\n"
+        "The rehearsal continues.\n"
+        "> Blockquote inside the scene.\n"
+        "## Appendix: Court Notes\n"
+        "The appendix mentions a judge.\n"
+    )
+    llm = ScriptedLLM({SCRIPT_REVIEW_PROMPT_ID: {"hits": []}})
+
+    review_script(document, rules, llm)
+
+    request_document = llm.calls[0].document
+    assert "The rehearsal continues." in request_document
+    assert "Front Matter Court" not in request_document
+    assert "Blockquote judge note" not in request_document
+    assert "Blockquote inside the scene" not in request_document
+    assert "Appendix" not in request_document
+
+
+@pytest.mark.parametrize(
+    "excluded_quote",
+    ["Front matter mentions a judge.", "The appendix mentions a judge."],
+)
+def test_semantic_quotes_from_excluded_sections_are_discarded(
+    rules, excluded_quote: str
+):
+    document = (
+        "# Front Matter\n"
+        "Front matter mentions a judge.\n"
+        "## Episode 1: Opening\n"
+        "### Episode 1 Scene 1: Rehearsal Hall\n"
+        "The rehearsal continues.\n"
+        "## Appendix: Court Notes\n"
+        "The appendix mentions a judge.\n"
+    )
+    llm = ScriptedLLM(
+        {
+            SCRIPT_REVIEW_PROMPT_ID: {
+                "hits": [
+                    {
+                        "category": "judicial",
+                        "quote": excluded_quote,
+                        "reason": "Excluded material must not become evidence.",
+                    }
+                ]
+            }
+        }
+    )
+
+    result = review_script(document, rules, llm)
+
+    assert result.findings == []
+    assert result.discarded == ["judicial"]
+
+
+def test_valid_semantic_scene_quote_maps_to_its_heading(rules):
+    document = (
+        "## Episode 2: Dispute\n"
+        "### Episode 2 Scene 4: Rehearsal Hall\n"
+        "The judge enters the rehearsal hall.\n"
+    )
+    llm = ScriptedLLM(
+        {
+            SCRIPT_REVIEW_PROMPT_ID: {
+                "hits": [
+                    {
+                        "category": "judicial",
+                        "quote": "The judge enters the rehearsal hall.",
+                        "reason": "A judge appears in the scene.",
+                    }
+                ]
+            }
+        }
+    )
+
+    result = review_script(document, rules, llm)
+
+    assert len(result.findings) == 1
+    assert (result.findings[0].scene.episode, result.findings[0].scene.scene) == (
+        2,
+        4,
+    )
+
+
+def test_plain_text_without_headings_is_sent_for_semantic_review(rules):
+    document = "The judge enters the rehearsal hall."
+    llm = ScriptedLLM(
+        {
+            SCRIPT_REVIEW_PROMPT_ID: {
+                "hits": [
+                    {
+                        "category": "judicial",
+                        "quote": document,
+                        "reason": "A judge appears in the text.",
+                    }
+                ]
+            }
+        }
+    )
+
+    result = review_script(document, rules, llm)
+
+    assert llm.calls[0].document == document
+    assert len(result.findings) == 1
+    assert result.findings[0].scene.quote == document
 
 
 def test_a_version_number_is_not_a_scene_number():

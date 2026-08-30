@@ -6,19 +6,77 @@ used by tests and the Firestore store used on Cloud Run stay interchangeable.
 
 from __future__ import annotations
 
-from typing import Protocol
+from dataclasses import dataclass
+from datetime import datetime
+from typing import Any, Protocol
 
 from schemas.assets import AssetVersion, MaterialCard, UploadTicket
 from schemas.common import AuditEntry, Fact, TimelineEvent
 from schemas.findings import Finding
 from schemas.forms import FormDraft
 from schemas.project import Project
+from schemas.reviews import ReviewSession, ReviewState
 from schemas.workflow import (
     InstitutionReview,
     MockInstitution,
     Notification,
     WorkflowTask,
 )
+
+
+@dataclass(frozen=True)
+class ReviewAnalysisBaseline:
+    """Exact durable aggregate captured before one analysis generation claims."""
+
+    session: ReviewSession
+    project: Project
+    facts: tuple[Fact, ...]
+    findings: tuple[Finding, ...]
+    forms: tuple[FormDraft, ...]
+    tasks: tuple[WorkflowTask, ...]
+    timeline: tuple[TimelineEvent, ...]
+    audit: tuple[AuditEntry, ...]
+
+
+@dataclass(frozen=True)
+class ReviewAnalysisStage:
+    baseline: ReviewAnalysisBaseline
+    stores: Any
+
+
+@dataclass(frozen=True)
+class ReviewAnalysisPublication:
+    """One complete project-scoped review generation ready for atomic publish."""
+
+    baseline: ReviewAnalysisBaseline
+    session: ReviewSession
+    project: Project
+    facts: tuple[Fact, ...]
+    findings: tuple[Finding, ...]
+    forms: tuple[FormDraft, ...]
+    tasks: tuple[WorkflowTask, ...]
+    timeline: tuple[TimelineEvent, ...]
+    audit: tuple[AuditEntry, ...]
+
+
+def validate_review_analysis_publication(
+    publication: ReviewAnalysisPublication,
+) -> str:
+    """Return the aggregate id, rejecting a cross-project/session bundle."""
+
+    project_id = publication.project.project_id
+    baseline = publication.baseline
+    if (
+        baseline.project.project_id != project_id
+        or baseline.session.project_id != project_id
+        or publication.session.project_id != project_id
+        or baseline.session.review_id != publication.session.review_id
+        or publication.session.generation != baseline.session.generation + 1
+        or any(task.project_id != project_id for task in baseline.tasks)
+        or any(task.project_id != project_id for task in publication.tasks)
+    ):
+        raise ValueError("review analysis publication crosses aggregate identities")
+    return project_id
 
 
 class ProjectStore(Protocol):
@@ -29,6 +87,21 @@ class ProjectStore(Protocol):
     def save(self, project: Project) -> Project: ...
 
     def list_all(self) -> list[Project]: ...
+
+
+class ReviewSessionStore(Protocol):
+    def put(self, session: ReviewSession) -> ReviewSession: ...
+
+    def get(self, review_id: str) -> ReviewSession | None: ...
+
+    def compare_and_put(
+        self,
+        review_id: str,
+        expected_state: ReviewState,
+        session: ReviewSession,
+        *,
+        expected_generation: int | None = None,
+    ) -> bool: ...
 
 
 class FactStore(Protocol):
@@ -94,6 +167,14 @@ class TaskStore(Protocol):
 
     def find_by_idempotency_key(self, key: str) -> WorkflowTask | None: ...
 
+    def get_or_create_by_idempotency_key(
+        self, task: WorkflowTask
+    ) -> tuple[WorkflowTask, bool]: ...
+
+    def claim_queued_task(
+        self, task_id: str, updated_at: datetime
+    ) -> WorkflowTask | None: ...
+
 
 class TimelineStore(Protocol):
     def add(self, project_id: str, event: TimelineEvent) -> TimelineEvent: ...
@@ -113,6 +194,8 @@ class FormStore(Protocol):
     def get(self, project_id: str, draft_id: str) -> FormDraft | None: ...
 
     def latest(self, project_id: str) -> FormDraft | None: ...
+
+    def list(self, project_id: str) -> list[FormDraft]: ...
 
 
 class InstitutionReviewStore(Protocol):

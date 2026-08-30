@@ -39,7 +39,7 @@ const UPSTREAM = process.env.API_UPSTREAM ?? "";
 const IAP_AUDIENCE = process.env.IAP_AUDIENCE ?? "";
 
 const METADATA_TOKEN_URL =
-  "http://metadata.google.internal/computeMetadata/v1/instance/service-account/identity";
+  "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/identity";
 
 /** Hop-by-hop headers, and ones the upstream must compute for itself. */
 const STRIP = new Set([

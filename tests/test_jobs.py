@@ -7,6 +7,9 @@ their project does not change.
 
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor, wait
+import threading
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -15,7 +18,10 @@ from api.main import create_app
 from api.settings import Settings
 from core.jobs import InlineRunner, QueuedRunner, RecordingPublisher, idempotency_key
 from core.llm import UnavailableLLM
+from core.workflow_service import WorkflowService
 from schemas.enums import TaskType
+from store.memory import InMemoryStores
+from store.sqlite import SqliteStores
 from workers.jobs import JobWorker
 
 OWNER = {"X-Mock-Role": "creator", "X-User-Id": "u_owner"}
@@ -26,13 +32,13 @@ SCRIPT = (
 REVISED = "第一集 场景一：码头。两个老友深夜叙旧。\n"
 
 
-def make_client(stores, snapshots, clock, runner) -> TestClient:
+def make_client(stores, snapshots, clock, runner, llm=None) -> TestClient:
     context = AppContext(
         settings=Settings(),
         stores=stores,
         snapshots=snapshots,
         clock=clock,
-        llm=UnavailableLLM(),
+        llm=llm or UnavailableLLM(),
         jobs=runner,
     )
     return TestClient(create_app(context=context))
@@ -173,10 +179,12 @@ def test_a_queued_review_has_not_written_findings_yet(queued_client):
     """The API answered; the work has not happened. That must be visible."""
 
     project_id, _ = project_with_script(queued_client)
-    body = queued_client.post(f"/v1/projects/{project_id}/review", headers=OWNER).json()
+    response = queued_client.post(f"/v1/projects/{project_id}/review", headers=OWNER)
 
-    assert body["findings"] == []
-    assert body["backend"] == "queued"
+    assert response.status_code == 200
+    assert response.json()["backend"] == "queued"
+    assert response.json()["pending_flags"] == ["script_semantic_check_pending"]
+    assert response.json()["findings"] == []
     assert (
         queued_client.get(f"/v1/projects/{project_id}/findings", headers=OWNER).json()
         == []
@@ -200,6 +208,87 @@ def test_the_worker_finishes_what_was_queued(queued_client, publisher, stores):
     assert len(findings) == 2
 
 
+def test_fast_worker_completion_is_not_overwritten_by_queued_dispatch(
+    stores, snapshots, clock
+) -> None:
+    class FastWorkerPublisher:
+        def __init__(self) -> None:
+            self.worker = None
+            self.published = []
+
+        def publish(self, task) -> None:
+            self.published.append(task)
+            assert self.worker is not None
+            handled = self.worker.handle(task)
+            assert handled.ran is True
+
+    publisher = FastWorkerPublisher()
+    client = make_client(stores, snapshots, clock, QueuedRunner(publisher))
+    publisher.worker = JobWorker(client.app.state.context.workflow, stores)
+    project_id, _ = project_with_script(client)
+
+    response = client.post(f"/v1/projects/{project_id}/review", headers=OWNER)
+
+    assert response.status_code == 200
+    assert len(publisher.published) == 1
+    task = stores.tasks.list(project_id)[0]
+    assert task.status.value == "needs_human"
+    assert task.result["finding_count"] == 2
+    assert len(stores.findings.list(project_id)) == 2
+    job_events = [
+        event.event
+        for event in stores.timeline.list(project_id)
+        if event.event.startswith("job.")
+    ]
+    assert job_events == [
+        "job.recorded",
+        "job.dispatch_attempted",
+        "job.completed",
+    ]
+
+
+def test_failed_publish_is_retried_without_creating_a_second_task(
+    stores, snapshots, clock
+) -> None:
+    class FlakyDuplicatePublisher:
+        def __init__(self) -> None:
+            self.attempts = 0
+            self.published = []
+
+        def publish(self, task) -> None:
+            self.attempts += 1
+            if self.attempts == 1:
+                raise RuntimeError("queue transport unavailable")
+            self.published.extend([task, task])
+
+    publisher = FlakyDuplicatePublisher()
+    client = make_client(stores, snapshots, clock, QueuedRunner(publisher))
+    project_id, _ = project_with_script(client)
+
+    with pytest.raises(RuntimeError, match="queue transport unavailable"):
+        client.post(f"/v1/projects/{project_id}/review", headers=OWNER)
+
+    queued = stores.tasks.list(project_id)
+    assert len(queued) == 1
+    assert queued[0].status.value == "queued"
+    retry = client.post(f"/v1/projects/{project_id}/review", headers=OWNER)
+    assert retry.status_code == 200
+    assert retry.json()["pending_flags"] == ["script_semantic_check_pending"]
+    assert publisher.attempts == 2
+    assert publisher.published == [queued[0], queued[0]]
+    assert len(stores.tasks.list(project_id)) == 1
+    job_events = [
+        event.event
+        for event in stores.timeline.list(project_id)
+        if event.event.startswith("job.")
+    ]
+    assert job_events == [
+        "job.recorded",
+        "job.dispatch_attempted",
+        "job.dispatch_attempted",
+    ]
+
+
 def test_the_worker_ignores_a_redelivered_finished_task(queued_client, publisher, stores):
     """Pub/Sub delivers at least once. Twice must not double the findings."""
 
@@ -219,11 +308,113 @@ def test_the_worker_ignores_a_redelivered_finished_task(queued_client, publisher
     assert len(findings) == 2
 
 
+@pytest.mark.parametrize("backend", ["memory", "sqlite"])
+def test_concurrent_worker_redelivery_claims_and_executes_once(
+    tmp_path, snapshots, clock, backend
+) -> None:
+    primary = (
+        InMemoryStores()
+        if backend == "memory"
+        else SqliteStores.at(tmp_path / "worker-claim.sqlite3")
+    )
+    concurrent = (
+        primary
+        if backend == "memory"
+        else SqliteStores.at(tmp_path / "worker-claim.sqlite3")
+    )
+    entered = threading.Event()
+    release = threading.Event()
+
+    class BlockingLLM:
+        name = "blocking"
+
+        def __init__(self) -> None:
+            self.calls = 0
+            self._lock = threading.Lock()
+
+        def available(self) -> bool:
+            return True
+
+        def structured(self, _request):
+            with self._lock:
+                self.calls += 1
+            entered.set()
+            assert release.wait(timeout=5)
+            return {"hits": []}
+
+    llm = BlockingLLM()
+    publisher = RecordingPublisher()
+    client = make_client(
+        primary, snapshots, clock, QueuedRunner(publisher), llm=llm
+    )
+    project_id, _ = project_with_script(client)
+    response = client.post(f"/v1/projects/{project_id}/review", headers=OWNER)
+    assert response.status_code == 200
+    duplicate_messages = [publisher.published[0], publisher.published[0]]
+    task = duplicate_messages[0]
+    first_worker = JobWorker(client.app.state.context.workflow, primary)
+    second_workflow = WorkflowService(concurrent, snapshots, clock, llm)
+    second_worker = JobWorker(second_workflow, concurrent)
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        first = pool.submit(first_worker.handle, task)
+        assert entered.wait(timeout=5)
+        running_replay = client.post(
+            f"/v1/projects/{project_id}/review", headers=OWNER
+        )
+        second = pool.submit(second_worker.handle, duplicate_messages[1])
+        completed, _ = wait([second], timeout=0.5)
+        release.set()
+        first_result = first.result(timeout=5)
+        second_result = second.result(timeout=5)
+
+    assert running_replay.status_code == 200
+    assert running_replay.json()["backend"] == "queued"
+    assert running_replay.json()["pending_flags"] == [
+        "script_semantic_check_pending"
+    ]
+    assert len(primary.tasks.list(project_id)) == 1
+    assert len(publisher.published) == 1
+    assert second in completed
+    assert first_result.ran is True
+    assert second_result.ran is False
+    assert second_result.reason == "already_claimed"
+    assert llm.calls == 1
+    stored = primary.tasks.get(task.task_id)
+    assert stored.status.value == "succeeded"
+    assert stored.result["finding_count"] == 2
+    assert len(primary.findings.list(project_id)) == 2
+    assert len(
+        [event for event in primary.timeline.list(project_id) if event.event == "job.completed"]
+    ) == 1
+    terminal_replay = client.post(
+        f"/v1/projects/{project_id}/review", headers=OWNER
+    )
+    assert terminal_replay.status_code == 200
+    assert terminal_replay.json()["pending_flags"] == []
+    assert len(primary.tasks.list(project_id)) == 1
+    assert len(publisher.published) == 1
+    assert llm.calls == 1
+    if backend == "sqlite":
+        concurrent.db.close()
+        primary.db.close()
+
+
 def test_the_worker_finishes_a_queued_extraction(queued_client, publisher, stores):
     project_id, version_id = project_with_script(queued_client)
-    queued_client.post(
+    first = queued_client.post(
         f"/v1/projects/{project_id}/assets/{version_id}/extract-facts", headers=OWNER
     )
+    replay = queued_client.post(
+        f"/v1/projects/{project_id}/assets/{version_id}/extract-facts", headers=OWNER
+    )
+
+    assert first.status_code == 200
+    assert replay.status_code == 200
+    assert first.json()["pending_flags"] == ["fact_extraction_pending"]
+    assert replay.json()["pending_flags"] == ["fact_extraction_pending"]
+    assert len(publisher.published) == 2
+    assert publisher.published[0].task_id == publisher.published[1].task_id
 
     worker = JobWorker(queued_client.app.state.context.workflow, stores)
     handled = worker.handle(publisher.published[0])

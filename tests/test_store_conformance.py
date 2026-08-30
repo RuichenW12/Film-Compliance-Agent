@@ -29,8 +29,10 @@ pytest reports the skip: a backend that never runs is not a verified backend.
 
 from __future__ import annotations
 
-import os
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta, timezone
+import os
+import threading
 from uuid import uuid4
 
 import pytest
@@ -49,6 +51,13 @@ from schemas.enums import (
 )
 from schemas.forms import FormDraft
 from schemas.project import Project
+from schemas.reviews import (
+    ConfirmedReviewDetails,
+    IntakeStatus,
+    ReviewMode,
+    ReviewSession,
+    ReviewState,
+)
 from schemas.workflow import MockInstitution, Notification, WorkflowTask
 from store.memory import InMemoryStores
 from store.sqlite import SqliteStores
@@ -124,6 +133,31 @@ def _fact(key: str, value, fact_id: str) -> Fact:
     )
 
 
+def _review_session() -> ReviewSession:
+    return ReviewSession(
+        review_id="review_1",
+        owner_uid="u_demo",
+        mode=ReviewMode.SCRIPT,
+        state=ReviewState.COMPLETE,
+        project_id="proj_1",
+        asset_version="asset_1",
+        source_filename="script.md",
+        source_sha256="a" * 64,
+        normalized_text_uri="blob://proj_1/script-text",
+        confirmed=ConfirmedReviewDetails(
+            title="先挂电话",
+            tags=["public security"],
+            synopsis="A caller races to stop a public-safety emergency.",
+            episode_count=10,
+            episode_minutes=3,
+            amount_bracket="at_or_above_upper",
+        ),
+        intake_status=IntakeStatus.COMPLETE,
+        created_at=NOW,
+        updated_at=NOW,
+    )
+
+
 # --------------------------------------------------------------- projects
 
 
@@ -150,6 +184,119 @@ def test_save_overwrites_without_duplicating(stores) -> None:
 
 def test_a_missing_project_is_none_not_an_error(stores) -> None:
     assert stores.projects.get("proj_nope") is None
+
+
+# --------------------------------------------------------- review sessions
+
+
+def test_a_review_session_round_trips(stores) -> None:
+    session = _review_session()
+    assert stores.review_sessions.put(session) == session
+    assert stores.review_sessions.get(session.review_id) == session
+
+
+def test_a_missing_review_session_is_none(stores) -> None:
+    assert stores.review_sessions.get("review_nope") is None
+
+
+def test_updating_a_review_session_replaces_the_document(stores) -> None:
+    session = _review_session()
+    stores.review_sessions.put(session)
+    updated = session.model_copy(update={"intake_pending_flags": ["pending"]})
+    stores.review_sessions.put(updated)
+    assert stores.review_sessions.get(session.review_id) == updated
+
+
+def test_review_session_state_claim_is_atomic(stores) -> None:
+    session = _review_session().model_copy(
+        update={"state": ReviewState.AWAITING_CONFIRMATION}
+    )
+    stores.review_sessions.put(session)
+    claimed = session.model_copy(update={"state": ReviewState.ANALYZING})
+
+    assert stores.review_sessions.compare_and_put(
+        session.review_id, ReviewState.AWAITING_CONFIRMATION, claimed
+    )
+    assert not stores.review_sessions.compare_and_put(
+        session.review_id, ReviewState.AWAITING_CONFIRMATION, claimed
+    )
+
+
+def test_review_session_claim_rejects_a_stale_generation_after_state_aba(
+    stores,
+) -> None:
+    original = _review_session().model_copy(update={"generation": 4})
+    stores.review_sessions.put(original)
+    newer_complete = original.model_copy(
+        update={
+            "generation": 5,
+            "confirmed": original.confirmed.model_copy(
+                update={"title": "newer generation"}
+            ),
+        }
+    )
+    stores.review_sessions.put(newer_complete)
+    stale_claim = original.model_copy(
+        update={"generation": 5, "state": ReviewState.ANALYZING}
+    )
+
+    assert not stores.review_sessions.compare_and_put(
+        original.review_id,
+        ReviewState.COMPLETE,
+        stale_claim,
+        expected_generation=4,
+    )
+    assert stores.review_sessions.get(original.review_id) == newer_complete
+
+
+def test_review_session_generation_defaults_for_legacy_payloads() -> None:
+    payload = _review_session().model_dump()
+    payload.pop("generation", None)
+
+    restored = ReviewSession.model_validate(payload)
+
+    assert restored.generation == 0
+
+
+def test_sqlite_review_session_survives_adapter_reconstruction(tmp_path) -> None:
+    path = tmp_path / "review-session.db"
+    first = SqliteStores.at(path)
+    first.review_sessions.put(_review_session())
+    first.db.close()
+
+    reopened = SqliteStores.at(path)
+    try:
+        assert reopened.review_sessions.get("review_1") == _review_session()
+    finally:
+        reopened.db.close()
+
+
+def test_sqlite_state_claim_is_atomic_across_two_connections(tmp_path) -> None:
+    path = tmp_path / "review-session-race.db"
+    first = SqliteStores.at(path)
+    second = SqliteStores.at(path)
+    session = _review_session().model_copy(
+        update={"state": ReviewState.AWAITING_CONFIRMATION}
+    )
+    first.review_sessions.put(session)
+    analyzing = session.model_copy(update={"state": ReviewState.ANALYZING})
+    extracting = session.model_copy(update={"state": ReviewState.EXTRACTING})
+    try:
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            results = list(
+                pool.map(
+                    lambda item: item[0].review_sessions.compare_and_put(
+                        session.review_id,
+                        ReviewState.AWAITING_CONFIRMATION,
+                        item[1],
+                    ),
+                    [(first, analyzing), (second, extracting)],
+                )
+            )
+        assert sorted(results) == [False, True]
+    finally:
+        first.db.close()
+        second.db.close()
 
 
 # ------------------------------------------------------------------ facts
@@ -212,6 +359,72 @@ def test_saving_a_task_does_not_create_a_second_one(stores) -> None:
     stores.tasks.save(task.model_copy(update={"status": TaskStatus.SUCCEEDED}))
     assert len(stores.tasks.list("proj_1")) == 1
     assert stores.tasks.get("task_1").status is TaskStatus.SUCCEEDED
+
+
+def _concurrent_task_store_contract(first, second) -> None:
+    barrier = threading.Barrier(2)
+    candidates = [
+        WorkflowTask(
+            task_id=f"task_{index}",
+            project_id="proj_1",
+            type=TaskType.REVIEW_FULL,
+            idempotency_key="proj_1:review_full:asset_1",
+        )
+        for index in (1, 2)
+    ]
+
+    def create(store, candidate):
+        barrier.wait(timeout=5)
+        return store.tasks.get_or_create_by_idempotency_key(candidate)
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        results = [
+            future.result(timeout=5)
+            for future in (
+                pool.submit(create, first, candidates[0]),
+                pool.submit(create, second, candidates[1]),
+            )
+        ]
+
+    assert len({task.task_id for task, _ in results}) == 1
+    assert sorted(created for _, created in results) == [False, True]
+    stored = first.tasks.list("proj_1")
+    assert len(stored) == 1
+
+    claim_barrier = threading.Barrier(2)
+
+    def claim(store):
+        claim_barrier.wait(timeout=5)
+        return store.tasks.claim_queued_task(stored[0].task_id, NOW)
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        claims = [
+            future.result(timeout=5)
+            for future in (
+                pool.submit(claim, first),
+                pool.submit(claim, second),
+            )
+        ]
+
+    assert sum(item is not None for item in claims) == 1
+    assert first.tasks.get(stored[0].task_id).status is TaskStatus.RUNNING
+
+
+def test_task_creation_and_queued_claim_are_atomic(stores) -> None:
+    _concurrent_task_store_contract(stores, stores)
+
+
+def test_sqlite_task_creation_and_claim_are_atomic_across_connections(
+    tmp_path,
+) -> None:
+    path = tmp_path / "task-atomicity.sqlite3"
+    first = SqliteStores.at(path)
+    second = SqliteStores.at(path)
+    try:
+        _concurrent_task_store_contract(first, second)
+    finally:
+        first.db.close()
+        second.db.close()
 
 
 # ------------------------------------------------------- timeline and audit

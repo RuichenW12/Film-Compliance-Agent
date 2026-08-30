@@ -94,6 +94,7 @@ def test_an_upload_records_its_own_sha256(client):
     assert response.status_code == 201
     body = response.json()
     assert body["sha256"] == hashlib.sha256(SCRIPT).hexdigest()
+    assert body["text_storage_uri"] is None
     assert body["kind"] == "script"
     assert body["uploaded_by"] == "u_owner"
     assert body["parent_version"] is None

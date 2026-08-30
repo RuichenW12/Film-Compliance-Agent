@@ -65,6 +65,20 @@ describe("CollectionPage", () => {
       if (url.endsWith("/v1/projects/proj_001/roadmap")) {
         return json({ roadmap: null, state: "CLASSIFIED", pending_flags: [] });
       }
+      if (url.endsWith("/v1/projects/proj_001/form")) {
+        return json({
+          draft_id: "draft-1",
+          form_type: "micro_drama",
+          frozen: false,
+          hash: null,
+          fields: {},
+          conflicts: [],
+          snapshot_version: "v2",
+        });
+      }
+      if (url.endsWith("/v1/projects/proj_001/gate")) {
+        return json({ passed: false, gaps: [] });
+      }
       if (url.endsWith("/v1/projects/proj_001")) {
         return json({
           project: {
@@ -93,7 +107,9 @@ describe("CollectionPage", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent(
       /integration data/i,
     );
-    const synopsisCard = screen.getByText(/Synopsis/).closest("li");
+    const synopsisCard = screen
+      .getByText("Synopsis", { selector: "strong" })
+      .closest("li");
     expect(synopsisCard).not.toBeNull();
     await user.click(
       within(synopsisCard!).getByRole("button", {

@@ -23,7 +23,9 @@ from schemas.enums import (
     AmountBracket,
     FactStatus,
     FindingSeverity,
+    ClaimedFormType,
     NotificationKind,
+    ProductionStage,
     ProjectState,
     SourceRefType,
     Tier,
@@ -38,6 +40,7 @@ from schemas.project import (
     Roadmap,
     TracksEnabled,
 )
+from schemas.reviews import ConfirmedReviewDetails, ReviewMode
 from schemas.snapshot import SnapshotService
 from schemas.workflow import (
     InstitutionReview,
@@ -52,6 +55,7 @@ from .classify.subject_rules import load_subject_rules
 from .classify.chain import ClassificationOutcome
 from .classify.d1c import PUBLISHED_KEYS, judge_tier
 from .clock import Clock
+from .extract import PENDING_FLAG as FACT_EXTRACTION_PENDING
 from .extract import extract_facts
 from .errors import (
     GateBlockedError,
@@ -59,6 +63,7 @@ from .errors import (
     ForbiddenError,
     NotFoundError,
     StateInvalidError,
+    UpstreamLLMError,
     ValidationFailedError,
 )
 from .forms import build_fields, deferred_keys, draft_hash, pending_keys
@@ -68,7 +73,13 @@ from .jobs import InlineRunner, JobOutcome, JobRunner, idempotency_key
 from .ids import new_id
 from .llm import LLMClient
 from .materials import build_material_cards
-from .review import SCRIPT_REVIEW_PROMPT_VERSION, evidence_for, review_script
+from .review import (
+    PENDING_FLAG,
+    SCRIPT_REVIEW_PROMPT_VERSION,
+    ReviewResult,
+    evidence_for,
+    review_script,
+)
 from .roadmap import build_roadmap
 from .teaser import PENDING_FLAG as TEASER_PENDING
 from .teaser import PROMPT_VERSION as TEASER_PROMPT_VERSION
@@ -102,6 +113,26 @@ class RecalcResult:
 
 
 class WorkflowService:
+    # A COMPLETE review package may be corrected even when its classification
+    # ended on an exit or human-review branch. Downstream filing states are
+    # deliberately absent: those packages have already crossed a lock boundary.
+    REANALYZABLE_REVIEW_STATES = frozenset(
+        {
+            ProjectState.CLASSIFIED,
+            ProjectState.ROADMAP_CONFIRMED,
+            ProjectState.COLLECTING_MATERIALS,
+            ProjectState.REVIEW_RUNNING,
+            ProjectState.REVISION_LOOP,
+            ProjectState.GATE_D3_PASSED,
+            ProjectState.NEEDS_HUMAN_SUBJECT,
+            ProjectState.NEEDS_HUMAN_FORMTYPE,
+            ProjectState.EXIT_NON_DRAMA,
+            ProjectState.EXIT_T2,
+            ProjectState.EXIT_T3,
+            ProjectState.EXIT_SISTER_PATH,
+        }
+    )
+
     def __init__(
         self,
         stores,
@@ -117,6 +148,22 @@ class WorkflowService:
         self._llm = llm
         self._video = video
         self._jobs = jobs or InlineRunner()
+
+    @property
+    def supports_synchronous_review_analysis(self) -> bool:
+        return self._jobs.synchronous_results
+
+    def for_staged_stores(self, stores) -> WorkflowService:
+        """Reuse configured backends while isolating analysis writes."""
+
+        return WorkflowService(
+            stores,
+            self._snapshots,
+            self._clock,
+            self._llm,
+            self._video,
+            self._jobs,
+        )
 
     # ------------------------------------------------------------------ reads
 
@@ -181,6 +228,128 @@ class WorkflowService:
             self._record_event(project_id, Actor.CREATOR, "intent.updated", {})
         return project, intent.missing_fields()
 
+    def apply_review_confirmation(
+        self,
+        project_id: str,
+        mode: ReviewMode,
+        details: ConfirmedReviewDetails,
+    ) -> Project:
+        """Persist creator-confirmed review details as the only intake truth."""
+
+        project = self.get_project(project_id)
+        stage = (
+            ProductionStage.SCRIPT_READY
+            if mode is ReviewMode.SCRIPT
+            else ProductionStage.IDEA
+        )
+        intent = IntentProfile(
+            form_type_claimed=ClaimedFormType.MICRO_DRAMA,
+            genre_keywords=details.tags,
+            synopsis=details.synopsis,
+            episode_count=details.episode_count,
+            episode_minutes=details.episode_minutes,
+            amount_bracket=details.amount_bracket,
+            is_ai_generated=True,
+            production_stage=stage,
+            source="user_confirmed_review",
+        )
+        project = project.model_copy(
+            update={
+                "title_working": details.title,
+                "intent_profile": intent,
+                "updated_at": self._clock.now(),
+            }
+        )
+        if project.state is ProjectState.DRAFT:
+            project = self._transition(
+                project,
+                ProjectState.INTAKE_DONE,
+                Actor.CREATOR,
+                "intent.submitted",
+            )
+        else:
+            self._stores.projects.save(project)
+
+        answer_id = f"review_confirmation:{project_id}"
+        source_ref = SourceRef(
+            type=SourceRefType.USER_ANSWER,
+            answer_id=answer_id,
+        )
+        for key, value in (
+            ("title", details.title),
+            ("episode_count", details.episode_count),
+            ("episode_minutes", details.episode_minutes),
+            ("amount_bracket", details.amount_bracket.value),
+        ):
+            self._upsert_fact(project_id, key, value, source_ref)
+
+        self._record_event(
+            project_id,
+            Actor.CREATOR,
+            "review.details_confirmed",
+            {"mode": mode.value, "answer_id": answer_id},
+        )
+        return project
+
+    def begin_review_reanalysis(
+        self, project_id: str, analysis_generation: int
+    ) -> Project:
+        """Record the dedicated backward edge used only by review reanalysis."""
+
+        project = self.get_project(project_id)
+        if project.state not in self.REANALYZABLE_REVIEW_STATES:
+            raise StateInvalidError(
+                "this project can no longer be reanalyzed in place",
+                {"state": project.state.value},
+            )
+        now = self._clock.now()
+        prepared = project.model_copy(
+            update={
+                "state": ProjectState.DRAFT,
+                "classification": None,
+                "roadmap": None,
+                "policy_stale": False,
+                "registration_number": None,
+                "updated_at": now,
+            }
+        )
+        self._stores.projects.save(prepared)
+        detail = {"generation": analysis_generation}
+        self._stores.audit.add(
+            project_id,
+            AuditEntry(
+                at=now,
+                actor=Actor.CREATOR,
+                from_state=project.state.value,
+                to_state=ProjectState.DRAFT.value,
+                reason="review.reanalysis_reset",
+                detail=detail,
+            ),
+        )
+        self._stores.timeline.add(
+            project_id,
+            TimelineEvent(
+                event_id=new_id("event"),
+                at=now,
+                actor=Actor.CREATOR,
+                event=f"state.{ProjectState.DRAFT.value}",
+                detail={
+                    "from": project.state.value,
+                    "reason": "review.reanalysis_reset",
+                    **detail,
+                },
+            ),
+        )
+        return prepared
+
+    def record_review_event(
+        self, project_id: str, event: str, detail: dict
+    ) -> TimelineEvent:
+        """Record review orchestration metadata without exposing store internals."""
+
+        self.get_project(project_id)
+        return self._record_event(project_id, Actor.SYSTEM, event, detail)
+
     def submit_channels(self, project_id: str, patch: dict) -> Project:
         """S2. Enabling the US track is a channel fact, not an LLM decision."""
 
@@ -207,7 +376,12 @@ class WorkflowService:
         )
         return project
 
-    def run_classification(self, project_id: str) -> tuple[Project, ClassificationOutcome]:
+    def run_classification(
+        self,
+        project_id: str,
+        *,
+        analysis_generation: int | None = None,
+    ) -> tuple[Project, ClassificationOutcome]:
         """S3: D1a -> D1b -> D1c, synchronous, one pinned snapshot version."""
 
         project = self.get_project(project_id)
@@ -231,7 +405,11 @@ class WorkflowService:
                 {"missing": outcome.ask_back},
             )
 
-        project = self._persist_classification(project, outcome)
+        project = self._persist_classification(
+            project,
+            outcome,
+            analysis_generation=analysis_generation,
+        )
         return project, outcome
 
     # States where re-deciding a classification is safe. Everything from
@@ -456,15 +634,25 @@ class WorkflowService:
 
     # --------------------------------------------------------- script review
 
-    def run_script_review(self, project_id: str):
-        """C1-a over the latest script version, recorded as a review task.
+    def run_script_review(
+        self,
+        project_id: str,
+        *,
+        asset_version: str | None = None,
+        analysis_generation: int | None = None,
+        force: bool = False,
+    ):
+        """C1-a over a selected script version, recorded as a review task.
 
         The first review of a version is `review_full`; a later one is
-        `review_incremental`, since prior findings carry forward. Both are keyed
-        on the asset version, so a redelivery returns the first task.
+        `review_incremental`, since prior findings carry forward. Normal retries
+        are keyed on the asset version, while an explicit completed-review
+        reanalysis adds its claimed generation to the key so the same source is
+        checked again without weakening ordinary redelivery idempotency. Callers
+        that omit ``asset_version`` retain the latest-script behavior.
         """
 
-        asset = self._latest_script(project_id)
+        asset = self._script_asset(project_id, asset_version)
         if asset is None:
             raise NotFoundError(
                 "this project has no uploaded script to review",
@@ -486,7 +674,11 @@ class WorkflowService:
         holder: list = []
 
         def work() -> JobOutcome:
-            project, written, result = self._review_now(project_id)
+            project, written, result = self._review_now(
+                project_id,
+                asset_version=asset.version_id,
+                analysis_generation=analysis_generation,
+            )
             holder.append((project, written, result))
             return JobOutcome(
                 result={
@@ -500,41 +692,74 @@ class WorkflowService:
                 error=result.pending_flags[0] if result.pending_flags else None,
             )
 
-        self._run_job(
+        job_asset_version = asset.version_id
+        if force:
+            assert analysis_generation is not None
+            job_asset_version = (
+                f"{asset.version_id}:analysis-generation:{analysis_generation}"
+            )
+        task, outcome, _ = self._run_job(
             project_id,
             task_type,
-            asset.version_id,
+            job_asset_version,
             work,
-            payload={"asset_version": asset.version_id},
+            payload={
+                "asset_version": asset.version_id,
+                **(
+                    {"analysis_generation": analysis_generation}
+                    if analysis_generation is not None
+                    else {}
+                ),
+            },
         )
         if holder:
             return holder[0]
-        # Queued, or replayed: report the project and the findings as they stand.
-        return (
-            self.get_project(project_id),
-            [],
-            self._empty_review(),
+        if task.status is TaskStatus.FAILED:
+            raise UpstreamLLMError(
+                "script review analysis failed",
+                {"task_id": task.task_id},
+            )
+        if task.status in {TaskStatus.QUEUED, TaskStatus.RUNNING}:
+            return (
+                self.get_project(project_id),
+                [],
+                ReviewResult(pending_flags=[PENDING_FLAG], backend="queued"),
+            )
+        if outcome is None and task.result is None:
+            raise UpstreamLLMError(
+                "script review analysis produced no result",
+                {"task_id": task.task_id},
+            )
+        result = ReviewResult(
+            discarded=list((task.result or {}).get("discarded") or []),
+            pending_flags=[task.error]
+            if task.status is TaskStatus.NEEDS_HUMAN and task.error
+            else [],
+            backend=str((task.result or {}).get("backend") or "rules"),
         )
+        return self.get_project(project_id), [], result
 
-    def _empty_review(self):
-        from .review import ReviewResult
-
-        return ReviewResult(pending_flags=[], backend="queued")
-
-    def _review_now(self, project_id: str):
+    def _review_now(
+        self,
+        project_id: str,
+        *,
+        asset_version: str | None = None,
+        analysis_generation: int | None = None,
+    ):
 
         project = self.get_project(project_id)
-        asset = self._latest_script(project_id)
+        asset = self._script_asset(project_id, asset_version)
         if asset is None:
             raise NotFoundError(
                 "this project has no uploaded script to review",
                 {"project_id": project_id},
             )
 
-        data = self._stores.blobs.get(asset.storage_uri)
+        review_storage_uri = asset.text_storage_uri or asset.storage_uri
+        data = self._stores.blobs.get(review_storage_uri)
         if data is None:
             raise NotFoundError(
-                "the stored bytes are missing for the latest script",
+                "the stored bytes are missing for the selected script",
                 {"asset_version": asset.version_id},
             )
         document = data.decode("utf-8", errors="replace")
@@ -545,13 +770,26 @@ class WorkflowService:
         )
         result = review_script(document, rules, self._llm)
 
-        # Carry decisions across versions: a scene the creator already judged is
-        # not re-litigated, and a scene they removed is marked self-fixed rather
-        # than left open against a script that no longer contains it.
-        carried, self_fixed = self._carry_findings_forward(
-            project_id, asset.version_id, document
-        )
-        existing = carried
+        self_fixed = 0
+        if analysis_generation is None:
+            # Carry decisions across source versions for the normal review API.
+            existing, self_fixed = self._carry_findings_forward(
+                project_id, asset.version_id, document
+            )
+        else:
+            # A completed-review generation is a fresh conclusion over the same
+            # source. Prior generations remain stored but are no longer current.
+            existing = set()
+            for finding in self._stores.findings.list(project_id):
+                if (
+                    finding.alert is None
+                    and finding.asset_version == asset.version_id
+                    and finding.active
+                ):
+                    self._stores.findings.save(
+                        project_id,
+                        finding.model_copy(update={"active": False}),
+                    )
 
         written: list[Finding] = []
         for proposed in result.findings:
@@ -579,6 +817,8 @@ class WorkflowService:
                         suggestion=proposed.suggestion,
                         prompt_version=SCRIPT_REVIEW_PROMPT_VERSION,
                         snapshot_version=version,
+                        analysis_generation=analysis_generation,
+                        active=True,
                         created_at=self._clock.now(),
                     ),
                 )
@@ -643,6 +883,8 @@ class WorkflowService:
         seen: set[tuple[str, str]] = set()
         self_fixed = 0
         for finding in self._stores.findings.list(project_id):
+            if not finding.active:
+                continue
             if finding.asset_version == version_id:
                 seen.add((finding.category, finding.locator.quote))
                 continue
@@ -871,12 +1113,8 @@ class WorkflowService:
         version = latest.version_id if latest else "intent_profile"
         key = f"{project_id}:{TaskType.TEASER.value}:{version}"
 
-        existing = self._stores.tasks.find_by_idempotency_key(key)
-        if existing is not None:
-            return existing
-
         now = self._clock.now()
-        task = WorkflowTask(
+        candidate = WorkflowTask(
             task_id=new_id("task"),
             project_id=project_id,
             type=TaskType.TEASER,
@@ -890,7 +1128,11 @@ class WorkflowService:
             created_at=now,
             updated_at=now,
         )
-        self._stores.tasks.add(task)
+        task, created = self._stores.tasks.get_or_create_by_idempotency_key(
+            candidate
+        )
+        if not created:
+            return task
 
         if self._video is None or not self._video.available():
             # No backend is a pending flag, never a placeholder video.
@@ -1324,6 +1566,19 @@ class WorkflowService:
         ]
         return scripts[-1] if scripts else None
 
+    def _script_asset(
+        self, project_id: str, asset_version: str | None
+    ) -> AssetVersion | None:
+        if asset_version is None:
+            return self._latest_script(project_id)
+        asset = self._stores.assets.get(project_id, asset_version)
+        if asset is None or asset.kind is not AssetKind.SCRIPT:
+            raise NotFoundError(
+                "script asset version not found",
+                {"project_id": project_id, "asset_version": asset_version},
+            )
+        return asset
+
     # --------------------------------------------------------------- roadmap
 
     def roadmap_preview(self, project_id: str) -> tuple[Roadmap | None, list[str]]:
@@ -1415,23 +1670,63 @@ class WorkflowService:
         """
 
         key = idempotency_key(project_id, task_type, asset_version)
-        existing = self._stores.tasks.find_by_idempotency_key(key)
-        if existing is not None:
-            return existing, None, True
-
         now = self._clock.now()
-        task = self._stores.tasks.add(
-            WorkflowTask(
-                task_id=new_id("task"),
-                project_id=project_id,
-                type=task_type,
-                status=TaskStatus.QUEUED,
-                idempotency_key=key,
-                payload=payload or {},
-                created_at=now,
-                updated_at=now,
-            )
+        candidate = WorkflowTask(
+            task_id=new_id("task"),
+            project_id=project_id,
+            type=task_type,
+            status=TaskStatus.QUEUED,
+            idempotency_key=key,
+            payload=payload or {},
+            created_at=now,
+            updated_at=now,
         )
+        task, created = self._stores.tasks.get_or_create_by_idempotency_key(
+            candidate
+        )
+        if not created:
+            if (
+                not self._jobs.synchronous_results
+                and task.status is TaskStatus.QUEUED
+            ):
+                self._record_event(
+                    project_id,
+                    Actor.SYSTEM,
+                    "job.dispatch_attempted",
+                    {
+                        "task_id": task.task_id,
+                        "type": task_type.value,
+                        "status": task.status.value,
+                    },
+                )
+                self._jobs.run(task, work)
+                task = self._stores.tasks.get(task.task_id) or task
+            return task, None, True
+
+        if not self._jobs.synchronous_results:
+            self._record_event(
+                project_id,
+                Actor.SYSTEM,
+                "job.recorded",
+                {
+                    "task_id": task.task_id,
+                    "type": task_type.value,
+                    "status": task.status.value,
+                    "error": task.error,
+                },
+            )
+            self._record_event(
+                project_id,
+                Actor.SYSTEM,
+                "job.dispatch_attempted",
+                {
+                    "task_id": task.task_id,
+                    "type": task_type.value,
+                    "status": task.status.value,
+                },
+            )
+            self._jobs.run(task, work)
+            return self._stores.tasks.get(task.task_id) or task, None, False
 
         task, outcome = self._jobs.run(task, work)
         task = self._stores.tasks.save(
@@ -1450,7 +1745,7 @@ class WorkflowService:
         )
         return task, outcome, False
 
-    def execute_task(self, task: WorkflowTask) -> WorkflowTask:
+    def execute_task(self, task: WorkflowTask) -> tuple[WorkflowTask, bool]:
         """Run a queued task's work and record the outcome on it.
 
         The API's `_run_job` refuses to start a job whose key already has a
@@ -1458,24 +1753,31 @@ class WorkflowService:
         task needs the opposite: run the work this record stands for. Both paths
         call the same `_*_now` method, so the work has one implementation and
         only the trigger differs.
+
+        A RUNNING task is an observable at-most-once claim. This demo has no
+        lease or automatic crash recovery; future recovery tooling must decide
+        when an abandoned claim is safe to retry.
         """
 
-        work = {
-            TaskType.FACT_EXTRACT: lambda: self._extract_outcome(task),
-            TaskType.REVIEW_FULL: lambda: self._review_outcome(task),
-            TaskType.REVIEW_INCREMENTAL: lambda: self._review_outcome(task),
-        }.get(task.type)
-
-        if work is None:
+        if task.type not in {
+            TaskType.FACT_EXTRACT,
+            TaskType.REVIEW_FULL,
+            TaskType.REVIEW_INCREMENTAL,
+        }:
             raise ValidationFailedError(
                 f"no worker handles {task.type.value}", {"type": task.type.value}
             )
 
-        running = self._stores.tasks.save(
-            task.model_copy(
-                update={"status": TaskStatus.RUNNING, "updated_at": self._clock.now()}
-            )
+        running = self._stores.tasks.claim_queued_task(
+            task.task_id, self._clock.now()
         )
+        if running is None:
+            return self._stores.tasks.get(task.task_id) or task, False
+        work = {
+            TaskType.FACT_EXTRACT: lambda: self._extract_outcome(running),
+            TaskType.REVIEW_FULL: lambda: self._review_outcome(running),
+            TaskType.REVIEW_INCREMENTAL: lambda: self._review_outcome(running),
+        }[running.type]
         outcome = work()
         finished = running.model_copy(
             update={
@@ -1497,7 +1799,7 @@ class WorkflowService:
                 "error": finished.error,
             },
         )
-        return finished
+        return finished, True
 
     def _extract_outcome(self, task: WorkflowTask) -> JobOutcome:
         version = str(task.payload.get("asset_version"))
@@ -1515,7 +1817,12 @@ class WorkflowService:
         )
 
     def _review_outcome(self, task: WorkflowTask) -> JobOutcome:
-        _, written, result = self._review_now(task.project_id)
+        generation = task.payload.get("analysis_generation")
+        _, written, result = self._review_now(
+            task.project_id,
+            asset_version=str(task.payload.get("asset_version")),
+            analysis_generation=int(generation) if generation is not None else None,
+        )
         return JobOutcome(
             result={
                 "finding_count": len(written),
@@ -1580,10 +1887,19 @@ class WorkflowService:
         recorded = task.result or {}
         keys = set(recorded.get("keys") or [])
         facts = [f for f in self._stores.facts.list(project_id) if f.key in keys]
+        waiting = task.status in {TaskStatus.QUEUED, TaskStatus.RUNNING}
         return facts, ExtractionResult(
             discarded=list(recorded.get("discarded") or []),
-            pending_flags=[task.error] if task.error else [],
-            backend=str(recorded.get("backend") or "unavailable"),
+            pending_flags=(
+                [task.error]
+                if task.error
+                else [FACT_EXTRACTION_PENDING]
+                if waiting
+                else []
+            ),
+            backend=str(
+                recorded.get("backend") or ("queued" if waiting else "unavailable")
+            ),
         )
 
     def _extract_now(self, project_id: str, version_id: str):
@@ -1785,7 +2101,12 @@ class WorkflowService:
         )
         return self._stores.upload_tickets.add(ticket)
 
-    def complete_upload(self, ticket_id: str, data: bytes) -> AssetVersion:
+    def complete_upload(
+        self,
+        ticket_id: str,
+        data: bytes,
+        text_storage_uri: str | None = None,
+    ) -> AssetVersion:
         """Write the bytes, then the immutable version record that names them."""
 
         if not data:
@@ -1807,6 +2128,7 @@ class WorkflowService:
             version_id=new_id("asset"),
             kind=ticket.kind,
             storage_uri=ticket.storage_uri,
+            text_storage_uri=text_storage_uri,
             sha256=hashlib.sha256(data).hexdigest(),
             parent_version=self._latest_version_of(ticket.project_id, ticket.kind),
             uploaded_by=ticket.issued_to,
@@ -1886,7 +2208,11 @@ class WorkflowService:
         return bool(thresholds)
 
     def _persist_classification(
-        self, project: Project, outcome: ClassificationOutcome
+        self,
+        project: Project,
+        outcome: ClassificationOutcome,
+        *,
+        analysis_generation: int | None = None,
     ) -> Project:
         now = self._clock.now()
         classification = outcome.classification
@@ -1900,8 +2226,11 @@ class WorkflowService:
         for proposed in outcome.facts:
             self._upsert_fact(project.project_id, proposed.key, proposed.value, proposed.source_ref)
 
-        if outcome.alert is not None:
-            self._write_alert_finding(project, outcome)
+        self._sync_classification_alert(
+            project,
+            outcome,
+            analysis_generation=analysis_generation,
+        )
 
         target = outcome.next_state
         if target is None:
@@ -1929,12 +2258,73 @@ class WorkflowService:
             )
         return project
 
-    def _write_alert_finding(self, project: Project, outcome: ClassificationOutcome) -> None:
+    def _sync_classification_alert(
+        self,
+        project: Project,
+        outcome: ClassificationOutcome,
+        *,
+        analysis_generation: int | None,
+    ) -> None:
+        finding_id = f"classification_alert:{project.project_id}"
+        for existing in self._stores.findings.list(project.project_id):
+            if (
+                existing.asset_version == "intent_profile"
+                and existing.alert is not None
+                and existing.finding_id != finding_id
+                and existing.active
+            ):
+                self._stores.findings.save(
+                    project.project_id,
+                    existing.model_copy(update={"active": False}),
+                )
+                self._record_event(
+                    project.project_id,
+                    Actor.SYSTEM,
+                    "finding.alert_deactivated",
+                    {"finding_id": existing.finding_id},
+                )
+
+        existing = self._stores.findings.get(project.project_id, finding_id)
+        if outcome.alert is None:
+            if existing is not None and existing.active:
+                self._stores.findings.save(
+                    project.project_id,
+                    existing.model_copy(
+                        update={
+                            "active": False,
+                            "analysis_generation": analysis_generation,
+                        }
+                    ),
+                )
+                self._record_event(
+                    project.project_id,
+                    Actor.SYSTEM,
+                    "finding.alert_deactivated",
+                    {"finding_id": existing.finding_id},
+                )
+            return
+
+        self._write_alert_finding(
+            project,
+            outcome,
+            analysis_generation=analysis_generation,
+        )
+
+    def _write_alert_finding(
+        self,
+        project: Project,
+        outcome: ClassificationOutcome,
+        *,
+        analysis_generation: int | None = None,
+    ) -> None:
+        assert outcome.alert is not None
         quote = ""
         if outcome.classification and outcome.classification.matched_rules:
             quote = outcome.classification.matched_rules[0].quote
+        finding_id = f"classification_alert:{project.project_id}"
+        existing = self._stores.findings.get(project.project_id, finding_id)
         finding = Finding(
-            finding_id=new_id("finding"),
+            finding_id=finding_id,
             asset_version="intent_profile",
             # `logline` was removed from IntentProfile when the synopsis became
             # the single story field, and this line still read it. Python's
@@ -1950,13 +2340,21 @@ class WorkflowService:
             snapshot_version=outcome.classification.policy_snapshot_version
             if outcome.classification
             else None,
-            created_at=self._clock.now(),
+            analysis_generation=analysis_generation,
+            active=True,
+            created_at=(
+                existing.created_at if existing is not None else self._clock.now()
+            ),
         )
-        self._stores.findings.add(project.project_id, finding)
+        self._stores.findings.save(project.project_id, finding)
         self._record_event(
             project.project_id,
             Actor.SYSTEM,
-            "finding.alert_created",
+            (
+                "finding.alert_created"
+                if existing is None
+                else "finding.alert_replaced"
+            ),
             {"finding_id": finding.finding_id, "category": finding.category},
         )
 

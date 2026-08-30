@@ -26,6 +26,13 @@ def snapshots() -> FileSnapshotService:
 
 
 @pytest.fixture
+def review_snapshots() -> FileSnapshotService:
+    """The upload-first demo is designed against the current v2 mock snapshot."""
+
+    return FileSnapshotService(ROOT / "policy" / "seed-snapshot-v2.yaml")
+
+
+@pytest.fixture
 def clock() -> FixedClock:
     return FixedClock(NOW, step_seconds=1)
 

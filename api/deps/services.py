@@ -9,6 +9,7 @@ from fastapi import Request
 
 from core.clock import Clock, SystemClock
 from core.llm import LLMClient, UnavailableLLM
+from core.review_facade import ReviewFacade
 from core.jobs import InlineRunner, JobRunner
 from core.teaser import UnavailableVideo, VideoBackend
 from core.workflow_service import WorkflowService
@@ -34,6 +35,17 @@ class AppContext:
     def workflow(self) -> WorkflowService:
         return WorkflowService(
             self.stores, self.snapshots, self.clock, self.llm, self.video, self.jobs
+        )
+
+    @property
+    def review_facade(self) -> ReviewFacade:
+        return ReviewFacade(
+            stores=self.stores,
+            snapshots=self.snapshots,
+            clock=self.clock,
+            llm=self.llm,
+            video=self.video,
+            jobs=self.jobs,
         )
 
 
@@ -112,3 +124,7 @@ def get_context(request: Request) -> AppContext:
 
 def get_workflow(request: Request) -> WorkflowService:
     return get_context(request).workflow
+
+
+def get_review_facade(request: Request) -> ReviewFacade:
+    return get_context(request).review_facade

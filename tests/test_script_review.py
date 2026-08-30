@@ -140,6 +140,21 @@ def test_without_a_backend_the_semantic_pass_is_pending(offline_client):
     assert body["backend"] == "unavailable"
 
 
+def test_semantic_backend_error_keeps_deterministic_findings_pending(
+    stores, snapshots, clock
+):
+    client = make_client(ScriptedLLM({}), stores, snapshots, clock)
+    project_id = project_with_script(client)
+
+    response = review(client, project_id)
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["findings"]
+    assert body["pending_flags"] == ["script_semantic_check_pending"]
+    assert body["backend"] == "scripted"
+
+
 def test_a_clean_script_offline_is_still_pending_not_cleared(offline_client):
     """Nothing found by patterns is not the same as nothing there."""
 

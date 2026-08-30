@@ -24,6 +24,7 @@ from schemas.common import EvidenceRef
 from schemas.enums import FindingSeverity
 
 from .classify.subject_rules import SubjectRule
+from .errors import UpstreamLLMError
 from .llm import LLMClient, LLMRequest
 
 SCRIPT_REVIEW_PROMPT_ID = "c1a_script_review"
@@ -38,6 +39,13 @@ _CN_DIGITS = {"一": 1, "二": 2, "三": 3, "四": 4, "五": 5, "六": 6, "七":
 #   "### 第1集《…》" then "**内景·…**"  — episode heading, then scene markers
 _ONE_LINE = re.compile(rf"第\s*([{_CN}]+)\s*集.{{0,4}}?场景\s*([{_CN}]+)")
 _EPISODE = re.compile(rf"^#*\s*第\s*([{_CN}]+)\s*集")
+_ONE_LINE_EN = re.compile(
+    r"^###\s+Episode\s+(\d+)\s+Scene\s+(\d+)\s*:\s*(?:\S.*)?$",
+    re.IGNORECASE,
+)
+_EPISODE_EN = re.compile(
+    r"^##\s+Episode\s+(\d+)\s*:\s*\S.*$", re.IGNORECASE
+)
 _SCENE_NUMBERED = re.compile(
     rf"^#*\s*\**\s*(?:场景\s*([{_CN}]+)|第\s*([{_CN}]+)\s*场)"
 )
@@ -119,7 +127,12 @@ def split_scenes(document: str) -> list[Scene]:
     """
 
     lines = document.splitlines()
-    has_episodes = any(_EPISODE.match(line.strip()) for line in lines)
+    has_episodes = any(
+        _EPISODE.match(line.strip())
+        or _EPISODE_EN.fullmatch(line.strip())
+        or _ONE_LINE_EN.fullmatch(line.strip())
+        for line in lines
+    )
 
     scenes: list[Scene] = []
     episode: int | None = None
@@ -132,12 +145,23 @@ def split_scenes(document: str) -> list[Scene]:
             continue
 
         one_line = _ONE_LINE.search(text)
+        one_line_en = _ONE_LINE_EN.fullmatch(text)
+        episode_en = _EPISODE_EN.fullmatch(text)
         if one_line:
             episode = _number(one_line.group(1))
             scene = _number(one_line.group(2))
             started = True
+        elif one_line_en:
+            episode = int(one_line_en.group(1))
+            scene = int(one_line_en.group(2))
+            started = True
         elif _EPISODE.match(text):
             episode = _number(_EPISODE.match(text).group(1))
+            scene = None
+            started = True
+            continue
+        elif episode_en:
+            episode = int(episode_en.group(1))
             scene = None
             started = True
             continue
@@ -202,12 +226,14 @@ def review_script(
         return result
 
     result.backend = llm.name
-    _semantic_pass(document, scenes, rules, llm, result, seen)
+    try:
+        _semantic_pass(scenes, rules, llm, result, seen)
+    except UpstreamLLMError:
+        result.pending_flags.append(PENDING_FLAG)
     return result
 
 
 def _semantic_pass(
-    document: str,
     scenes: list[Scene],
     rules: list[SubjectRule],
     llm: LLMClient,
@@ -215,12 +241,13 @@ def _semantic_pass(
     seen: set[tuple[str, int | None, int | None]],
 ) -> None:
     by_category = {rule.category: rule for rule in rules}
+    reviewable_document = "\n".join(scene.quote for scene in scenes)
     reply = llm.structured(
         LLMRequest(
             prompt_id=SCRIPT_REVIEW_PROMPT_ID,
             prompt_version=SCRIPT_REVIEW_PROMPT_VERSION,
             instruction=INSTRUCTION,
-            document=document,
+            document=reviewable_document,
             response_schema=RESPONSE_SCHEMA,
             context={"categories": sorted(by_category)},
         )
@@ -230,12 +257,15 @@ def _semantic_pass(
         category = str(raw.get("category") or "").strip()
         quote = str(raw.get("quote") or "").strip()
         rule = by_category.get(category)
-        # Unknown category, or a quote the script does not contain: discarded.
-        if rule is None or not quote or quote not in document:
+        # Unknown category, or a quote outside reviewable scene content: discarded.
+        if rule is None or not quote or quote not in reviewable_document:
             if category:
                 result.discarded.append(category)
             continue
         scene = _scene_for(quote, scenes)
+        if scene is None:
+            result.discarded.append(category)
+            continue
         key = (category, scene.episode, scene.scene)
         if key in seen:
             # The deterministic stage already reported this scene.
@@ -264,11 +294,11 @@ def _proposal(
     )
 
 
-def _scene_for(quote: str, scenes: list[Scene]) -> Scene:
+def _scene_for(quote: str, scenes: list[Scene]) -> Scene | None:
     for scene in scenes:
         if quote in scene.quote or scene.quote in quote:
             return scene
-    return Scene(quote=quote)
+    return None
 
 
 def evidence_for(clause_id: str, version: str) -> EvidenceRef:

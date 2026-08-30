@@ -8,6 +8,7 @@
     "build": "next build",
     "start": "next start -p 3000",
     "test": "vitest run",
+    "test:e2e": "playwright test e2e/review-demo.spec.ts --workers=1",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
@@ -16,6 +17,7 @@
     "react-dom": "19.2.8"
   },
   "devDependencies": {
+    "@playwright/test": "1.62.1",
     "@testing-library/jest-dom": "7.0.1",
     "@testing-library/react": "16.3.2",
     "@testing-library/user-event": "14.6.6",

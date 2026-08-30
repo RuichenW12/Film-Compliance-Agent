@@ -31,11 +31,19 @@ from typing import Iterable, TypeVar
 
 from pydantic import BaseModel
 
+from core.repositories import (
+    ReviewAnalysisBaseline,
+    ReviewAnalysisPublication,
+    ReviewAnalysisStage,
+    validate_review_analysis_publication,
+)
 from schemas.assets import AssetVersion, MaterialCard, UploadTicket
 from schemas.common import AuditEntry, Fact, TimelineEvent
+from schemas.enums import TaskStatus
 from schemas.findings import Finding
 from schemas.forms import FormDraft
 from schemas.project import Project
+from schemas.reviews import ReviewSession, ReviewState
 from schemas.workflow import (
     InstitutionReview,
     MockInstitution,
@@ -226,6 +234,57 @@ class SqliteProjectStore:
         return self._c.list_all()
 
 
+class SqliteReviewSessionStore:
+    def __init__(self, db: Database) -> None:
+        self._c = Collection(db, "review_sessions", ReviewSession)
+
+    def put(self, session: ReviewSession) -> ReviewSession:
+        self._c.put("", session.review_id, session)
+        return session
+
+    def get(self, review_id: str) -> ReviewSession | None:
+        return self._c.get("", review_id)
+
+    def compare_and_put(
+        self,
+        review_id: str,
+        expected_state: ReviewState,
+        session: ReviewSession,
+        *,
+        expected_generation: int | None = None,
+    ) -> bool:
+        with self._c.db._lock:
+            connection = self._c.db._connection
+            connection.execute("BEGIN IMMEDIATE")
+            try:
+                row = connection.execute(
+                    "SELECT payload FROM documents WHERE collection = ? AND doc_key = ?",
+                    (self._c.name, review_id),
+                ).fetchone()
+                if row is None:
+                    connection.execute("ROLLBACK")
+                    return False
+                current = ReviewSession.model_validate_json(row["payload"])
+                if current.state is not expected_state:
+                    connection.execute("ROLLBACK")
+                    return False
+                if (
+                    expected_generation is not None
+                    and current.generation != expected_generation
+                ):
+                    connection.execute("ROLLBACK")
+                    return False
+                connection.execute(
+                    "UPDATE documents SET payload = ? WHERE collection = ? AND doc_key = ?",
+                    (session.model_dump_json(), self._c.name, review_id),
+                )
+                connection.execute("COMMIT")
+                return True
+            except Exception:
+                connection.execute("ROLLBACK")
+                raise
+
+
 class SqliteFactStore:
     def __init__(self, db: Database) -> None:
         self._c = Collection(db, "facts", Fact)
@@ -320,6 +379,59 @@ class SqliteTaskStore:
                 return task
         return None
 
+    def get_or_create_by_idempotency_key(
+        self, task: WorkflowTask
+    ) -> tuple[WorkflowTask, bool]:
+        connection = self._c.db._connection
+        with self._c.db._lock:
+            connection.execute("BEGIN IMMEDIATE")
+            try:
+                rows = connection.execute(
+                    "SELECT payload FROM documents "
+                    "WHERE collection = ? ORDER BY ordinal",
+                    ("tasks",),
+                ).fetchall()
+                for row in rows:
+                    existing = WorkflowTask.model_validate_json(row["payload"])
+                    if existing.idempotency_key == task.idempotency_key:
+                        connection.execute("COMMIT")
+                        return existing, False
+                self._c.put("", task.task_id, task)
+                connection.execute("COMMIT")
+                return task, True
+            except Exception:
+                connection.execute("ROLLBACK")
+                raise
+
+    def claim_queued_task(
+        self, task_id: str, updated_at: datetime
+    ) -> WorkflowTask | None:
+        connection = self._c.db._connection
+        with self._c.db._lock:
+            connection.execute("BEGIN IMMEDIATE")
+            try:
+                row = connection.execute(
+                    "SELECT payload FROM documents "
+                    "WHERE collection = ? AND doc_key = ?",
+                    ("tasks", task_id),
+                ).fetchone()
+                if row is None:
+                    connection.execute("ROLLBACK")
+                    return None
+                task = WorkflowTask.model_validate_json(row["payload"])
+                if task.status is not TaskStatus.QUEUED:
+                    connection.execute("ROLLBACK")
+                    return None
+                running = task.model_copy(
+                    update={"status": TaskStatus.RUNNING, "updated_at": updated_at}
+                )
+                self._c.put("", task_id, running)
+                connection.execute("COMMIT")
+                return running
+            except Exception:
+                connection.execute("ROLLBACK")
+                raise
+
 
 class SqliteTimelineStore:
     def __init__(self, db: Database) -> None:
@@ -359,6 +471,9 @@ class SqliteFormStore:
     def latest(self, project_id: str) -> FormDraft | None:
         drafts = self._c.list(project_id)
         return drafts[-1] if drafts else None
+
+    def list(self, project_id: str) -> list[FormDraft]:
+        return self._c.list(project_id)
 
 
 class SqliteInstitutionReviewStore:
@@ -471,6 +586,7 @@ class SqliteStores:
 
     def __post_init__(self) -> None:
         self.projects = SqliteProjectStore(self.db)
+        self.review_sessions = SqliteReviewSessionStore(self.db)
         self.facts = SqliteFactStore(self.db)
         self.findings = SqliteFindingStore(self.db)
         self.materials = SqliteMaterialStore(self.db)
@@ -484,6 +600,243 @@ class SqliteStores:
         self.institution_reviews = SqliteInstitutionReviewStore(self.db)
         self.notifications = SqliteNotificationStore(self.db)
         self.institutions = SqliteInstitutionRegistry(self.db)
+
+    def stage_review_analysis(
+        self, review_id: str, project_id: str
+    ) -> ReviewAnalysisStage:
+        from store.memory import InMemoryStores
+
+        connection = self.db._connection
+        with self.db._lock:
+            connection.execute("BEGIN")
+            try:
+                session_row = connection.execute(
+                    "SELECT payload FROM documents "
+                    "WHERE collection = ? AND doc_key = ?",
+                    ("review_sessions", review_id),
+                ).fetchone()
+                project_row = connection.execute(
+                    "SELECT payload FROM documents "
+                    "WHERE collection = ? AND doc_key = ?",
+                    ("projects", project_id),
+                ).fetchone()
+                if session_row is None or project_row is None:
+                    raise KeyError(
+                        f"review aggregate not found: {review_id}/{project_id}"
+                    )
+
+                def project_rows(collection: str):
+                    return connection.execute(
+                        "SELECT payload FROM documents "
+                        "WHERE collection = ? AND parent = ? ORDER BY ordinal",
+                        (collection, project_id),
+                    ).fetchall()
+
+                facts = tuple(
+                    Fact.model_validate_json(row["payload"])
+                    for row in project_rows("facts")
+                )
+                findings = tuple(
+                    Finding.model_validate_json(row["payload"])
+                    for row in project_rows("findings")
+                )
+                forms = tuple(
+                    FormDraft.model_validate_json(row["payload"])
+                    for row in project_rows("forms")
+                )
+                timeline = tuple(
+                    TimelineEvent.model_validate_json(row["payload"])
+                    for row in project_rows("timeline")
+                )
+                audit = tuple(
+                    AuditEntry.model_validate_json(row["payload"])
+                    for row in project_rows("audit")
+                )
+                task_rows = connection.execute(
+                    "SELECT payload FROM documents "
+                    "WHERE collection = ? ORDER BY ordinal",
+                    ("tasks",),
+                ).fetchall()
+                tasks = tuple(
+                    task
+                    for task in (
+                        WorkflowTask.model_validate_json(row["payload"])
+                        for row in task_rows
+                    )
+                    if task.project_id == project_id
+                )
+                assets = tuple(
+                    AssetVersion.model_validate_json(row["payload"])
+                    for row in project_rows("assets")
+                )
+                blobs: dict[str, bytes] = {}
+                for asset in assets:
+                    for uri in (asset.storage_uri, asset.text_storage_uri):
+                        if not uri:
+                            continue
+                        blob_row = connection.execute(
+                            "SELECT data FROM blobs WHERE uri = ?", (uri,)
+                        ).fetchone()
+                        if blob_row is not None:
+                            blobs[uri] = bytes(blob_row["data"])
+
+                baseline = ReviewAnalysisBaseline(
+                    session=ReviewSession.model_validate_json(session_row["payload"]),
+                    project=Project.model_validate_json(project_row["payload"]),
+                    facts=facts,
+                    findings=findings,
+                    forms=forms,
+                    tasks=tasks,
+                    timeline=timeline,
+                    audit=audit,
+                )
+                project = Project.model_validate_json(project_row["payload"])
+                connection.execute("COMMIT")
+            except Exception:
+                connection.execute("ROLLBACK")
+                raise
+
+        staged = InMemoryStores()
+        staged.projects.create(project)
+        for fact in facts:
+            staged.facts.add(project_id, fact)
+        for finding in findings:
+            staged.findings.add(project_id, finding)
+        for form in forms:
+            staged.forms.put(project_id, form)
+        for task in tasks:
+            staged.tasks.add(task)
+        for event in timeline:
+            staged.timeline.add(project_id, event)
+        for entry in audit:
+            staged.audit.add(project_id, entry)
+        for asset in assets:
+            staged.assets.add(project_id, asset)
+        for uri, content in blobs.items():
+            staged.blobs.put(uri, content)
+        return ReviewAnalysisStage(baseline=baseline, stores=staged)
+
+    def prepare_review_analysis_publication(
+        self, stage: ReviewAnalysisStage, session: ReviewSession
+    ) -> ReviewAnalysisPublication:
+        staged = stage.stores
+        project = staged.projects.get(session.project_id)
+        if project is None:
+            raise KeyError(f"project not found: {session.project_id}")
+        return ReviewAnalysisPublication(
+            baseline=stage.baseline,
+            session=session,
+            project=project,
+            facts=tuple(staged.facts.list(session.project_id)),
+            findings=tuple(staged.findings.list(session.project_id)),
+            forms=tuple(staged.forms.list(session.project_id)),
+            tasks=tuple(staged.tasks.list(session.project_id)),
+            timeline=tuple(staged.timeline.list(session.project_id)),
+            audit=tuple(staged.audit.list(session.project_id)),
+        )
+
+    def publish_review_analysis(
+        self, publication: ReviewAnalysisPublication
+    ) -> bool:
+        project_id = validate_review_analysis_publication(publication)
+        baseline = publication.baseline
+        connection = self.db._connection
+        with self.db._lock:
+            connection.execute("BEGIN IMMEDIATE")
+            try:
+                row = connection.execute(
+                    "SELECT payload FROM documents "
+                    "WHERE collection = ? AND doc_key = ?",
+                    ("review_sessions", publication.session.review_id),
+                ).fetchone()
+                if row is None:
+                    connection.execute("ROLLBACK")
+                    return False
+                current = ReviewSession.model_validate_json(row["payload"])
+                project_row = connection.execute(
+                    "SELECT payload FROM documents "
+                    "WHERE collection = ? AND doc_key = ?",
+                    ("projects", project_id),
+                ).fetchone()
+                live_project = (
+                    Project.model_validate_json(project_row["payload"])
+                    if project_row is not None
+                    else None
+                )
+
+                def project_models(collection: str, model):
+                    rows = connection.execute(
+                        "SELECT payload FROM documents "
+                        "WHERE collection = ? AND parent = ? ORDER BY ordinal",
+                        (collection, project_id),
+                    ).fetchall()
+                    return tuple(
+                        model.model_validate_json(item["payload"])
+                        for item in rows
+                    )
+
+                live_facts = project_models("facts", Fact)
+                live_findings = project_models("findings", Finding)
+                live_forms = project_models("forms", FormDraft)
+                live_timeline = project_models("timeline", TimelineEvent)
+                live_audit = project_models("audit", AuditEntry)
+                task_rows = connection.execute(
+                    "SELECT payload FROM documents "
+                    "WHERE collection = ? ORDER BY ordinal",
+                    ("tasks",),
+                ).fetchall()
+                live_tasks = tuple(
+                    task
+                    for task in (
+                        WorkflowTask.model_validate_json(item["payload"])
+                        for item in task_rows
+                    )
+                    if task.project_id == project_id
+                )
+                if (
+                    current.state is not ReviewState.ANALYZING
+                    or current.generation != publication.session.generation
+                    or live_project != baseline.project
+                    or live_facts != baseline.facts
+                    or live_findings != baseline.findings
+                    or live_forms != baseline.forms
+                    or live_tasks != baseline.tasks
+                    or live_timeline != baseline.timeline
+                    or live_audit != baseline.audit
+                ):
+                    connection.execute("ROLLBACK")
+                    return False
+
+                self.projects.save(publication.project)
+                for collection in ("facts", "findings", "forms", "timeline", "audit"):
+                    connection.execute(
+                        "DELETE FROM documents WHERE collection = ? AND parent = ?",
+                        (collection, project_id),
+                    )
+                for fact in publication.facts:
+                    self.facts.add(project_id, fact)
+                for finding in publication.findings:
+                    self.findings.save(project_id, finding)
+                for form in publication.forms:
+                    self.forms.put(project_id, form)
+                for event in publication.timeline:
+                    self.timeline.add(project_id, event)
+                for entry in publication.audit:
+                    self.audit.add(project_id, entry)
+
+                for task in self.tasks.list(project_id):
+                    connection.execute(
+                        "DELETE FROM documents WHERE collection = ? AND doc_key = ?",
+                        ("tasks", task.task_id),
+                    )
+                for task in publication.tasks:
+                    self.tasks.save(task)
+                self.review_sessions.put(publication.session)
+                connection.execute("COMMIT")
+                return True
+            except Exception:
+                connection.execute("ROLLBACK")
+                raise
 
     @classmethod
     def at(cls, path: str | Path) -> "SqliteStores":

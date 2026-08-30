@@ -73,7 +73,7 @@ class JobWorker:
             return HandledJob(failed, ran=False, reason="no_handler")
 
         try:
-            self._workflow.execute_task(current)
+            finished, ran = self._workflow.execute_task(current)
         except Exception as failure:
             logger.exception("job %s failed", current.task_id)
             failed = current.model_copy(
@@ -82,6 +82,15 @@ class JobWorker:
             self._stores.tasks.save(failed)
             return HandledJob(failed, ran=True, reason="failed")
 
-        return HandledJob(
-            self._stores.tasks.get(current.task_id) or current, ran=True
-        )
+        if not ran:
+            return HandledJob(
+                finished,
+                ran=False,
+                reason=(
+                    "already_finished"
+                    if finished.status in TERMINAL
+                    else "already_claimed"
+                ),
+            )
+
+        return HandledJob(finished, ran=True)
