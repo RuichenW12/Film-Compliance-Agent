@@ -129,7 +129,6 @@ def split_scenes(document: str) -> list[Scene]:
     lines = document.splitlines()
     has_episodes = any(
         _EPISODE.match(line.strip())
-        or _ONE_LINE.search(line.strip())
         or _EPISODE_EN.fullmatch(line.strip())
         or _ONE_LINE_EN.fullmatch(line.strip())
         for line in lines

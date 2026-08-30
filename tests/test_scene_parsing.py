@@ -73,6 +73,21 @@ def test_a_plain_script_with_no_episode_headings_is_reviewed_whole():
     assert all(scene.episode is None for scene in scenes)
 
 
+def test_chinese_prose_scene_reference_does_not_hide_earlier_content(rules):
+    document = (
+        "法院走廊里两人交谈。\n"
+        "旁白引用第一集 场景一，但这不是标题。\n"
+    )
+
+    result = review_script(document, rules, UnavailableLLM())
+
+    assert len(result.findings) == 1
+    assert result.findings[0].category == "judicial"
+    assert result.findings[0].scene.quote == "法院走廊里两人交谈。"
+    assert result.findings[0].scene.episode is None
+    assert result.findings[0].scene.scene is None
+
+
 def test_english_episode_scene_headings_locate_body_and_stop_at_appendix():
     scenes = split_scenes(
         "# The Blank Byline\n"
