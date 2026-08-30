@@ -59,9 +59,10 @@ Upload script
 - 云端异步基础设施升级；
 - 将合成 fixture 描述成行业审核过的黄金样例。
 
-## 2. 当前实现基线
+## 2. 设计起始基线（历史）
 
-本设计基于分支 `codex/demo-ui-simplification-design` 的当前实现：
+以下是本 TDD 编写时用于规划的起始基线，不是当前交接状态；当前实现与
+最终验证结果以第 0、13、15、16 节为准：
 
 - `WorkflowService` 是 ProjectState 和项目聚合的唯一写入者；
 - 上传票据、原始 Blob、不可变 AssetVersion、事实、Finding 和 FormDraft 已存在；
@@ -91,13 +92,18 @@ flowchart LR
 
 ### 3.1 模块深度
 
-ReviewFacade 是新流程的主模块。它向路由和测试暴露四个核心操作：开始、读取、确认、生成产物；其实现隐藏原有十余个项目级操作。删除 ReviewFacade 会迫使路由或前端重新编排项目创建、上传票据、资产落库、候选提取、确认写入、分类、审查和表单组装，因此该模块具有实际深度。
+ReviewFacade 是新流程的主模块。它向路由和测试暴露开始、读取、初次确认、
+完成后重新分析、重试 intake、读取原文件和生成产物七个操作；其实现隐藏原有
+十余个项目级操作。删除 ReviewFacade 会迫使路由或前端重新编排项目创建、上传
+票据、资产落库、候选提取、确认写入、分类、审查、重分析和表单组装，因此该
+模块具有实际深度。
 
 ScriptIntakeAnalyzer、ScriptTextExtractor 和 ArtifactComposer 是 ReviewFacade 的内部模块。它们不通过 HTTP 单独暴露，也不让前端理解其调用顺序。
 
 只有真实存在两个 adapters 的位置形成 seam：
 
-- LLMClient：Vertex adapter 与 Scripted/Unavailable 测试 adapters；
+- LLMClient：Vertex adapter、fixture-bounded `DemoIntakeLLM`，以及
+  Scripted/Unavailable 单元测试 adapters；
 - ReviewSessionStore：Memory 与 SQLite adapters；
 - 既有 BlobStore、ProjectStore 等存储 interface：Memory 与 SQLite adapters。
 
@@ -131,16 +137,14 @@ api/
   main.py                            # 挂载 reviews router
 
 web/
-  app/page.tsx                       # Demo 根入口，服务端壳 + Suspense
+  app/page.tsx                       # Demo 根入口，服务端读取 review query
   app/wizard/page.tsx                # 兼容重定向到 /
   app/layout.tsx                     # 简化后的产品标识，不含旧导航和角色切换
-  components/review/ReviewFlow.tsx   # 客户端状态与 URL 恢复
-  components/review/ProgressSteps.tsx
-  components/review/UploadStep.tsx
-  components/review/ConfirmStep.tsx
-  components/review/ResultsStep.tsx
-  components/review/BeyondDemo.tsx
-  components/review/review-flow.module.css
+  app/review-flow.module.css         # 三步流程、tabs、响应式与 focus 样式
+  components/review-flow.tsx         # 状态、URL 恢复和内嵌 ProgressSteps tabs
+  components/upload-step.tsx
+  components/confirm-step.tsx
+  components/results-step.tsx        # 含非交互式 Beyond this demo 区域
   lib/reviews-api.ts                 # Review HTTP client 和下载辅助函数
 
 tests/
@@ -174,6 +178,12 @@ class ReviewFacade:
         actor_uid: str,
         details: ConfirmedReviewDetails,
     ) -> ReviewView: ...
+    def reanalyze(
+        self,
+        review_id: str,
+        actor_uid: str,
+        details: ConfirmedReviewDetails,
+    ) -> ReviewView: ...
     def artifact(
         self,
         review_id: str,
@@ -184,7 +194,10 @@ class ReviewFacade:
     def source(self, review_id: str, actor_uid: str) -> GeneratedArtifact: ...
 ```
 
-`retry_intake` 和 `source` 是对上位规格最小 HTTP 列表的两处必要补全：上位规格已经要求 `Retry extraction` 和原始文件可下载，但原四个 endpoint 无法表达这两个动作。它们不增加新的业务阶段。
+`reanalyze`、`retry_intake` 和 `source` 是对初版最小 HTTP 列表的必要补全：
+分别表达完成后的可编辑重分析、`Retry extraction` 和原始文件下载。
+`reanalyze` 复用同一 ReviewSession、Project 和 AssetVersion；后两者不增加新的
+业务阶段。
 
 ### 5.1 StartReviewCommand
 
@@ -216,8 +229,13 @@ class StartReviewCommand(DomainModel):
 
 ### 5.2 调用约束
 
-- `get`、`confirm`、`artifact`、`retry_intake` 和 `source` 都先校验 session owner；
+- `get`、`confirm`、`reanalyze`、`artifact`、`retry_intake` 和 `source` 都先校验 session owner；
 - `confirm` 只接受 `AWAITING_CONFIRMATION`；重复提交相同内容返回已有 COMPLETE 结果，不重复分类或写 Finding；
+- `reanalyze` 只接受可重新分析、未冻结的 `COMPLETE` 聚合；相同确认值直接
+  返回当前结果，不同值以 generation-aware CAS claim 后重新分类、重新做同一
+  AssetVersion 的 script review，并原子发布完整 project aggregate；
+- 同一 project 的 session/project/fact/finding/form/task/timeline/audit 任一基线
+  在计算期间变化，旧 generation 不覆盖新写入；并发请求不能同时 claim；
 - `retry_intake` 只接受 `AWAITING_CONFIRMATION`，且 intake 状态为 unavailable，或 partial 并带有可重试的 intake pending flag；
 - `artifact` 只读取已存分析结果，不触发分类或场景审查；
 - 单个产物失败不把 ReviewSession 从 COMPLETE 改为 FAILED；客户端重试同一 GET 即可；
@@ -311,6 +329,7 @@ class ConfirmedReviewDetails(DomainModel):
 ```python
 class ReviewSession(DomainModel):
     review_id: str
+    generation: int = Field(default=0, ge=0)
     owner_uid: str
     mode: ReviewMode
     state: ReviewState
@@ -363,9 +382,27 @@ Finding 按 episode、scene、category、quote 排序后生成 `RISK-001...`，�
 class ReviewSessionStore(Protocol):
     def put(self, session: ReviewSession) -> ReviewSession: ...
     def get(self, review_id: str) -> ReviewSession | None: ...
+    def compare_and_put(
+        self,
+        review_id: str,
+        expected_state: ReviewState,
+        session: ReviewSession,
+        *,
+        expected_generation: int | None = None,
+    ) -> bool: ...
 ```
 
-interface 不提供 list、delete 或按 Project 查询，因为 Creator Demo 没有 session dashboard。Memory 和 SQLite adapters 运行同一组 conformance tests；SQLite 使用现有 documents 表的新 logical collection `review_sessions`。
+interface 不提供 list、delete 或按 Project 查询，因为 Creator Demo 没有 session
+dashboard。`compare_and_put` 同时校验 state 和可选 generation，避免
+`COMPLETE -> ANALYZING -> COMPLETE` 的 ABA 覆盖。Memory 和 SQLite adapters
+运行同一组 conformance tests；SQLite 使用现有 documents 表的新 logical
+collection `review_sessions`。
+
+承载 stores 还实现 `stage_review_analysis`、
+`prepare_review_analysis_publication` 和 `publish_review_analysis`。它们对完整
+project aggregate 建立不可变基线，在内存共享锁或 SQLite transaction 下比较并
+发布 session、project、facts、findings、forms、tasks、timeline 和 audit，避免
+只原子更新 session 却留下混合 generation 的结果。
 
 ## 7. 状态机
 
@@ -378,6 +415,8 @@ stateDiagram-v2
     AWAITING_CONFIRMATION --> EXTRACTING: retry intake
     AWAITING_CONFIRMATION --> ANALYZING: confirmed values persisted
     ANALYZING --> COMPLETE: classification and applicable review stored
+    COMPLETE --> ANALYZING: edited confirmed values claimed for reanalysis
+    ANALYZING --> COMPLETE: latest aggregate published atomically
     UPLOADING --> FAILED: persistence failure
     EXTRACTING --> FAILED: unrecoverable parser or orchestration failure
     ANALYZING --> FAILED: classification or persistence failure
@@ -394,6 +433,9 @@ stateDiagram-v2
 | AWAITING_CONFIRMATION | confirm | ANALYZING | 先写 user-answer facts，再开始判断 |
 | ANALYZING | script flow done | COMPLETE | 分类、Finding 和 FormDraft 已存 |
 | ANALYZING | idea flow done | COMPLETE | 只有分类和 FormDraft，无场景审查 |
+| COMPLETE | unchanged reanalyze | COMPLETE | 幂等返回，不重跑分析 |
+| COMPLETE | edited reanalyze | ANALYZING | 同一 source/project，generation CAS claim |
+| ANALYZING | reanalysis published | COMPLETE | 完整 project aggregate 原子替换为最新 generation |
 
 FAILED 仅用于无法保留可靠 session 结果的编排或存储失败。LLM 不可用不是 FAILED；语义检查不可用也不是 FAILED。
 
@@ -501,7 +543,7 @@ def apply_review_confirmation(
 - title、episode_count、episode_minutes 和 amount_bracket 写入带 USER_ANSWER provenance 的事实；
 - 写入一条 `review.details_confirmed` timeline event。
 
-ReviewFacade.confirm 的固定顺序：
+ReviewFacade.confirm 的初次分析顺序：
 
 ```text
 validate session and confirmation
@@ -515,6 +557,23 @@ validate session and confirmation
 ```
 
 该顺序保证分类永远读取 user-confirmed values。上传、解析或 LLM 候选都不能绕过 Confirmation Bridge。
+
+ReviewFacade.reanalyze 的当前顺序：
+
+```text
+validate COMPLETE session, owner, project state and unfrozen form
+→ capture complete project aggregate baseline
+→ exact state+generation CAS to ANALYZING
+→ apply edited confirmation in staged stores
+→ rerun classification and same-AssetVersion script review
+→ rebuild FormDraft and result projection
+→ compare complete baseline and atomically publish latest generation
+→ state=COMPLETE
+```
+
+因此修改 title/tags/synopsis 等确认值会生成新的分类、风险视图和表单，但不会
+修改或替换上传源文件。并发基线冲突不会发布 staged 结果；分析异常只把匹配的
+ANALYZING generation 标成 FAILED，不把部分 project aggregate 暴露为完成结果。
 
 场景语义阶段如遇 `UpstreamLLMError`，`core/review.py` 必须保留确定性 Finding 并返回 `script_semantic_check_pending`。结果页显示 Semantic review pending，不能显示 Passed。
 
@@ -541,15 +600,21 @@ validate session and confirmation
 
 请求体为 ConfirmedReviewDetails，成功返回 COMPLETE ReviewView。字段校验错误为 422；状态冲突为 409。
 
-### 11.4 `POST /v1/reviews/{review_id}/retry-intake`
+### 11.4 `POST /v1/reviews/{review_id}/reanalyze`
+
+请求体仍为 ConfirmedReviewDetails。只接受符合第 5.2 节约束的 COMPLETE review；
+复用同一 Project 和 AssetVersion，成功返回最新 COMPLETE ReviewView。字段校验为
+422；非 COMPLETE、冻结/下游状态或并发 claim 冲突为 409。
+
+### 11.5 `POST /v1/reviews/{review_id}/retry-intake`
 
 复用已经保存的规范化文本，不要求重新上传。成功返回新的 AWAITING_CONFIRMATION ReviewView。
 
-### 11.5 `GET /v1/reviews/{review_id}/artifacts/{artifact_type}`
+### 11.6 `GET /v1/reviews/{review_id}/artifacts/{artifact_type}`
 
 允许 `form`、`summary`、`annotated-script`。响应带正确 Content-Type、Content-Length 和安全的 Content-Disposition filename。
 
-### 11.6 `GET /v1/reviews/{review_id}/source`
+### 11.7 `GET /v1/reviews/{review_id}/source`
 
 返回原始 bytes，文件名为上传时的安全 basename，响应头包含 `X-Asset-Sha256`。
 
@@ -616,8 +681,10 @@ PDF 使用 ReportLab。产品运行依赖增加：
 - `/` 成为唯一 Creator Demo 入口；
 - `/wizard` 使用 Next.js server redirect 到 `/`，保留旧书签兼容；
 - ReviewFlow 是最小 client module，页面和 layout 保持 server module；
-- 创建 session 后用 `router.replace("/?review=<id>")` 写入 URL；
-- 初次渲染通过 `useSearchParams()` 读取 review ID，并 GET 恢复状态；
+- `app/page.tsx` 从 server `searchParams` 读取 review ID 并以
+  `initialReviewId` 传给 ReviewFlow，后者 GET 恢复状态；
+- 创建、恢复或 mutation 返回 session 后，ReviewFlow 用
+  `window.history.replaceState` 写入唯一的 `?review=<id>`；Start over 删除该参数；
 - 不把完整 session 或剧本文本写入 localStorage。
 
 ### 13.2 屏幕所有权
@@ -631,14 +698,22 @@ PDF 使用 ReportLab。产品运行依赖增加：
 | COMPLETE | ResultsStep |
 | FAILED | 当前步骤的错误与可用恢复动作 |
 
-ReviewFlow 只依据 ReviewView.state 切屏，不读取 ProjectState。
+ReviewFlow 不读取 ProjectState。它由 ReviewView.state 推导 server step 和本次浏览器
+会话已到达的 `furthestStep`，同时用本地 `selectedStep` 控制展示；因此切换已访问
+tab 不伪造服务端状态，也不触发 API。恢复或 mutation 返回的新 ReviewView 会选择
+其 server step，但同一 session 的本地 `furthestStep` 不会倒退。
 
 ### 13.3 交互和无障碍
 
 - 每个 input 使用可见 label；file input 的 drop zone 不替代原生 keyboard input；
 - 错误与状态使用 `role="alert"` 或 `aria-live="polite"`；
-- screen 切换后 focus 到该屏 `<h1>`，不依赖滚动动画；
-- progress indicator 使用有序列表和 `aria-current="step"`；
+- 内容切换后，Upload/Confirm focus 到首个主要 input，Results focus 到可编程聚焦的
+  `<h1>`；键盘切换 tab 时 focus 保持在新 tab，不依赖滚动动画；
+- progress indicator 使用 `role="tablist"`、`role="tab"`、`aria-selected`、
+  `aria-controls` 和对应 `tabpanel`；未访问的未来 tab disabled，mutation 或处理中
+  全部 disabled，已访问 tab 可点击切换且不发后端请求；
+- tabs 使用 roving `tabIndex`，支持 Left/Right/Up/Down、Home、End 导航并移动
+  focus；CSS 保留可见的 `:focus-visible`；不增加单独 Back 按钮；
 - 风险状态同时使用图标、文字和结构；
 - CSS 使用 `review-flow.module.css`，global CSS 只保留真正的 reset/token；
 - 断点验证 1440、1024、768 和 390 CSS px；
@@ -650,12 +725,14 @@ ReviewFlow 只依据 ReviewView.state 切屏，不读取 ProjectState。
 `web/lib/reviews-api.ts` 暴露：
 
 ```typescript
-startReview(input: File | "idea"): Promise<ReviewView>
+createScriptReview(file: File): Promise<ReviewView>
+createIdeaReview(): Promise<ReviewView>
 getReview(reviewId: string): Promise<ReviewView>
 confirmReview(reviewId: string, details: ConfirmedReviewDetails): Promise<ReviewView>
+reanalyzeReview(reviewId: string, details: ConfirmedReviewDetails): Promise<ReviewView>
 retryReviewIntake(reviewId: string): Promise<ReviewView>
-downloadReviewArtifact(reviewId: string, type: ReviewArtifactType): Promise<void>
-downloadReviewSource(reviewId: string): Promise<void>
+reviewDownloadUrl(path: string): string
+downloadReviewFile(path: string, filename: string): Promise<void>
 ```
 
 multipart 上传不能经过当前强制 `Content-Type: application/json` 的 `apiFetch`。reviews-api 使用同一 API_BASE 和 authHeaders，但让浏览器自动生成 multipart boundary。
@@ -671,7 +748,7 @@ multipart 上传不能经过当前强制 `Content-Type: application/json` 的 `a
 | 文件超过 5 MiB | 413 | `SCRIPT_TOO_LARGE` | 留在 Upload |
 | intake LLM 不可用 | 201/200 | 无 HTTP error | Confirm + Analysis unavailable |
 | confirm 字段错误 | 422 | `VALIDATION_ERROR` | 对应字段提示 |
-| 重复或错误状态 confirm | 409 | `STATE_INVALID` | 恢复最新 session |
+| 重复或错误状态 confirm/reanalyze | 409 | `STATE_INVALID` | 恢复最新 session |
 | semantic LLM 不可用 | 200 | 无 HTTP error | 保留规则命中 + Semantic pending |
 | 单个 artifact 失败 | 503 | `ARTIFACT_GENERATION_FAILED` | 仅该文件 Retry |
 
@@ -740,7 +817,10 @@ ReviewFacade 通过现有 WorkflowService timeline 写入：
 - LLM unavailable 仍可手填确认；
 - semantic unavailable 保留确定性 Finding 并标 pending；
 - session owner 隔离；
-- Memory/SQLite 重启恢复 ReviewSession。
+- Memory/SQLite 重启恢复 ReviewSession；
+- reanalysis 复用同一 review/project/source/asset，以 generation CAS 拒绝并发 claim；
+- staged aggregate 只有在完整基线未变化时发布，冲突保留 live 写入与之前的
+  COMPLETE 结果；失败、queued/running job 不伪装成成功。
 
 ### 15.4 ArtifactComposer
 
@@ -761,13 +841,14 @@ ReviewFacade 通过现有 WorkflowService timeline 写入：
 - multipart script 和 idea 两种创建路径；
 - 5 MiB、类型、解码、owner、404/409/422/503；
 - GET 恢复状态不泄漏内部 IDs/enums/flags；
-- confirm 请求和响应 schema；
+- confirm 与 `POST /v1/reviews/{review_id}/reanalyze` 的请求、响应和状态冲突；
 - 三个 artifact 与 source 的 headers 和 bytes；
 - CORS 允许 POST/GET，multipart 不被 JSON header 破坏。
 
 ### 15.6 Fixture acceptance
 
-`tests/test_review_demo_fixture.py` 使用 `e2e-30min-public-security.md` 和 ScriptedLLM adapter 验证：
+`tests/test_review_demo_fixture.py` 使用 `e2e-30min-public-security.md` 和
+fixture-bounded `DemoIntakeLLM` 验证：
 
 - source SHA-256 不变；
 - title=`先挂电话`，source structure=`1 × 30 min`；
@@ -790,9 +871,17 @@ ReviewFacade 通过现有 WorkflowService timeline 写入：
 - semantic pending 文案正确；
 - idea path 不显示 summary/annotated download；
 - 错误关联字段，screen change focus 正确；
-- UI 不出现角色切换、项目 ID、raw enum、policy pack 或旧 workflow controls。
+- UI 不出现角色切换、项目 ID、raw enum、policy pack 或旧 workflow controls；
+- 三个步骤是已访问可选、未来 disabled 的 ARIA tabs，并支持完整键盘导航；
+- COMPLETE -> Confirm 使用最后确认值，切 tab 不请求 API，修改提交只调用一次
+  `reanalyzeReview`，成功后回到 Results；Upload tab 可继续当前 source 或上传新文件
+  开始新的 ReviewSession。
 
-`web/e2e/review-demo.spec.ts` 使用 Playwright 在 1440、1024、768 和 390 宽度运行 primary fixture，验证 keyboard-only 路径、无水平滚动、下载事件和刷新恢复。新增 dev dependency：
+`web/e2e/review-demo.spec.ts` 使用 Playwright 在 1440、1024、768 和 390
+宽度运行英文 30 分钟 fixture 的 upload -> confirm -> results -> edit ->
+reanalyze 主路径，并验证无水平滚动、confirmed 值恢复、下载表单中的更新标题和
+无 Back 按钮；另以英文 70 分钟 fixture 验证 7 episodes、70 minutes、28 scenes
+及差异化 tags/synopsis，并单独覆盖键盘 tabs。新增 dev dependency：
 
 ```json
 "@playwright/test": "1.62.1"
@@ -800,7 +889,21 @@ ReviewFacade 通过现有 WorkflowService timeline 写入：
 
 ## 16. 验收命令
 
-2026-08-30 最终验收依次运行：
+可移植的复现形式（先在仓库自己的 Python 环境安装 test extras）：
+
+```bash
+repo_root="/absolute/path/to/AllAgentic"
+python_bin="/absolute/path/to/python-with-test-extras"
+cd "$repo_root"
+PYTHONPATH="$repo_root" "$python_bin" -m pytest -q
+cd "$repo_root/web"
+npm test
+npm run typecheck
+npm run build
+E2E_PYTHON="$python_bin" PYTHONPATH="$repo_root" npm run test:e2e
+```
+
+2026-08-30 本机最终验收使用的精确命令：
 
 ```bash
 PYTHONPATH=$PWD /Users/ruichenwang/Documents/ChatGPT/AllAgentic/.venv/bin/pytest -q
@@ -815,7 +918,10 @@ npm run test:e2e
 
 结果：Python `897 passed, 3 skipped`（共收集 900 项，另有 1 条现有 Starlette/httpx deprecation warning）；Vitest `13 files / 49 tests passed`；typecheck 和 build 均 exit 0；Playwright `6 passed`。真实浏览器验收使用运行中的 FastAPI 和 Next.js，不以 component test 代替。Vertex live smoke 是单独证据：本次未运行 live demo intake/risk 请求，本地 adapter 通过不能表述为云端 LLM 已验证。
 
-## 17. 实现顺序
+## 17. 实现顺序（历史计划）
+
+本节记录当时的 TDD 落地顺序；当前交接接口和验证以第 0、5、6、7、13、15、
+16 节为准。
 
 1. 数据契约、ReviewSessionStore 和 store conformance；
 2. ScriptTextExtractor 与 AssetVersion 规范化文本支持；
@@ -826,7 +932,8 @@ npm run test:e2e
 7. Review HTTP routes 和 contract tests；
 8. reviews-api client 与三屏 React flow；
 9. layout/CSS 简化和静态 Beyond this demo；
-10. 全量回归、build、Playwright 四尺寸验收和一次可选 Vertex live smoke。
+10. dynamic intake、reanalysis、visited tabs 与英文 fixtures；
+11. 全量回归、build、Playwright 四尺寸验收；Vertex live smoke 保持独立且未运行。
 
 每一步实现均使用 red → green → refactor：先新增一个可观察行为的失败测试，确认因缺少该行为而失败，再写最小实现并运行相关回归。不能先写生产实现再补测试。
 
