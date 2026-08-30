@@ -65,7 +65,7 @@ describe("notification client", () => {
 describe("message rendering", () => {
   it("fills the params the API sent", () => {
     expect(format(ITEM.body_key, ITEM.params)).toBe(
-      "Snapshot v2 moved this project from T3 to T3."
+      "A policy update moved this project from T3 to T3. What you have to do may have changed too."
     );
   });
 

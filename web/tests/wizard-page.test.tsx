@@ -20,12 +20,11 @@ afterEach(() => {
 
 
 describe("WizardPage", () => {
-  it("submits an exact RMB investment amount", async () => {
+  it("submits classification inputs without inventing an exact amount", async () => {
     const fetchMock = vi
       .fn()
       .mockResolvedValueOnce(json({ project_id: "proj_001", state: "DRAFT" }))
       .mockResolvedValueOnce(json({ state: "INTAKE_DONE", missing: [] }))
-      .mockResolvedValueOnce(json({ tracks_enabled: { china: true, us: false } }))
       .mockResolvedValueOnce(
         json({
           classification: {
@@ -49,18 +48,22 @@ describe("WizardPage", () => {
 
     const user = userEvent.setup();
     render(<WizardPage />);
-    await user.type(screen.getByLabelText("Logline"), "A workplace romance.");
-    await user.type(
-      screen.getByLabelText("Investment amount (RMB)"),
-      "1500000"
-    );
+    const synopsis = screen
+      .getByText("What happens")
+      .closest("label")!
+      .querySelector("textarea")!;
+    await user.type(synopsis, "A workplace romance.");
+    expect(synopsis).toHaveValue("A workplace romance.");
     await user.click(
       screen.getByRole("button", { name: "Run classification" })
     );
 
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(4));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(3));
     expect(screen.getByRole("alert")).toHaveTextContent(/integration data/i);
     const intent = JSON.parse(String(fetchMock.mock.calls[1][1]?.body));
-    expect(intent.investment_amount_rmb).toBe(1_500_000);
+    expect(intent.synopsis).toBe("A workplace romance.");
+    expect(intent.amount_bracket).toBe("unknown");
+    expect(intent).not.toHaveProperty("investment_amount_rmb");
+    expect(intent.is_ai_generated).toBe(true);
   });
 });
