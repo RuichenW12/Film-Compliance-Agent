@@ -56,11 +56,21 @@ class InMemoryReviewSessionStore:
         return self._items.get(review_id)
 
     def compare_and_put(
-        self, review_id: str, expected_state: ReviewState, session: ReviewSession
+        self,
+        review_id: str,
+        expected_state: ReviewState,
+        session: ReviewSession,
+        *,
+        expected_generation: int | None = None,
     ) -> bool:
         with self._lock:
             current = self._items.get(review_id)
             if current is None or current.state is not expected_state:
+                return False
+            if (
+                expected_generation is not None
+                and current.generation != expected_generation
+            ):
                 return False
             self._items[review_id] = session
             return True

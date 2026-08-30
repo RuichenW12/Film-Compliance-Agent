@@ -38,7 +38,12 @@ class ReviewSessionStore(Protocol):
     def get(self, review_id: str) -> ReviewSession | None: ...
 
     def compare_and_put(
-        self, review_id: str, expected_state: ReviewState, session: ReviewSession
+        self,
+        review_id: str,
+        expected_state: ReviewState,
+        session: ReviewSession,
+        *,
+        expected_generation: int | None = None,
     ) -> bool: ...
 
 

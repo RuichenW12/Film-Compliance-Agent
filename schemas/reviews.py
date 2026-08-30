@@ -122,6 +122,7 @@ class ConfirmedReviewDetails(DomainModel):
 
 class ReviewSession(DomainModel):
     review_id: str
+    generation: int = Field(default=0, ge=0)
     owner_uid: str
     mode: ReviewMode
     state: ReviewState

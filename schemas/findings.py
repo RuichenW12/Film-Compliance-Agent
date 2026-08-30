@@ -69,6 +69,8 @@ class Finding(DomainModel):
     status: FindingStatus = FindingStatus.OPEN
     prompt_version: str | None = None
     snapshot_version: str | None = None
+    analysis_generation: int | None = Field(default=None, ge=0)
+    active: bool = True
     created_at: AwareDatetime | None = None
 
     @model_validator(mode="after")
@@ -88,8 +90,10 @@ class Finding(DomainModel):
 
     @property
     def blocks_gate_d3(self) -> bool:
-        """Open blocks, unresolved needs_human, and undispatched alerts all block D3."""
+        """Only current open conclusions and undispatched alerts block D3."""
 
+        if not self.active:
+            return False
         if self.status in (
             FindingStatus.RESOLVED,
             FindingStatus.WAIVED,

@@ -170,6 +170,42 @@ def test_review_session_state_claim_is_atomic(stores) -> None:
     )
 
 
+def test_review_session_claim_rejects_a_stale_generation_after_state_aba(
+    stores,
+) -> None:
+    original = _review_session().model_copy(update={"generation": 4})
+    stores.review_sessions.put(original)
+    newer_complete = original.model_copy(
+        update={
+            "generation": 5,
+            "confirmed": original.confirmed.model_copy(
+                update={"title": "newer generation"}
+            ),
+        }
+    )
+    stores.review_sessions.put(newer_complete)
+    stale_claim = original.model_copy(
+        update={"generation": 5, "state": ReviewState.ANALYZING}
+    )
+
+    assert not stores.review_sessions.compare_and_put(
+        original.review_id,
+        ReviewState.COMPLETE,
+        stale_claim,
+        expected_generation=4,
+    )
+    assert stores.review_sessions.get(original.review_id) == newer_complete
+
+
+def test_review_session_generation_defaults_for_legacy_payloads() -> None:
+    payload = _review_session().model_dump()
+    payload.pop("generation", None)
+
+    restored = ReviewSession.model_validate(payload)
+
+    assert restored.generation == 0
+
+
 def test_sqlite_review_session_survives_adapter_reconstruction(tmp_path) -> None:
     path = tmp_path / "review-session.db"
     first = SqliteStores.at(path)

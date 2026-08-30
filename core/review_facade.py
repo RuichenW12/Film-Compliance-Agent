@@ -220,9 +220,13 @@ class ReviewFacade:
             session,
             state=ReviewState.ANALYZING,
             confirmed=details,
+            generation=session.generation + 1,
         )
         if not self._stores.review_sessions.compare_and_put(
-            review_id, ReviewState.AWAITING_CONFIRMATION, session
+            review_id,
+            ReviewState.AWAITING_CONFIRMATION,
+            session,
+            expected_generation=session.generation - 1,
         ):
             current = self._owned(review_id, actor_uid)
             if current.state is ReviewState.COMPLETE and current.confirmed == details:
@@ -231,7 +235,7 @@ class ReviewFacade:
                 "review confirmation is already being processed",
                 {"state": current.state.value},
             )
-        return self._analyze_claimed(session)
+        return self._analyze_claimed(session, force_script_review=False)
 
     def reanalyze(
         self,
@@ -253,27 +257,44 @@ class ReviewFacade:
             state=ReviewState.ANALYZING,
             confirmed=details,
             semantic_status=None,
+            generation=session.generation + 1,
         )
         if not self._stores.review_sessions.compare_and_put(
-            review_id, ReviewState.COMPLETE, analyzing
+            review_id,
+            ReviewState.COMPLETE,
+            analyzing,
+            expected_generation=session.generation,
         ):
             current = self._owned(review_id, owner_uid)
             raise StateInvalidError(
                 "review reanalysis is already being processed",
                 {"state": current.state.value},
             )
-        return self._analyze_claimed(analyzing)
+        return self._analyze_claimed(analyzing, force_script_review=True)
 
-    def _analyze_claimed(self, session: ReviewSession) -> ReviewView:
+    def _analyze_claimed(
+        self,
+        session: ReviewSession,
+        *,
+        force_script_review: bool,
+    ) -> ReviewView:
         try:
             assert session.confirmed is not None
             self._workflow.apply_review_confirmation(
                 session.project_id, session.mode, session.confirmed
             )
-            self._workflow.run_classification(session.project_id)
+            self._workflow.run_classification(
+                session.project_id,
+                analysis_generation=session.generation,
+            )
             semantic_status = None
             if session.mode is ReviewMode.SCRIPT:
-                _, _, result = self._workflow.run_script_review(session.project_id)
+                _, _, result = self._workflow.run_script_review(
+                    session.project_id,
+                    analysis_generation=(
+                        session.generation if force_script_review else None
+                    ),
+                )
                 semantic_status = (
                     SemanticStatus.PENDING
                     if "script_semantic_check_pending" in result.pending_flags
@@ -287,14 +308,21 @@ class ReviewFacade:
                     "applicant_entity",
                     "To be supplied by filing institution",
                 )
-            session = self._updated(
+            complete = self._updated(
                 session,
                 state=ReviewState.COMPLETE,
                 semantic_status=semantic_status,
             )
-            self._stores.review_sessions.put(session)
-            self._record(session.project_id, "review.package_ready", session)
-            return self._view(session)
+            view = self._view(complete)
+            self._record(complete.project_id, "review.package_ready", complete)
+            if not self._stores.review_sessions.compare_and_put(
+                complete.review_id,
+                ReviewState.ANALYZING,
+                complete,
+                expected_generation=session.generation,
+            ):
+                raise StateInvalidError("review generation changed during analysis")
+            return view
         except Exception as exc:
             code = getattr(getattr(exc, "code", None), "value", None)
             failed = self._updated(
@@ -303,7 +331,12 @@ class ReviewFacade:
                 error_code=code or type(exc).__name__,
                 error_message=str(exc),
             )
-            self._stores.review_sessions.put(failed)
+            self._stores.review_sessions.compare_and_put(
+                failed.review_id,
+                ReviewState.ANALYZING,
+                failed,
+                expected_generation=session.generation,
+            )
             raise
 
     def retry_intake(self, review_id: str, actor_uid: str) -> ReviewView:
@@ -501,7 +534,11 @@ class ReviewFacade:
             )
         project = self._workflow.get_project(session.project_id)
         findings = sorted(
-            self._stores.findings.list(session.project_id),
+            (
+                finding
+                for finding in self._stores.findings.list(session.project_id)
+                if finding.active
+            ),
             key=lambda item: (
                 item.locator.episode if item.locator.episode is not None else 10**9,
                 item.locator.scene if item.locator.scene is not None else 10**9,

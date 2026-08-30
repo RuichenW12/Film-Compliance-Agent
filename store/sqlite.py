@@ -239,7 +239,12 @@ class SqliteReviewSessionStore:
         return self._c.get("", review_id)
 
     def compare_and_put(
-        self, review_id: str, expected_state: ReviewState, session: ReviewSession
+        self,
+        review_id: str,
+        expected_state: ReviewState,
+        session: ReviewSession,
+        *,
+        expected_generation: int | None = None,
     ) -> bool:
         with self._c.db._lock:
             connection = self._c.db._connection
@@ -254,6 +259,12 @@ class SqliteReviewSessionStore:
                     return False
                 current = ReviewSession.model_validate_json(row["payload"])
                 if current.state is not expected_state:
+                    connection.execute("ROLLBACK")
+                    return False
+                if (
+                    expected_generation is not None
+                    and current.generation != expected_generation
+                ):
                     connection.execute("ROLLBACK")
                     return False
                 connection.execute(

@@ -281,7 +281,12 @@ class WorkflowService:
         )
         return project
 
-    def run_classification(self, project_id: str) -> tuple[Project, ClassificationOutcome]:
+    def run_classification(
+        self,
+        project_id: str,
+        *,
+        analysis_generation: int | None = None,
+    ) -> tuple[Project, ClassificationOutcome]:
         """S3: D1a -> D1b -> D1c, synchronous, one pinned snapshot version."""
 
         project = self.get_project(project_id)
@@ -305,7 +310,11 @@ class WorkflowService:
                 {"missing": outcome.ask_back},
             )
 
-        project = self._persist_classification(project, outcome)
+        project = self._persist_classification(
+            project,
+            outcome,
+            analysis_generation=analysis_generation,
+        )
         return project, outcome
 
     # States where re-deciding a classification is safe. Everything from
@@ -530,12 +539,19 @@ class WorkflowService:
 
     # --------------------------------------------------------- script review
 
-    def run_script_review(self, project_id: str):
+    def run_script_review(
+        self,
+        project_id: str,
+        *,
+        analysis_generation: int | None = None,
+    ):
         """C1-a over the latest script version, recorded as a review task.
 
         The first review of a version is `review_full`; a later one is
-        `review_incremental`, since prior findings carry forward. Both are keyed
-        on the asset version, so a redelivery returns the first task.
+        `review_incremental`, since prior findings carry forward. Normal retries
+        are keyed on the asset version, while an explicit completed-review
+        reanalysis adds its claimed generation to the key so the same source is
+        checked again without weakening ordinary redelivery idempotency.
         """
 
         asset = self._latest_script(project_id)
@@ -574,12 +590,24 @@ class WorkflowService:
                 error=result.pending_flags[0] if result.pending_flags else None,
             )
 
+        job_asset_version = asset.version_id
+        if analysis_generation is not None:
+            job_asset_version = (
+                f"{asset.version_id}:analysis-generation:{analysis_generation}"
+            )
         self._run_job(
             project_id,
             task_type,
-            asset.version_id,
+            job_asset_version,
             work,
-            payload={"asset_version": asset.version_id},
+            payload={
+                "asset_version": asset.version_id,
+                **(
+                    {"analysis_generation": analysis_generation}
+                    if analysis_generation is not None
+                    else {}
+                ),
+            },
         )
         if holder:
             return holder[0]
@@ -1966,7 +1994,11 @@ class WorkflowService:
         return bool(thresholds)
 
     def _persist_classification(
-        self, project: Project, outcome: ClassificationOutcome
+        self,
+        project: Project,
+        outcome: ClassificationOutcome,
+        *,
+        analysis_generation: int | None = None,
     ) -> Project:
         now = self._clock.now()
         classification = outcome.classification
@@ -1980,8 +2012,11 @@ class WorkflowService:
         for proposed in outcome.facts:
             self._upsert_fact(project.project_id, proposed.key, proposed.value, proposed.source_ref)
 
-        if outcome.alert is not None:
-            self._write_alert_finding(project, outcome)
+        self._sync_classification_alert(
+            project,
+            outcome,
+            analysis_generation=analysis_generation,
+        )
 
         target = outcome.next_state
         if target is None:
@@ -2009,12 +2044,61 @@ class WorkflowService:
             )
         return project
 
-    def _write_alert_finding(self, project: Project, outcome: ClassificationOutcome) -> None:
+    def _sync_classification_alert(
+        self,
+        project: Project,
+        outcome: ClassificationOutcome,
+        *,
+        analysis_generation: int | None,
+    ) -> None:
+        finding_id = f"classification_alert:{project.project_id}"
+        for existing in self._stores.findings.list(project.project_id):
+            if (
+                existing.asset_version == "intent_profile"
+                and existing.alert is not None
+                and existing.finding_id != finding_id
+                and existing.active
+            ):
+                self._stores.findings.save(
+                    project.project_id,
+                    existing.model_copy(update={"active": False}),
+                )
+
+        existing = self._stores.findings.get(project.project_id, finding_id)
+        if outcome.alert is None:
+            if existing is not None and existing.active:
+                self._stores.findings.save(
+                    project.project_id,
+                    existing.model_copy(
+                        update={
+                            "active": False,
+                            "analysis_generation": analysis_generation,
+                        }
+                    ),
+                )
+            return
+
+        self._write_alert_finding(
+            project,
+            outcome,
+            analysis_generation=analysis_generation,
+        )
+
+    def _write_alert_finding(
+        self,
+        project: Project,
+        outcome: ClassificationOutcome,
+        *,
+        analysis_generation: int | None = None,
+    ) -> None:
+        assert outcome.alert is not None
         quote = ""
         if outcome.classification and outcome.classification.matched_rules:
             quote = outcome.classification.matched_rules[0].quote
+        finding_id = f"classification_alert:{project.project_id}"
+        existing = self._stores.findings.get(project.project_id, finding_id)
         finding = Finding(
-            finding_id=new_id("finding"),
+            finding_id=finding_id,
             asset_version="intent_profile",
             # `logline` was removed from IntentProfile when the synopsis became
             # the single story field, and this line still read it. Python's
@@ -2030,9 +2114,13 @@ class WorkflowService:
             snapshot_version=outcome.classification.policy_snapshot_version
             if outcome.classification
             else None,
-            created_at=self._clock.now(),
+            analysis_generation=analysis_generation,
+            active=True,
+            created_at=(
+                existing.created_at if existing is not None else self._clock.now()
+            ),
         )
-        self._stores.findings.add(project.project_id, finding)
+        self._stores.findings.save(project.project_id, finding)
         self._record_event(
             project.project_id,
             Actor.SYSTEM,

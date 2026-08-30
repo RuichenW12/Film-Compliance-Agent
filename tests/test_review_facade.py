@@ -8,9 +8,11 @@ import pytest
 
 from core.errors import ForbiddenError, StateInvalidError
 from core.llm import ScriptedLLM, UnavailableLLM
+from core.review import SCRIPT_REVIEW_PROMPT_ID
 from core.review_facade import ReviewFacade
 from core.script_intake import SCRIPT_INTAKE_PROMPT_ID
 from schemas.enums import AmountBracket, ProductionStage
+from schemas.policy_snapshot import PackName
 from schemas.reviews import (
     ConfirmedReviewDetails,
     IdeaOnly,
@@ -21,6 +23,8 @@ from schemas.reviews import (
     StartReviewCommand,
     UploadedScript,
 )
+from schemas.snapshot import SnapshotService
+from store.memory import InMemoryStores
 from store.sqlite import SqliteStores
 
 
@@ -60,6 +64,34 @@ INTAKE_REPLY = {
         "explanation": "A planning estimate from the supplied ranges.",
     },
 }
+
+EDGE_PACK = {
+    "subject_rules": [
+        {
+            "rule_id": "SR-EDGE-REANALYSIS",
+            "category": "public_security",
+            "trigger_patterns": ["缉毒"],
+            "is_edge_case": True,
+            "clause_ref": "nrta-order-16-article-5",
+        }
+    ]
+}
+
+
+class EdgeReviewSnapshots(SnapshotService):
+    def __init__(self, base: SnapshotService) -> None:
+        self._base = base
+
+    def latest_version(self, as_of=None) -> str:
+        return self._base.latest_version(as_of)
+
+    def get_pack(self, name: PackName, version: str | None = None) -> dict:
+        if PackName(name) is PackName.P2_SUBJECT_RULES:
+            return dict(EDGE_PACK)
+        return self._base.get_pack(name, version)
+
+    def clause(self, clause_id: str, version: str):
+        return self._base.clause(clause_id, version)
 
 
 def facade(stores, snapshots, clock, llm=None) -> ReviewFacade:
@@ -470,6 +502,216 @@ def test_failed_reanalysis_terminalizes_the_claimed_session(
     assert restored.state is ReviewState.FAILED
     assert "private reanalysis" not in (restored.failure_message or "")
     assert "Start a new review" in (restored.failure_message or "")
+
+
+def _assert_stale_reanalysis_cannot_claim_after_complete_aba(
+    first: ReviewFacade,
+    second: ReviewFacade,
+    stores,
+) -> None:
+    started = start_script(first)
+    first.confirm(started.review_id, "u_demo", confirmed())
+    stale_read = threading.Event()
+    resume_stale = threading.Event()
+    original_owned = first._owned
+    paused = False
+
+    def pause_after_read(review_id: str, actor_uid: str):
+        nonlocal paused
+        session = original_owned(review_id, actor_uid)
+        if not paused and session.state is ReviewState.COMPLETE:
+            paused = True
+            stale_read.set()
+            assert resume_stale.wait(timeout=5)
+        return session
+
+    first._owned = pause_after_read
+    stale_details = confirmed(title="stale request A")
+    fresh_details = confirmed(title="fresh request B")
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        stale = pool.submit(
+            first.reanalyze,
+            started.review_id,
+            "u_demo",
+            stale_details,
+        )
+        assert stale_read.wait(timeout=5)
+        fresh = second.reanalyze(
+            started.review_id,
+            "u_demo",
+            fresh_details,
+        )
+        assert fresh.state is ReviewState.COMPLETE
+        resume_stale.set()
+        with pytest.raises(StateInvalidError):
+            stale.result(timeout=5)
+
+    current = stores.review_sessions.get(started.review_id)
+    assert current is not None
+    assert current.state is ReviewState.COMPLETE
+    assert current.confirmed == fresh_details
+    assert current.generation == 2
+
+
+def test_memory_reanalysis_claim_rejects_complete_state_aba(
+    review_snapshots, clock
+) -> None:
+    stores = InMemoryStores()
+    _assert_stale_reanalysis_cannot_claim_after_complete_aba(
+        facade(stores, review_snapshots, clock),
+        facade(stores, review_snapshots, clock),
+        stores,
+    )
+
+
+def test_sqlite_reanalysis_claim_rejects_complete_state_aba(
+    tmp_path, review_snapshots, clock
+) -> None:
+    path = tmp_path / "review-reanalysis-aba.db"
+    first_stores = SqliteStores.at(path)
+    second_stores = SqliteStores.at(path)
+    try:
+        _assert_stale_reanalysis_cannot_claim_after_complete_aba(
+            facade(first_stores, review_snapshots, clock),
+            facade(second_stores, review_snapshots, clock),
+            first_stores,
+        )
+    finally:
+        first_stores.db.close()
+        second_stores.db.close()
+
+
+def test_late_failure_from_old_generation_cannot_overwrite_newer_completion(
+    stores, review_snapshots, clock, monkeypatch
+) -> None:
+    service = facade(stores, review_snapshots, clock)
+    started = start_script(service)
+    service.confirm(started.review_id, "u_demo", confirmed())
+    entered = threading.Event()
+    release = threading.Event()
+
+    def fail_late(*_args, **_kwargs):
+        entered.set()
+        assert release.wait(timeout=5)
+        raise RuntimeError("old generation failed late")
+
+    monkeypatch.setattr(service._workflow, "run_classification", fail_late)
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        old = pool.submit(
+            service.reanalyze,
+            started.review_id,
+            "u_demo",
+            confirmed(title="old generation"),
+        )
+        assert entered.wait(timeout=5)
+        claimed = stores.review_sessions.get(started.review_id)
+        assert claimed is not None
+        newer = claimed.model_copy(
+            update={
+                "generation": claimed.generation + 1,
+                "state": ReviewState.COMPLETE,
+                "confirmed": confirmed(title="newer generation"),
+            }
+        )
+        stores.review_sessions.put(newer)
+        release.set()
+        with pytest.raises(RuntimeError, match="old generation failed late"):
+            old.result(timeout=5)
+
+    assert stores.review_sessions.get(started.review_id) == newer
+
+
+def test_same_asset_reanalysis_preserves_unavailable_semantic_pending(
+    stores, review_snapshots, clock
+) -> None:
+    service = facade(stores, review_snapshots, clock, UnavailableLLM())
+    started = start_script(service)
+    first = service.confirm(started.review_id, "u_demo", confirmed())
+    assert first.semantic_status.value == "pending"
+
+    rerun = service.reanalyze(
+        started.review_id,
+        "u_demo",
+        confirmed(title="Pending semantic rerun"),
+    )
+
+    assert rerun.semantic_status.value == "pending"
+
+
+def test_same_asset_reanalysis_calls_semantic_review_again(
+    stores, review_snapshots, clock
+) -> None:
+    llm = ScriptedLLM(
+        {
+            SCRIPT_INTAKE_PROMPT_ID: INTAKE_REPLY,
+            SCRIPT_REVIEW_PROMPT_ID: {"hits": []},
+        }
+    )
+    service = facade(stores, review_snapshots, clock, llm)
+    started = start_script(service)
+    service.confirm(started.review_id, "u_demo", confirmed())
+    assert sum(call.prompt_id == SCRIPT_REVIEW_PROMPT_ID for call in llm.calls) == 1
+
+    rerun = service.reanalyze(
+        started.review_id,
+        "u_demo",
+        confirmed(title="Semantic rerun"),
+    )
+
+    assert rerun.semantic_status.value == "complete"
+    assert sum(call.prompt_id == SCRIPT_REVIEW_PROMPT_ID for call in llm.calls) == 2
+
+
+def test_reanalysis_replaces_then_hides_classification_alert_findings(
+    stores, review_snapshots, clock
+) -> None:
+    service = facade(
+        stores,
+        EdgeReviewSnapshots(review_snapshots),
+        clock,
+        UnavailableLLM(),
+    )
+    started = service.start(
+        StartReviewCommand(owner_uid="u_demo", source=IdeaOnly())
+    )
+    edge = confirmed(
+        tags=["缉毒"],
+        synopsis="一名缉毒警察在边境执行卧底任务。",
+    )
+    first = service.confirm(started.review_id, "u_demo", edge)
+    session = stores.review_sessions.get(started.review_id)
+    assert session is not None
+    assert len([finding for finding in first.findings if finding.explanation]) == 1
+
+    same_edge = service.reanalyze(
+        started.review_id,
+        "u_demo",
+        edge.model_copy(update={"title": "缉毒项目修订版"}),
+    )
+    active_alerts = [finding for finding in same_edge.findings if finding.explanation]
+    assert len(active_alerts) == 1
+    stored_alerts = [
+        finding
+        for finding in stores.findings.list(session.project_id)
+        if finding.alert is not None
+    ]
+    assert len(stored_alerts) == 1
+    assert stored_alerts[0].analysis_generation == 2
+    assert stored_alerts[0].active is True
+
+    no_edge = service.reanalyze(
+        started.review_id,
+        "u_demo",
+        confirmed(
+            title="普通家庭故事",
+            tags=["家庭"],
+            synopsis="一家人在便利店里化解日常误会。",
+        ),
+    )
+    assert [finding for finding in no_edge.findings if finding.explanation] == []
+    stored = stores.findings.list(session.project_id)
+    assert len([finding for finding in stored if finding.alert is not None]) == 1
+    assert next(finding for finding in stored if finding.alert is not None).active is False
 
 
 def test_review_owner_isolated(stores, review_snapshots, clock) -> None:
