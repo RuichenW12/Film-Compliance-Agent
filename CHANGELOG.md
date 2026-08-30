@@ -22,6 +22,22 @@ Conventions:
 
 ## 2026-08-31
 
+### A — English fixture recording handoff
+
+- The Maxine handoff and recording design now use
+  `e2e-30min-public-security-en.md`; the Chinese fixture and 70-minute English
+  judicial fixture are outside the final recording path.
+- Two fresh production runs produced complete English tags and Synopses, a
+  `3 × 10 min` suggestion, one locatable English public-security finding, and
+  all four download entries. Raw English suggestions classified once as Class 1
+  and once as Class 3.
+- The recording therefore uses the existing human confirmation gate to add the
+  governed tag `Public Security (公安)` before the first analysis. Reanalysis
+  verified deterministic Class 1/co-review without modifying the English source.
+
+Verified: two production Gemini 3.5 English uploads and analyses, plus one
+governed-tag reanalysis.
+
 ### A — Gemini 3.5 recording baseline and Maxine handoff
 
 - Production API revision `api-gemini35` now uses `gemini-3.5-flash` through
