@@ -24,6 +24,7 @@ from schemas.reviews import (
     IntakeStatus,
     ReviewArtifactLink,
     ReviewArtifactType,
+    ReviewAmountOption,
     ReviewClassificationView,
     ReviewFindingView,
     ReviewMode,
@@ -348,11 +349,22 @@ class ReviewFacade:
         return [
             {
                 "value": row["amount_bracket"],
+                "label": self._amount_label(
+                    row["amount_bracket"], row["lower_rmb"], row["upper_rmb"]
+                ),
                 "lower_rmb": row["lower_rmb"],
                 "upper_rmb": row["upper_rmb"],
             }
             for row in rows
         ]
+
+    @staticmethod
+    def _amount_label(bracket: str, lower: int, upper: int) -> str:
+        if bracket == "below_lower":
+            return f"Below CNY {lower:,}"
+        if bracket == "between":
+            return f"CNY {lower:,}–{upper:,}"
+        return f"CNY {upper:,} or above"
 
     def _view(self, session: ReviewSession) -> ReviewView:
         project = self._workflow.get_project(session.project_id)
@@ -447,6 +459,10 @@ class ReviewFacade:
                 if session.mode is ReviewMode.SCRIPT
                 else None
             ),
+            amount_options=[
+                ReviewAmountOption.model_validate(option)
+                for option in self._threshold_options()
+            ],
             classification=classification,
             findings=finding_views,
             artifacts=artifacts,

@@ -108,6 +108,11 @@ def test_start_hides_upload_orchestration_and_waits_for_confirmation(
     assert view.candidates.episode_minutes.value == 3
     assert view.source_sha256
     assert view.source_download_url.endswith("/source")
+    assert [option.label for option in view.amount_options] == [
+        "Below CNY 300,000",
+        "CNY 300,000–800,000",
+        "CNY 800,000 or above",
+    ]
     assert stores.projects.list_all()[0].intent_profile.synopsis is None
     assert stores.facts.list(stores.projects.list_all()[0].project_id) == []
 

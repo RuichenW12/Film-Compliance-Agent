@@ -219,6 +219,13 @@ class ReviewArtifactLink(DomainModel):
     download_url: str
 
 
+class ReviewAmountOption(DomainModel):
+    value: AmountBracket
+    label: str
+    lower_rmb: int
+    upper_rmb: int
+
+
 class GeneratedArtifact(DomainModel):
     filename: str
     media_type: str
@@ -236,6 +243,7 @@ class ReviewView(DomainModel):
     source_filename: str | None = None
     source_sha256: str | None = None
     source_download_url: str | None = None
+    amount_options: list[ReviewAmountOption] = Field(default_factory=list)
     classification: ReviewClassificationView | None = None
     findings: list[ReviewFindingView] = Field(default_factory=list)
     artifacts: list[ReviewArtifactLink] = Field(default_factory=list)
