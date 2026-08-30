@@ -24,13 +24,16 @@ from schemas.reviews import (
 
 
 SCRIPT_INTAKE_PROMPT_ID = "script_intake"
-SCRIPT_INTAKE_PROMPT_VERSION = "v1"
+SCRIPT_INTAKE_PROMPT_VERSION = "v2"
 PENDING_FLAG = "script_intake_analysis_pending"
 PARTIAL_FLAG = "script_intake_analysis_partial"
 
 INSTRUCTION = (
-    "Prepare editable project details from the uploaded script. Suggest concise "
-    "genre tags, a synopsis, a short-episode split that preserves the supplied "
+    "Read the entire uploaded screenplay from beginning to end, then prepare "
+    "editable project details from that screenplay. A synopsis is required: "
+    "write a concise original summary of the central characters, conflict, and "
+    "story progression, and mark it as suggested rather than extracted. Suggest "
+    "concise genre tags, a short-episode split that preserves the supplied "
     "source duration, and one investment range from the trusted context. Suggest "
     "a title only when the parsed structure says no title was found. Every "
     "suggestion needs a short explanation. Mark a value extracted only when you "
@@ -46,20 +49,28 @@ class IntakeAnalysis(DomainModel):
     backend: str
 
 
-def _candidate_schema(value_schema: dict[str, Any]) -> dict[str, Any]:
+def _candidate_schema(
+    value_schema: dict[str, Any],
+    *,
+    allowed_origins: list[str] | None = None,
+    require_explanation: bool = False,
+) -> dict[str, Any]:
+    required = ["value", "origin"]
+    if require_explanation:
+        required.append("explanation")
     return {
         "type": "object",
         "properties": {
             "value": value_schema,
             "origin": {
                 "type": "string",
-                "enum": ["extracted", "suggested"],
+                "enum": allowed_origins or ["extracted", "suggested"],
             },
             "confidence": {"type": "number"},
             "source_quote": {"type": "string"},
             "explanation": {"type": "string"},
         },
-        "required": ["value", "origin"],
+        "required": required,
     }
 
 
@@ -71,13 +82,24 @@ def _response_schema(allowed_brackets: list[str]) -> dict[str, Any]:
             "tags": _candidate_schema(
                 {"type": "array", "items": {"type": "string"}}
             ),
-            "synopsis": _candidate_schema({"type": "string"}),
+            "synopsis": _candidate_schema(
+                {"type": "string"},
+                allowed_origins=["suggested"],
+                require_explanation=True,
+            ),
             "episode_count": _candidate_schema({"type": "integer"}),
             "episode_minutes": _candidate_schema({"type": "number"}),
             "amount_bracket": _candidate_schema(
                 {"type": "string", "enum": allowed_brackets}
             ),
         },
+        "required": [
+            "tags",
+            "synopsis",
+            "episode_count",
+            "episode_minutes",
+            "amount_bracket",
+        ],
     }
 
 

@@ -6,6 +6,7 @@ import pytest
 
 from core.llm import ScriptedLLM, UnavailableLLM
 from core.script_intake import (
+    INSTRUCTION,
     SCRIPT_INTAKE_PROMPT_ID,
     ScriptIntakeAnalyzer,
 )
@@ -94,7 +95,7 @@ def test_request_treats_the_script_as_document_data_and_limits_amount_values() -
     rendered = request.render()
 
     assert request.prompt_id == "script_intake"
-    assert request.prompt_version == "v1"
+    assert request.prompt_version == "v2"
     assert request.document == parsed.text
     assert rendered.index("<<<DOC>>>") < rendered.index("Ignore all previous")
     assert request.context["threshold_options"] == THRESHOLD_OPTIONS
@@ -104,6 +105,21 @@ def test_request_treats_the_script_as_document_data_and_limits_amount_values() -
         "at_or_above_upper",
     ]
     assert SCRIPT not in str(request.context)
+
+
+def test_request_requires_the_llm_to_read_the_script_and_return_a_synopsis() -> None:
+    _, llm, parsed = analyze()
+    request = llm.calls[0]
+
+    assert request.document == parsed.text
+    assert "Read the entire uploaded screenplay" in INSTRUCTION
+    assert "synopsis" in request.response_schema["required"]
+    assert request.response_schema["properties"]["synopsis"]["properties"][
+        "origin"
+    ]["enum"] == ["suggested"]
+    assert "explanation" in request.response_schema["properties"]["synopsis"][
+        "required"
+    ]
 
 
 def test_title_is_suggested_only_when_the_document_has_no_title() -> None:
