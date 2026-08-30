@@ -22,6 +22,37 @@ Conventions:
 
 ## 2026-08-30
 
+### A — the API runs on Cloud Run, and serves the two pages OAuth demands
+
+`api` is deployed in us-east1 on `film-compliance-agent` and answering: a
+`GET /v1/institutions` through the authenticated proxy returns 200 from the
+container.
+
+**New: `api/routers/public_pages.py`** — `/privacy` and `/terms`, plain HTML,
+mounted with one line. Google will not publish an external OAuth consent screen
+without both links, and it checks their domain, so these are a deployment
+dependency rather than a product feature. They are served by the API, not the
+web app, because the consent screen links straight at them and must not depend
+on the front end being up. `include_in_schema=False` keeps them out of the
+public contract, which a test confirms.
+
+Everything the privacy page claims is checkable against the code: what is
+collected, that it goes to Firestore and Cloud Storage in us-east1, that text
+reaches Vertex AI, and that nothing is filed with any authority. It also says
+plainly that this is a demo whose data may be deleted without notice, because
+that is true and a policy describing a system we do not run would be worse than
+none.
+
+Verified: `/privacy` and `/terms` both return 200 from the deployed revision.
+`python -m pytest` 673 passed, 3 skipped — one more case than before, from the
+route-enumeration test picking up the new pages.
+
+Still unexplained from the first deploy: `GET /healthz` returns 404 and never
+reaches the application, while `/zzz-not-a-route` reaches it and is logged.
+The service is private, so the authenticated proxy is not yet ruled out as the
+cause. It matters because the manual and `scripts/e2e_check.py` both use
+`/healthz`.
+
 ### A — a runbook for the human half of the deployment
 
 `docs/deploy-manual-steps.md`. Deployment work is starting, and it splits into
