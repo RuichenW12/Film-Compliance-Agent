@@ -10,6 +10,7 @@ from core.comparison import budget_comparison
 from core.errors import ForbiddenError, NotFoundError, StateInvalidError
 from core.ids import new_id
 from core.llm import LLMClient
+from core.review_artifacts import ArtifactComposer, ArtifactFormField, ReviewPackage
 from core.script_intake import ScriptIntakeAnalyzer
 from core.script_text import parse_script
 from core.workflow_service import WorkflowService
@@ -75,6 +76,7 @@ class ReviewFacade:
         snapshots: SnapshotService,
         clock: Clock,
         llm: LLMClient | None,
+        artifact_composer: ArtifactComposer | None = None,
     ) -> None:
         self._stores = stores
         self._snapshots = snapshots
@@ -82,6 +84,7 @@ class ReviewFacade:
         self._llm = llm
         self._workflow = WorkflowService(stores, snapshots, clock, llm)
         self._intake = ScriptIntakeAnalyzer(llm)
+        self._artifact_composer = artifact_composer or ArtifactComposer()
 
     def start(self, command: StartReviewCommand) -> ReviewView:
         project = self._workflow.create_project(command.owner_uid)
@@ -277,6 +280,57 @@ class ReviewFacade:
             media_type=media_type,
             content=content,
         )
+
+    def artifact(
+        self,
+        review_id: str,
+        actor_uid: str,
+        artifact_type: ReviewArtifactType,
+    ) -> GeneratedArtifact:
+        session = self._owned(review_id, actor_uid)
+        if session.state is not ReviewState.COMPLETE:
+            raise StateInvalidError("review artifacts are available after analysis")
+        if (
+            session.mode is ReviewMode.IDEA
+            and artifact_type is not ReviewArtifactType.FORM
+        ):
+            raise StateInvalidError("idea reviews expose only the review form")
+        if session.confirmed is None:
+            raise StateInvalidError("completed review details are missing")
+
+        view = self._view(session)
+        if view.classification is None:
+            raise StateInvalidError("review classification is missing")
+        draft = self._stores.forms.latest(session.project_id)
+        if draft is None:
+            raise StateInvalidError("review form draft is missing")
+
+        source_text = None
+        if session.normalized_text_uri is not None:
+            content = self._stores.blobs.get(session.normalized_text_uri)
+            if content is None:
+                raise NotFoundError("normalized script text is missing")
+            source_text = content.decode("utf-8")
+
+        package = ReviewPackage(
+            review_id=session.review_id,
+            mode=session.mode,
+            confirmed=session.confirmed.model_copy(deep=True),
+            classification=view.classification.model_copy(deep=True),
+            findings=tuple(item.model_copy(deep=True) for item in view.findings),
+            semantic_status=session.semantic_status,
+            form_fields=tuple(
+                ArtifactFormField(
+                    key=key,
+                    value=field.display_value,
+                    status=field.status.value,
+                )
+                for key, field in sorted(draft.fields.items())
+            ),
+            source_text=source_text,
+            source_filename=session.source_filename,
+        )
+        return self._artifact_composer.compose(package, artifact_type)
 
     def _owned(self, review_id: str, actor_uid: str) -> ReviewSession:
         session = self._stores.review_sessions.get(review_id)

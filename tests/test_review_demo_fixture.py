@@ -9,6 +9,7 @@ from core.script_intake import SCRIPT_INTAKE_PROMPT_ID
 from schemas.enums import AmountBracket
 from schemas.reviews import (
     ConfirmedReviewDetails,
+    ReviewArtifactType,
     ReviewState,
     StartReviewCommand,
     UploadedScript,
@@ -112,3 +113,21 @@ def test_public_security_fixture_reaches_confirmed_risk_package(
     } & {finding.category for finding in result.findings}
     assert result.semantic_status.value == "pending"
     assert "clean pass" not in result.model_dump_json().lower()
+
+    form = service.artifact(
+        result.review_id, "u_demo", ReviewArtifactType.FORM
+    )
+    summary = service.artifact(
+        result.review_id, "u_demo", ReviewArtifactType.SUMMARY
+    )
+    annotated = service.artifact(
+        result.review_id, "u_demo", ReviewArtifactType.ANNOTATED_SCRIPT
+    )
+
+    assert form.content.startswith(b"%PDF-")
+    assert summary.content.startswith(b"%PDF-")
+    annotated_text = annotated.content.decode("utf-8")
+    for line in raw.decode("utf-8").splitlines():
+        assert line in annotated_text
+    for finding in result.findings:
+        assert f"<!-- {finding.risk_id}" in annotated_text
