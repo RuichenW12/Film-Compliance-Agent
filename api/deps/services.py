@@ -109,3 +109,7 @@ def get_context(request: Request) -> AppContext:
 
 def get_workflow(request: Request) -> WorkflowService:
     return get_context(request).workflow
+
+
+def get_review_facade(request: Request) -> ReviewFacade:
+    return get_context(request).review_facade

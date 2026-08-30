@@ -119,7 +119,9 @@ class ReviewFacade:
 
         assert isinstance(command.source, UploadedScript)
         parsed = parse_script(command.source.filename, command.source.content)
-        filename = Path(command.source.filename).name or "script.md"
+        filename = (
+            Path(command.source.filename.replace("\\", "/")).name or "script.md"
+        )
         normalized_uri = (
             f"blob://{project.project_id}/{session.review_id}/normalized-text"
         )
