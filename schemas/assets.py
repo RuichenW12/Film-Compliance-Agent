@@ -14,6 +14,7 @@ class AssetVersion(DomainModel):
     version_id: str
     kind: AssetKind
     storage_uri: str
+    text_storage_uri: str | None = None
     sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
     parent_version: str | None = None
     diff_summary: str | None = None

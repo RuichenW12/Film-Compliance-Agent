@@ -116,7 +116,7 @@ Also test strict UTF-8/BOM handling, empty input, unsupported extension, 5 MiB l
 **Step 3: Implement minimal parser and dependency changes**
 
 - add runtime dependencies `python-docx`, `python-multipart`, and `reportlab`;
-- add `pytest-asyncio>=0.25,<1` to the test extra;
+- add `pytest-asyncio>=1.4,<2` to the test extra, matching the locally verified baseline;
 - add optional `text_storage_uri` to `AssetVersion` while preserving old JSON compatibility;
 - add structured input errors and status mapping;
 - ensure raw SHA-256 always covers original bytes, never normalized text.

@@ -684,7 +684,7 @@ ReviewFacade 通过现有 WorkflowService timeline 写入：
 - `/wizard` 只做重定向，不再维护第二套 creator flow；
 - AssetVersion 新字段可选，旧 SQLite JSON 可正常反序列化；
 - ReviewSession 使用新的 SQLite logical collection，不需要 schema migration；
-- `pytest-asyncio>=0.25,<1` 加入 test extra，确保 clean install 可复现当前测试基线。
+- `pytest-asyncio>=1.4,<2` 加入 test extra，与当前已验证的 1.4.0 基线一致，确保 clean install 可复现。
 
 ## 15. 测试策略
 
