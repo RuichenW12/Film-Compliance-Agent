@@ -13,8 +13,16 @@ from typing import Any
 
 from .errors import UpstreamLLMError
 from .llm import LLMRequest
-from .review import SCRIPT_REVIEW_PROMPT_ID
-from .script_intake import SCRIPT_INTAKE_PROMPT_ID
+from .review import (
+    RESPONSE_SCHEMA as REVIEW_RESPONSE_SCHEMA,
+    SCRIPT_REVIEW_PROMPT_ID,
+    SCRIPT_REVIEW_PROMPT_VERSION,
+)
+from .script_intake import (
+    SCRIPT_INTAKE_PROMPT_ID,
+    SCRIPT_INTAKE_PROMPT_VERSION,
+    _response_schema as intake_response_schema,
+)
 
 
 class DemoIntakeLLM:
@@ -28,8 +36,13 @@ class DemoIntakeLLM:
     def structured(self, request: LLMRequest) -> dict[str, Any]:
         if request.prompt_id == SCRIPT_INTAKE_PROMPT_ID:
             replies = _INTAKE_REPLIES
+            _require_version(request, SCRIPT_INTAKE_PROMPT_VERSION)
+            allowed_amounts = _validate_intake_schema(request.response_schema)
         elif request.prompt_id == SCRIPT_REVIEW_PROMPT_ID:
             replies = _REVIEW_REPLIES
+            _require_version(request, SCRIPT_REVIEW_PROMPT_VERSION)
+            _validate_review_schema(request.response_schema)
+            allowed_amounts = None
         else:
             raise UpstreamLLMError(
                 f"unsupported demo prompt: {request.prompt_id}",
@@ -38,7 +51,7 @@ class DemoIntakeLLM:
 
         checksum = _document_checksum(request.document)
         try:
-            return deepcopy(replies[checksum])
+            reply = replies[checksum]
         except KeyError as exc:
             raise UpstreamLLMError(
                 "unknown demo document",
@@ -47,12 +60,54 @@ class DemoIntakeLLM:
                     "document_sha256": checksum,
                 },
             ) from exc
+        if allowed_amounts is not None:
+            amount = reply["amount_bracket"]["value"]
+            if amount not in allowed_amounts:
+                raise UpstreamLLMError(
+                    f"demo amount bracket {amount!r} is not permitted by the request",
+                    {"prompt_id": request.prompt_id, "amount_bracket": amount},
+                )
+        return deepcopy(reply)
 
 
 def _document_checksum(document: str) -> str:
     if not isinstance(document, str):
         raise UpstreamLLMError("demo document must be text")
     return sha256(document.encode("utf-8")).hexdigest()
+
+
+def _require_version(request: LLMRequest, expected: str) -> None:
+    if request.prompt_version != expected:
+        raise UpstreamLLMError(
+            f"unsupported demo prompt version: {request.prompt_version}",
+            {
+                "prompt_id": request.prompt_id,
+                "prompt_version": request.prompt_version,
+                "expected_version": expected,
+            },
+        )
+
+
+def _validate_intake_schema(schema: dict[str, Any]) -> frozenset[str]:
+    try:
+        allowed = schema["properties"]["amount_bracket"]["properties"][
+            "value"
+        ]["enum"]
+    except (KeyError, TypeError):
+        allowed = None
+    if (
+        not isinstance(allowed, list)
+        or not allowed
+        or not all(isinstance(value, str) for value in allowed)
+        or schema != intake_response_schema(allowed)
+    ):
+        raise UpstreamLLMError("unsupported demo intake response schema")
+    return frozenset(allowed)
+
+
+def _validate_review_schema(schema: dict[str, Any]) -> None:
+    if schema != REVIEW_RESPONSE_SCHEMA:
+        raise UpstreamLLMError("unsupported demo review response schema")
 
 
 def _suggested(value: Any, explanation: str) -> dict[str, Any]:
@@ -69,6 +124,8 @@ def _intake_reply(
     synopsis: str,
     episode_count: int,
     episode_minutes: float,
+    amount_bracket: str,
+    amount_explanation: str,
     language: str,
 ) -> dict[str, Any]:
     if language == "zh":
@@ -84,7 +141,7 @@ def _intake_reply(
                 episode_minutes, "单集时长与建议集数共同保持原总时长。"
             ),
             "amount_bracket": _suggested(
-                "at_or_above_upper", "依据当前快照档位给出的可编辑制作金额估算。"
+                amount_bracket, amount_explanation
             ),
         }
     return {
@@ -104,8 +161,8 @@ def _intake_reply(
             "Episode length and count preserve the source duration together.",
         ),
         "amount_bracket": _suggested(
-            "at_or_above_upper",
-            "An editable production estimate from the current snapshot bands.",
+            amount_bracket,
+            amount_explanation,
         ),
     }
 
@@ -120,6 +177,8 @@ _INTAKE_REPLIES: dict[str, dict[str, Any]] = {
         synopsis="社区民警帮助一对父女把险些受骗的经历转化为真实的社区提醒，也让他们重新建立彼此确认的联系。",
         episode_count=10,
         episode_minutes=3,
+        amount_bracket="between",
+        amount_explanation="这是合成、可编辑的演示规划估算，依据五人角色、十五场戏和集中本地场景的可见制作复杂度；并非从剧本提取，也不是合规结论。",
         language="zh",
     ),
     # e2e-30min-public-security-en.md
@@ -128,6 +187,8 @@ _INTAKE_REPLIES: dict[str, dict[str, Any]] = {
         synopsis="A community police officer helps a father and daughter turn an almost-successful scam call into an honest public warning and a new way to stay in contact.",
         episode_count=10,
         episode_minutes=3,
+        amount_bracket="between",
+        amount_explanation="This is a synthetic, editable demo planning estimate based on the visible production complexity of five characters, fifteen scenes, and mostly local locations; it is not extracted from the script and is not a compliance conclusion.",
         language="en",
     ),
     # e2e-70min-judicial-long-context.md
@@ -136,6 +197,8 @@ _INTAKE_REPLIES: dict[str, dict[str, Any]] = {
         synopsis="编剧林夏为恩师遗作的署名与剧场经理发生争议，双方在调解和庭审过程中依靠版本证据重新厘清共同创作的贡献边界。",
         episode_count=7,
         episode_minutes=10,
+        amount_bracket="at_or_above_upper",
+        amount_explanation="这是合成、可编辑的演示规划估算，依据七集、二十八场戏及剧场与法院等多地点的可见制作复杂度；并非从剧本提取，也不是合规结论。",
         language="zh",
     ),
     # e2e-70min-judicial-long-context-en.md
@@ -144,6 +207,8 @@ _INTAKE_REPLIES: dict[str, dict[str, Any]] = {
         synopsis="A playwright challenges the missing credit on her late mentor's work, and a mediation and hearing force every contributor to confront the evidence of shared authorship.",
         episode_count=7,
         episode_minutes=10,
+        amount_bracket="at_or_above_upper",
+        amount_explanation="This is a synthetic, editable demo planning estimate based on the visible production complexity of seven episodes, twenty-eight scenes, and multiple theater and court locations; it is not extracted from the script and is not a compliance conclusion.",
         language="en",
     ),
 }

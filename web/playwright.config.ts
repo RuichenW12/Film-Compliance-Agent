@@ -19,6 +19,9 @@ export default defineConfig({
     {
       command: `${python} -m uvicorn scripts.review_demo_server:app --host 127.0.0.1 --port 8080`,
       cwd: "..",
+      env: {
+        DEMO_LLM_BACKEND: "local",
+      },
       url: "http://127.0.0.1:8080/healthz",
       reuseExistingServer: false,
       timeout: 30_000,
