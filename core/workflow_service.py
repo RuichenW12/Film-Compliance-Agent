@@ -55,6 +55,7 @@ from .classify.subject_rules import load_subject_rules
 from .classify.chain import ClassificationOutcome
 from .classify.d1c import PUBLISHED_KEYS, judge_tier
 from .clock import Clock
+from .extract import PENDING_FLAG as FACT_EXTRACTION_PENDING
 from .extract import extract_facts
 from .errors import (
     GateBlockedError,
@@ -1683,7 +1684,48 @@ class WorkflowService:
             candidate
         )
         if not created:
+            if (
+                not self._jobs.synchronous_results
+                and task.status is TaskStatus.QUEUED
+            ):
+                self._record_event(
+                    project_id,
+                    Actor.SYSTEM,
+                    "job.dispatch_attempted",
+                    {
+                        "task_id": task.task_id,
+                        "type": task_type.value,
+                        "status": task.status.value,
+                    },
+                )
+                self._jobs.run(task, work)
+                task = self._stores.tasks.get(task.task_id) or task
             return task, None, True
+
+        if not self._jobs.synchronous_results:
+            self._record_event(
+                project_id,
+                Actor.SYSTEM,
+                "job.recorded",
+                {
+                    "task_id": task.task_id,
+                    "type": task_type.value,
+                    "status": task.status.value,
+                    "error": task.error,
+                },
+            )
+            self._record_event(
+                project_id,
+                Actor.SYSTEM,
+                "job.dispatch_attempted",
+                {
+                    "task_id": task.task_id,
+                    "type": task_type.value,
+                    "status": task.status.value,
+                },
+            )
+            self._jobs.run(task, work)
+            return self._stores.tasks.get(task.task_id) or task, None, False
 
         task, outcome = self._jobs.run(task, work)
         task = self._stores.tasks.save(
@@ -1710,6 +1752,10 @@ class WorkflowService:
         task needs the opposite: run the work this record stands for. Both paths
         call the same `_*_now` method, so the work has one implementation and
         only the trigger differs.
+
+        A RUNNING task is an observable at-most-once claim. This demo has no
+        lease or automatic crash recovery; future recovery tooling must decide
+        when an abandoned claim is safe to retry.
         """
 
         if task.type not in {
@@ -1840,10 +1886,19 @@ class WorkflowService:
         recorded = task.result or {}
         keys = set(recorded.get("keys") or [])
         facts = [f for f in self._stores.facts.list(project_id) if f.key in keys]
+        waiting = task.status in {TaskStatus.QUEUED, TaskStatus.RUNNING}
         return facts, ExtractionResult(
             discarded=list(recorded.get("discarded") or []),
-            pending_flags=[task.error] if task.error else [],
-            backend=str(recorded.get("backend") or "unavailable"),
+            pending_flags=(
+                [task.error]
+                if task.error
+                else [FACT_EXTRACTION_PENDING]
+                if waiting
+                else []
+            ),
+            backend=str(
+                recorded.get("backend") or ("queued" if waiting else "unavailable")
+            ),
         )
 
     def _extract_now(self, project_id: str, version_id: str):
