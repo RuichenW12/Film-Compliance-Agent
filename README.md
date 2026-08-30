@@ -2,7 +2,7 @@
 
 Film Compliance Agent is a workflow for helping micro-drama creators and licensed institutions prepare compliance reviews and filing materials. The product path combines deterministic gates, evidence-linked AI review, human confirmation, and versioned policy snapshots.
 
-> Current product status (2026-08-30): the upload-first creator review, editable confirmation gate, Policy Snapshot classification, scene review, reanalysis, material collection, form freeze, institution console, downloadable review package, and supporting APIs are implemented and tested. The English product demo is deployed to Cloud Run behind Google IAP at <https://web-827776020662.us-east1.run.app> and uses Vertex Gemini when configured.
+> Current product status (2026-08-31): the upload-first creator review, editable confirmation gate, Policy Snapshot classification, scene review, reanalysis, material collection, form freeze, institution console, downloadable review package, and supporting APIs are implemented and tested. The English product demo is deployed to Cloud Run behind Google IAP at <https://web-827776020662.us-east1.run.app> and uses Gemini 3.5 Flash through the Google GenAI SDK and Vertex AI.
 >
 > Deployment boundary: the current recording deployment runs the API with `STORE_BACKEND=memory`; review sessions can disappear after scale-to-zero, restart, or redeploy. The existing Firestore database and adapters are not being claimed as persistence validation for the new ReviewSession flow.
 >

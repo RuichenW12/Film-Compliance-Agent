@@ -50,8 +50,8 @@ Set on the service, not in the image. Nothing here is secret.
 | Variable | Value |
 |---|---|
 | `GOOGLE_CLOUD_PROJECT` | `film-compliance-agent` |
-| `REGION` | `us-east1` |
-| `VERTEX_MODEL_GEMINI` | `gemini-2.5-flash` |
+| `REGION` | `global` (Vertex model endpoint; Cloud Run remains in `us-east1`) |
+| `VERTEX_MODEL_GEMINI` | `gemini-3.5-flash` |
 | `STORE_BACKEND` | `memory` |
 
 **`web`**

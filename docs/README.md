@@ -29,6 +29,9 @@ Document groups include:
 - [Deployment](deployment.md) — **how the deployed system works**: topology,
   configuration, how to ship a change, what behaves differently in the cloud,
   and what is not built yet. Start here if you are changing product code.
+- [Maxine demo recording handoff](maxine-demo-recording-handoff.md) — current
+  production baseline, accepted fixture result, four-minute operating plan,
+  factual boundaries, and release checklist for the final recording.
 - [Deployment — the parts that need you](deploy-manual-steps.md) — the human
   steps only: irreversible choices, interactive logins, and secret values
 - [Illustrated walkthrough](walkthrough.html) — architecture, the classification
