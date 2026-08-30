@@ -39,6 +39,10 @@ _CN_DIGITS = {"一": 1, "二": 2, "三": 3, "四": 4, "五": 5, "六": 6, "七":
 #   "### 第1集《…》" then "**内景·…**"  — episode heading, then scene markers
 _ONE_LINE = re.compile(rf"第\s*([{_CN}]+)\s*集.{{0,4}}?场景\s*([{_CN}]+)")
 _EPISODE = re.compile(rf"^#*\s*第\s*([{_CN}]+)\s*集")
+_ONE_LINE_EN = re.compile(
+    r"\bEpisode\s+(\d+)\s+Scene\s+(\d+)\b", re.IGNORECASE
+)
+_EPISODE_EN = re.compile(r"^#*\s*Episode\s+(\d+)\b", re.IGNORECASE)
 _SCENE_NUMBERED = re.compile(
     rf"^#*\s*\**\s*(?:场景\s*([{_CN}]+)|第\s*([{_CN}]+)\s*场)"
 )
@@ -120,7 +124,10 @@ def split_scenes(document: str) -> list[Scene]:
     """
 
     lines = document.splitlines()
-    has_episodes = any(_EPISODE.match(line.strip()) for line in lines)
+    has_episodes = any(
+        _EPISODE.match(line.strip()) or _EPISODE_EN.match(line.strip())
+        for line in lines
+    )
 
     scenes: list[Scene] = []
     episode: int | None = None
@@ -133,12 +140,22 @@ def split_scenes(document: str) -> list[Scene]:
             continue
 
         one_line = _ONE_LINE.search(text)
+        one_line_en = _ONE_LINE_EN.search(text)
         if one_line:
             episode = _number(one_line.group(1))
             scene = _number(one_line.group(2))
             started = True
+        elif one_line_en:
+            episode = int(one_line_en.group(1))
+            scene = int(one_line_en.group(2))
+            started = True
         elif _EPISODE.match(text):
             episode = _number(_EPISODE.match(text).group(1))
+            scene = None
+            started = True
+            continue
+        elif _EPISODE_EN.match(text):
+            episode = int(_EPISODE_EN.match(text).group(1))
             scene = None
             started = True
             continue

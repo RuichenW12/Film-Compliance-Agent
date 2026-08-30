@@ -66,6 +66,24 @@ def test_demo_fixture_extracts_title_and_structure() -> None:
     assert parsed.text.encode("utf-8") == raw
 
 
+@pytest.mark.parametrize("runtime_label", ["Target runtime", "Total runtime"])
+def test_english_metadata_and_scene_headings_are_parsed(runtime_label: str) -> None:
+    document = (
+        "# The Blank Byline\n\n"
+        f"- {runtime_label}: 70 minutes\n"
+        "- Episodes: 7\n\n"
+        "### Episode 1 Scene 1: Rehearsal Hall\n"
+        "### Episode 7 Scene 4: Opening Night\n"
+    )
+
+    parsed = parse_script("script.md", document.encode("utf-8"))
+
+    assert parsed.title == "The Blank Byline"
+    assert parsed.structure.source_episode_count == 7
+    assert parsed.structure.source_total_minutes == 70
+    assert parsed.structure.source_scene_count == 2
+
+
 def test_utf8_bom_is_removed_but_other_text_is_unchanged() -> None:
     parsed = parse_script("script.txt", b"\xef\xbb\xbfFirst line\nSecond line\n")
     assert parsed.text == "First line\nSecond line\n"

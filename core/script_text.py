@@ -32,12 +32,19 @@ _TITLE = re.compile(
     r"^#\s+(?:《(?P<bracketed>[^》]+)》|(?P<plain>.+?))[ \t]*$",
     re.MULTILINE,
 )
-_EPISODE_COUNT = re.compile(r"^-\s*集数：\s*(\d+)\s*集\s*$", re.MULTILINE)
-_TOTAL_MINUTES = re.compile(
-    r"^-\s*目标时长：\s*约?\s*(\d+(?:\.\d+)?)\s*分钟\s*$",
-    re.MULTILINE,
+_EPISODE_COUNT = re.compile(
+    r"^-\s*(?:集数：\s*|Episodes?:\s*)(\d+)(?:\s*集|\s*episodes?)?\s*$",
+    re.IGNORECASE | re.MULTILINE,
 )
-_SCENE_HEADING = re.compile(r"^###\s+第.+?集\s+场景.+?：", re.MULTILINE)
+_TOTAL_MINUTES = re.compile(
+    r"^-\s*(?:目标时长：\s*约?\s*|(?:Target|Total)\s+runtime:\s*)"
+    r"(\d+(?:\.\d+)?)(?:\s*分钟|\s*minutes?)\s*$",
+    re.IGNORECASE | re.MULTILINE,
+)
+_SCENE_HEADING = re.compile(
+    r"^###\s+(?:第.+?集\s+场景.+?：|Episode\s+\d+\s+Scene\s+\d+\s*:)",
+    re.IGNORECASE | re.MULTILINE,
+)
 _NUMBERED_SCENE = re.compile(
     r"^\s*第\s*\d+\s*集\s*[/·-]\s*第\s*\d+\s*场", re.MULTILINE
 )

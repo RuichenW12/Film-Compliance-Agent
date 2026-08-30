@@ -73,6 +73,29 @@ def test_a_plain_script_with_no_episode_headings_is_reviewed_whole():
     assert all(scene.episode is None for scene in scenes)
 
 
+def test_english_episode_scene_headings_locate_body_and_stop_at_appendix():
+    scenes = split_scenes(
+        "# The Blank Byline\n"
+        "\n"
+        "### Episode 1 Scene 1: Rehearsal Hall\n"
+        "\n"
+        "Lin Xia circles a line in red.\n"
+        "\n"
+        "### Episode 7 Scene 4: Opening Night\n"
+        "\n"
+        "The old stage clock starts moving.\n"
+        "\n"
+        "## Appendix: Continuity Notes\n"
+        "\n"
+        "The judge's costume remains unchanged.\n"
+    )
+
+    body = [scene for scene in scenes if not scene.quote.startswith("###")]
+    assert [(scene.episode, scene.scene) for scene in body] == [(1, 1), (7, 4)]
+    assert all("Appendix" not in scene.quote for scene in scenes)
+    assert all("judge" not in scene.quote for scene in scenes)
+
+
 # ------------------------------------------------------- what must not be reviewed
 
 
