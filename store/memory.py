@@ -12,6 +12,7 @@ from schemas.common import AuditEntry, Fact, TimelineEvent
 from schemas.findings import Finding
 from schemas.forms import FormDraft
 from schemas.project import Project
+from schemas.reviews import ReviewSession
 from schemas.workflow import (
     InstitutionReview,
     MockInstitution,
@@ -39,6 +40,18 @@ class InMemoryProjectStore:
 
     def list_all(self) -> list[Project]:
         return list(self._items.values())
+
+
+class InMemoryReviewSessionStore:
+    def __init__(self) -> None:
+        self._items: dict[str, ReviewSession] = {}
+
+    def put(self, session: ReviewSession) -> ReviewSession:
+        self._items[session.review_id] = session
+        return session
+
+    def get(self, review_id: str) -> ReviewSession | None:
+        return self._items.get(review_id)
 
 
 class InMemoryFactStore:
@@ -290,6 +303,7 @@ class Stores(Protocol):
     """The bundle the API and workers receive by dependency injection."""
 
     projects: object
+    review_sessions: object
     facts: object
     findings: object
     materials: object
@@ -308,6 +322,9 @@ class Stores(Protocol):
 @dataclass
 class InMemoryStores:
     projects: InMemoryProjectStore = field(default_factory=InMemoryProjectStore)
+    review_sessions: InMemoryReviewSessionStore = field(
+        default_factory=InMemoryReviewSessionStore
+    )
     facts: InMemoryFactStore = field(default_factory=InMemoryFactStore)
     findings: InMemoryFindingStore = field(default_factory=InMemoryFindingStore)
     materials: InMemoryMaterialStore = field(default_factory=InMemoryMaterialStore)

@@ -36,6 +36,7 @@ from schemas.common import AuditEntry, Fact, TimelineEvent
 from schemas.findings import Finding
 from schemas.forms import FormDraft
 from schemas.project import Project
+from schemas.reviews import ReviewSession
 from schemas.workflow import (
     InstitutionReview,
     MockInstitution,
@@ -224,6 +225,18 @@ class SqliteProjectStore:
 
     def list_all(self) -> list[Project]:
         return self._c.list_all()
+
+
+class SqliteReviewSessionStore:
+    def __init__(self, db: Database) -> None:
+        self._c = Collection(db, "review_sessions", ReviewSession)
+
+    def put(self, session: ReviewSession) -> ReviewSession:
+        self._c.put("", session.review_id, session)
+        return session
+
+    def get(self, review_id: str) -> ReviewSession | None:
+        return self._c.get("", review_id)
 
 
 class SqliteFactStore:
@@ -471,6 +484,7 @@ class SqliteStores:
 
     def __post_init__(self) -> None:
         self.projects = SqliteProjectStore(self.db)
+        self.review_sessions = SqliteReviewSessionStore(self.db)
         self.facts = SqliteFactStore(self.db)
         self.findings = SqliteFindingStore(self.db)
         self.materials = SqliteMaterialStore(self.db)

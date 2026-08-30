@@ -13,6 +13,7 @@ from schemas.common import AuditEntry, Fact, TimelineEvent
 from schemas.findings import Finding
 from schemas.forms import FormDraft
 from schemas.project import Project
+from schemas.reviews import ReviewSession
 from schemas.workflow import (
     InstitutionReview,
     MockInstitution,
@@ -29,6 +30,12 @@ class ProjectStore(Protocol):
     def save(self, project: Project) -> Project: ...
 
     def list_all(self) -> list[Project]: ...
+
+
+class ReviewSessionStore(Protocol):
+    def put(self, session: ReviewSession) -> ReviewSession: ...
+
+    def get(self, review_id: str) -> ReviewSession | None: ...
 
 
 class FactStore(Protocol):

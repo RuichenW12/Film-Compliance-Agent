@@ -28,7 +28,7 @@
 
 Cover:
 
-- `ConfirmedReviewDetails` rejects `AmountBracket.UNKNOWN`, empty tags, duplicate/blank tags, and tags over 40 characters;
+- `ConfirmedReviewDetails` rejects `AmountBracket.UNKNOWN`, empty/blank tags, and tags over 40 characters, while trimming and deduplicating valid tags;
 - script sessions from `EXTRACTING` onward require source references;
 - idea sessions reject source references;
 - `FAILED` requires error code/message and `COMPLETE` requires confirmed details;

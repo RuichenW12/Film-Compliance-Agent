@@ -32,6 +32,13 @@ from schemas.enums import (
 )
 from schemas.forms import FormDraft
 from schemas.project import Project
+from schemas.reviews import (
+    ConfirmedReviewDetails,
+    IntakeStatus,
+    ReviewMode,
+    ReviewSession,
+    ReviewState,
+)
 from schemas.workflow import MockInstitution, Notification, WorkflowTask
 from store.memory import InMemoryStores
 from store.sqlite import SqliteStores
@@ -73,6 +80,31 @@ def _fact(key: str, value, fact_id: str) -> Fact:
     )
 
 
+def _review_session() -> ReviewSession:
+    return ReviewSession(
+        review_id="review_1",
+        owner_uid="u_demo",
+        mode=ReviewMode.SCRIPT,
+        state=ReviewState.COMPLETE,
+        project_id="proj_1",
+        asset_version="asset_1",
+        source_filename="script.md",
+        source_sha256="a" * 64,
+        normalized_text_uri="blob://proj_1/script-text",
+        confirmed=ConfirmedReviewDetails(
+            title="先挂电话",
+            tags=["public security"],
+            synopsis="A caller races to stop a public-safety emergency.",
+            episode_count=10,
+            episode_minutes=3,
+            amount_bracket="at_or_above_upper",
+        ),
+        intake_status=IntakeStatus.COMPLETE,
+        created_at=NOW,
+        updated_at=NOW,
+    )
+
+
 # --------------------------------------------------------------- projects
 
 
@@ -99,6 +131,40 @@ def test_save_overwrites_without_duplicating(stores) -> None:
 
 def test_a_missing_project_is_none_not_an_error(stores) -> None:
     assert stores.projects.get("proj_nope") is None
+
+
+# --------------------------------------------------------- review sessions
+
+
+def test_a_review_session_round_trips(stores) -> None:
+    session = _review_session()
+    assert stores.review_sessions.put(session) == session
+    assert stores.review_sessions.get(session.review_id) == session
+
+
+def test_a_missing_review_session_is_none(stores) -> None:
+    assert stores.review_sessions.get("review_nope") is None
+
+
+def test_updating_a_review_session_replaces_the_document(stores) -> None:
+    session = _review_session()
+    stores.review_sessions.put(session)
+    updated = session.model_copy(update={"intake_pending_flags": ["pending"]})
+    stores.review_sessions.put(updated)
+    assert stores.review_sessions.get(session.review_id) == updated
+
+
+def test_sqlite_review_session_survives_adapter_reconstruction(tmp_path) -> None:
+    path = tmp_path / "review-session.db"
+    first = SqliteStores.at(path)
+    first.review_sessions.put(_review_session())
+    first.db.close()
+
+    reopened = SqliteStores.at(path)
+    try:
+        assert reopened.review_sessions.get("review_1") == _review_session()
+    finally:
+        reopened.db.close()
 
 
 # ------------------------------------------------------------------ facts
