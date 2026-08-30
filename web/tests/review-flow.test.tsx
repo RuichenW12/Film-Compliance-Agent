@@ -550,6 +550,45 @@ describe("upload-first review flow", () => {
     await waitFor(() => expect(results).toHaveFocus());
   });
 
+  it("clears a transient confirm fetch error after recovery polling completes", async () => {
+    vi.mocked(getReview)
+      .mockResolvedValueOnce(CONFIRM_VIEW)
+      .mockResolvedValueOnce({ ...CONFIRM_VIEW, state: "ANALYZING" })
+      .mockResolvedValueOnce(COMPLETE_VIEW);
+    vi.mocked(confirmReview).mockRejectedValue(new TypeError("Failed to fetch"));
+    const user = userEvent.setup();
+    render(<ReviewFlow initialReviewId="review_001" />);
+
+    await user.click(
+      await screen.findByRole("button", { name: "Confirm & analyze risks" })
+    );
+
+    expect(
+      await screen.findByRole("heading", { name: "Review results" }, { timeout: 2500 })
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(getReview).toHaveBeenCalledTimes(3);
+  });
+
+  it("clears a transient confirm fetch error when recovery is already complete", async () => {
+    vi.mocked(getReview)
+      .mockResolvedValueOnce(CONFIRM_VIEW)
+      .mockResolvedValueOnce(COMPLETE_VIEW);
+    vi.mocked(confirmReview).mockRejectedValue(new TypeError("Failed to fetch"));
+    const user = userEvent.setup();
+    render(<ReviewFlow initialReviewId="review_001" />);
+
+    await user.click(
+      await screen.findByRole("button", { name: "Confirm & analyze risks" })
+    );
+
+    expect(
+      await screen.findByRole("heading", { name: "Review results" })
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(getReview).toHaveBeenCalledTimes(2);
+  });
+
   it("polls a restored analyzing review until it completes", async () => {
     vi.mocked(getReview)
       .mockResolvedValueOnce({ ...CONFIRM_VIEW, state: "ANALYZING" })

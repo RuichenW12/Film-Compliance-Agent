@@ -117,6 +117,7 @@ export function ReviewFlow({ initialReviewId }: { initialReviewId?: string }) {
         const value = await getReview(review.review_id);
         if (!active) return;
         remember(value);
+        setError(null);
         if (["UPLOADING", "EXTRACTING", "ANALYZING"].includes(value.state)) {
           timer = window.setTimeout(poll, 600);
         }
@@ -175,7 +176,13 @@ export function ReviewFlow({ initialReviewId }: { initialReviewId?: string }) {
       remember(await submit(review.review_id, details));
     } catch (caught) {
       setError(messageFor(caught));
-      try { remember(await getReview(review.review_id)); } catch {}
+      try {
+        const recovered = await getReview(review.review_id);
+        remember(recovered);
+        if (["ANALYZING", "COMPLETE"].includes(recovered.state)) {
+          setError(null);
+        }
+      } catch {}
     } finally {
       mutationInFlight.current = false;
       setBusy(null);
