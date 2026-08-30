@@ -2,7 +2,7 @@
 
 **Date:** 2026-08-30
 
-**Status:** Confirmed; awaiting written-spec review
+**Status:** Confirmed; written-spec review complete
 
 **Scope owner:** Upload-first creator demo
 
@@ -80,7 +80,7 @@ and evidence-boundary text. The translation preserves:
 - the 30-minute fixture's one episode and 15 scenes;
 - the 70-minute fixture's seven episodes and 28 scenes;
 - machine keys such as `public_security` and `judicial`;
-- deterministic English phrases needed by the governed subject-rule snapshot;
+- exact English source phrases that the bounded local semantic adapter can cite;
 - synthetic, externally unreviewed, and non-legal-advice labeling.
 
 The English fixtures are test drafts, not golden compliance samples.
@@ -170,6 +170,16 @@ and metadata. It must:
 The regular app continues to use the configured real LLM adapter. No fixed
 `INTAKE_REPLY` is allowed in the manual demo path.
 
+The same bounded adapter may answer the script-review prompt for the known
+English fixtures. Those replies must use an existing category and quote an
+exact line from the current document. The governed seed snapshot remains
+unchanged because its deterministic trigger patterns are Chinese and carry a
+separate evidence boundary. Unknown documents still fail closed.
+
+English `Episode` and `Scene` headings are added to the deterministic structure
+and locator parsers alongside the existing Chinese grammar. This is format
+support only; it does not add or translate a subject rule.
+
 ## 6. Error and Evidence Boundaries
 
 - Intake model output remains editable candidate data until explicit user
@@ -190,7 +200,8 @@ The regular app continues to use the configured real LLM adapter. No fixed
 - both English files parse as strict UTF-8 Markdown;
 - titles, duration, episode count, and 15/28 scene counts match their Chinese
   sources;
-- the expected target category is found and non-target categories do not
+- through the bounded local semantic adapter, the expected target category is
+  found from an exact English source quote and non-target categories do not
   appear;
 - each file retains its synthetic/unreviewed and non-guidance boundary.
 
