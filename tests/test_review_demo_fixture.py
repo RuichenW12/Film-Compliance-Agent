@@ -3,9 +3,8 @@ from __future__ import annotations
 import hashlib
 from pathlib import Path
 
-from core.llm import ScriptedLLM
+from core.demo_intake_llm import DemoIntakeLLM
 from core.review_facade import ReviewFacade
-from core.script_intake import SCRIPT_INTAKE_PROMPT_ID
 from schemas.enums import AmountBracket
 from schemas.reviews import (
     ConfirmedReviewDetails,
@@ -20,35 +19,6 @@ FIXTURE = (
     Path(__file__).parent / "fixtures" / "scripts" / "e2e-30min-public-security.md"
 )
 
-INTAKE_REPLY = {
-    "tags": {
-        "value": ["public security", "family drama"],
-        "origin": "suggested",
-        "explanation": "The story combines scam prevention and family repair.",
-    },
-    "synopsis": {
-        "value": "A family turns an almost-successful scam call into a public warning.",
-        "origin": "suggested",
-        "explanation": "This condenses the uploaded story.",
-    },
-    "episode_count": {
-        "value": 10,
-        "origin": "suggested",
-        "explanation": "Ten episodes preserve the thirty-minute source duration.",
-    },
-    "episode_minutes": {
-        "value": 3,
-        "origin": "suggested",
-        "explanation": "Three minutes per episode preserves the total duration.",
-    },
-    "amount_bracket": {
-        "value": "at_or_above_upper",
-        "origin": "suggested",
-        "explanation": "A user-editable planning estimate from the supplied ranges.",
-    },
-}
-
-
 def test_public_security_fixture_reaches_confirmed_risk_package(
     stores, review_snapshots, clock
 ) -> None:
@@ -57,7 +27,7 @@ def test_public_security_fixture_reaches_confirmed_risk_package(
         stores=stores,
         snapshots=review_snapshots,
         clock=clock,
-        llm=ScriptedLLM({SCRIPT_INTAKE_PROMPT_ID: INTAKE_REPLY}),
+        llm=DemoIntakeLLM(),
     )
 
     started = service.start(

@@ -1,55 +1,38 @@
-"""Local scripted adapter for the synthetic upload-first browser demo.
+"""Local entrypoint for the synthetic upload-first browser demo.
 
-This entrypoint is intentionally separate from ``api.main:app``. It provides
-repeatable intake suggestions for the checked-in fixture and must never be
-reported as a Vertex or production-backend validation.
+This entrypoint is intentionally separate from ``api.main:app``. It uses the
+configured Vertex client when available and an explicitly fixture-bounded local
+adapter otherwise. Local fallback evidence must never be reported as Vertex or
+production-backend validation.
 """
 
-from api.deps.services import AppContext
+from dataclasses import replace
+
+from api.deps.services import AppContext, build_llm
 from api.main import create_app
 from api.settings import Settings
 from core.clock import SystemClock
-from core.llm import ScriptedLLM
-from core.script_intake import SCRIPT_INTAKE_PROMPT_ID
+from core.demo_intake_llm import DemoIntakeLLM
+from core.llm import LLMClient
 from schemas.snapshot import FileSnapshotService
 from store.memory import InMemoryStores
 
 
-INTAKE_REPLY = {
-    "tags": {
-        "value": ["公安", "家庭现实"],
-        "origin": "suggested",
-        "explanation": "The source-language tags preserve the public-security subject signal.",
-    },
-    "synopsis": {
-        "value": "社区民警在派出所帮助居民识别可疑来电，修复父女关系。",
-        "origin": "suggested",
-        "explanation": "This condenses the uploaded story in its source language without rewriting it.",
-    },
-    "episode_count": {
-        "value": 10,
-        "origin": "suggested",
-        "explanation": "Ten episodes preserve the thirty-minute source duration.",
-    },
-    "episode_minutes": {
-        "value": 3,
-        "origin": "suggested",
-        "explanation": "Three minutes per episode preserves the total duration.",
-    },
-    "amount_bracket": {
-        "value": "at_or_above_upper",
-        "origin": "suggested",
-        "explanation": "A user-editable planning estimate from the current snapshot ranges.",
-    },
-}
+def select_demo_llm(settings: Settings) -> LLMClient:
+    """Prefer configured Vertex; use bounded fixture data only if unavailable."""
+
+    real_llm = build_llm(settings)
+    return real_llm if real_llm.available() else DemoIntakeLLM()
 
 
-settings = Settings(snapshot_seed_path="policy/seed-snapshot-v2.yaml")
+settings = replace(
+    Settings.from_env(), snapshot_seed_path="policy/seed-snapshot-v2.yaml"
+)
 context = AppContext(
     settings=settings,
     stores=InMemoryStores(),
     snapshots=FileSnapshotService(settings.snapshot_path),
     clock=SystemClock(),
-    llm=ScriptedLLM({SCRIPT_INTAKE_PROMPT_ID: INTAKE_REPLY}),
+    llm=select_demo_llm(settings),
 )
 app = create_app(context=context)
