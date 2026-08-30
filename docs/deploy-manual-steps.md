@@ -19,7 +19,7 @@ Checked or performed on 2026-08-30. Listed so you don't repeat any of it.
 |---|---|
 | Project | `film-compliance-agent` · number `827776020662` · ACTIVE |
 | Billing | `01CE31-A7C20B-F215BA` — attached and open (your free-credit account) |
-| APIs enabled | `aiplatform` `firestore` `run` `pubsub` `cloudbuild` `artifactregistry` `secretmanager` `cloudscheduler` `storage` `logging` `monitoring` `cloudtrace` |
+| APIs enabled | `aiplatform` `firestore` `run` `pubsub` `cloudbuild` `artifactregistry` `secretmanager` `cloudscheduler` `iap` `storage` `logging` `monitoring` `cloudtrace` |
 | gcloud | 582.0.0, installed at `%LOCALAPPDATA%\Google\Cloud SDK` |
 | Emulators | `cloud-firestore-emulator` and `pubsub-emulator` installed |
 | Java | present — the Firestore emulator needs it |
@@ -148,39 +148,58 @@ gcloud auth application-default set-quota-project film-compliance-agent
 
 ---
 
-## 4. The demo access code — you choose the value
+## 4. The OAuth consent screen — console only
 
-The deployment is private behind a single shared code rather than Google
-sign-in, so anyone you hand it to gets the whole product without you having to
-grant their account anything.
+**Decided: Google sign-in via IAP, open to anyone with a Google account.** No
+shared access code, no allow-list to maintain, and — the reason it wins under
+the "don't touch Richard's code" constraint — **no application code at all.**
+It is pure configuration, so there is nothing for a merge to conflict with.
 
-**Pick a value and create the secret yourself.** Do not paste it into this chat
-or into any file in the repository.
+An earlier draft of this file said to create a shared secret instead. That was
+based on IAP needing an external HTTPS load balancer at roughly $18/month.
+It no longer does: `--iap` is available directly on `gcloud run services update`
+in SDK 582. Ignore that older step; nothing was created, so there is nothing to
+undo.
 
-```powershell
-# Type your chosen code, press Enter, then Ctrl+Z and Enter to finish.
-gcloud secrets create demo-access-code `
-  --replication-policy=automatic `
-  --project=film-compliance-agent `
-  --data-file=-
-```
+### What only you can do
 
-Check it exists without revealing it:
+IAP needs an OAuth consent screen, and **this must be done in the console.**
+Not a preference — the `gcloud iap oauth-brands` commands were permanently shut
+down in March 2026, and what remains only creates *internal* brands for Google
+Workspace organisations. This project is on a personal Gmail account, so there
+is no organisation and no CLI path.
 
-```powershell
-gcloud secrets versions list demo-access-code --project=film-compliance-agent
-```
+Go to **Google Auth Platform → Branding**:
 
-To change it later:
+<https://console.cloud.google.com/auth/branding?project=film-compliance-agent>
 
-```powershell
-gcloud secrets versions add demo-access-code `
-  --project=film-compliance-agent --data-file=-
-```
+1. **User type: External.** "Internal" requires a Workspace organisation.
+2. **App name** — this is what a visitor reads on the sign-in screen, so make it
+   the product name rather than the project id.
+3. **User support email** and **developer contact** — your own address.
+4. Save.
 
-Something memorable and not guessable is right here. This is a demo gate, not a
-password protecting anything real — but it is the only thing between the
-internet and an admin role switcher, so do not make it `demo`.
+Then **Google Auth Platform → Audience**, and press **Publish app**.
+
+> **Publish, don't leave it in Testing.** Testing mode only admits Google
+> accounts you have added by hand to a test-user list, capped at 100 — which
+> quietly reintroduces exactly the allow-list problem we chose IAP to avoid.
+> Publishing means any Google account can sign in.
+>
+> An unverified app may show an extra "Google hasn't verified this app" screen.
+> For the scopes IAP uses — your email address and basic profile — that is a
+> notice, not a block. Verification is only worth pursuing if this outlives the
+> demo.
+
+Tell me when Publish is done and I will do the rest from the CLI: turning IAP on
+for the Cloud Run service, and granting access to every signed-in Google
+account. Those are two commands and they belong to phase 5d.
+
+### What this gives you
+
+Anyone you send the URL to signs in with Google and is through — no account
+admin, nothing to hand out, no secret that can leak. You also get an access log
+of who opened it, which a shared code could never give you.
 
 ---
 
@@ -224,14 +243,15 @@ For context, so you know what is not waiting on this file:
 |---|---|---|
 | 5a | `store/firestore.py` — the 14 storage ports, verified against the local emulator | no |
 | 5b | GCS blob store and signed upload URLs | no |
-| 5c | The access gate middleware, and moving the policy admin routes behind the internal token | only §4 |
-| 5d | Terraform, Dockerfiles, Cloud Build, first deploy | needs §2 |
+| 5c | Moving the policy admin routes behind the internal token | no |
+| 5d | Terraform, Dockerfiles, Cloud Build, first deploy, IAP | needs §2 and §4 |
 | 5e | Snapshot seeding job; the fictional institution registry | no |
 | 5f | Pub/Sub jobs, the push worker, the policy schedule | no |
 
-Real identity (Identity Platform) is **cut**, not deferred — the access code
-covers the demo, and everything auth-shaped stays contained in
-`api/deps/demo_auth.py` for whenever it is genuinely needed.
+In-application identity (Identity Platform, a sign-in page in our own UI) is
+**cut**. IAP sits in front of the whole service and needs no application code,
+so everything auth-shaped stays contained in `api/deps/demo_auth.py` — the role
+switcher still works exactly as it does locally, behind the Google sign-in.
 
 ---
 
@@ -249,4 +269,5 @@ if ($current -notlike "*$sdk*") { [Environment]::SetEnvironmentVariable("Path", 
 gcloud firestore databases create --location=us-east1 --type=firestore-native --project=film-compliance-agent
 ```
 
-Everything else in this file can wait until the phase that needs it.
+Then the one console task, §4: configure and **publish** the OAuth consent
+screen. Everything else in this file can wait until the phase that needs it.
