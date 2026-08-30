@@ -13,15 +13,17 @@ Related: [the design overview](https://claude.ai/code/artifact/746a003c-f4ea-4e1
 
 ## Where you are
 
-> ### ▶ Continue at [§4 — the OAuth consent screen](#4-the-oauth-consent-screen--console-only).
-> It is the only thing waiting on you. Two console pages, no commands.
+> ### ▶ Continue at [§4b — the IAP OAuth client](#4b-the-iap-oauth-client--console-only).
+> The consent screen is published. One console step is left before the
+> deployed service will let anyone in.
 
 | Step | | Verified |
 |---|---|---|
 | §1 gcloud on PATH | **done** | on your user PATH; `film` configuration active on `film-compliance-agent` |
 | §2 Firestore database | **done** | `(default)` · `us-east1` · `FIRESTORE_NATIVE` — the irreversible one, and it landed correctly |
 | §3 Credentials | **done** | ADC quota project set to `film-compliance-agent` |
-| **§4 OAuth consent screen** | **← you are here** | not yet configured |
+| §4 OAuth consent screen | **done** | Branding saved, app **published** |
+| **§4b IAP OAuth client** | **← you are here** | console-only; the project is outside an Organization |
 | §5 Budget alert | optional | do it whenever; nothing depends on it |
 | §6 Look at the deployed thing | later | I will ask, after the first deploy |
 
@@ -174,7 +176,7 @@ gcloud auth application-default set-quota-project film-compliance-agent
 
 ---
 
-## 4. The OAuth consent screen — console only  ·  ◀ DO THIS
+## 4. The OAuth consent screen — console only  ·  ✅ done
 
 **Decided: Google sign-in via IAP, open to anyone with a Google account.** No
 shared access code, no allow-list to maintain, and — the reason it wins under
@@ -187,9 +189,18 @@ It no longer does: `--iap` is available directly on `gcloud run services update`
 in SDK 582. Ignore that older step; nothing was created, so there is nothing to
 undo.
 
-### What only you can do
+### What only you could do — done 2026-08-30
 
-IAP needs an OAuth consent screen, and **this must be done in the console.**
+Branding is saved and the app is **published**. Recorded here because the
+sequence was not obvious and would have to be repeated on a new project:
+Google refused to publish until *Authorized domains* contained the service's
+full hostname, `api-827776020662.us-east1.run.app` — not `run.app`. That the
+validator asked for the full host is itself informative: it treats a Cloud Run
+service hostname as a domain in its own right, which is what made this route
+possible at all. The privacy and terms URLs point at pages the API now serves.
+
+The original instructions follow. IAP needs an OAuth consent screen, and
+**this must be done in the console.**
 Not a preference — the `gcloud iap oauth-brands` commands were permanently shut
 down in March 2026, and what remains only creates *internal* brands for Google
 Workspace organisations. This project is on a personal Gmail account, so there
@@ -217,15 +228,67 @@ Then **Google Auth Platform → Audience**, and press **Publish app**.
 > notice, not a block. Verification is only worth pursuing if this outlives the
 > demo.
 
-Tell me when Publish is done and I will do the rest from the CLI: turning IAP on
-for the Cloud Run service, and granting access to every signed-in Google
-account. Those are two commands and they belong to phase 5d.
+Both of those CLI steps are now done — IAP is on and `allAuthenticatedUsers`
+has access. What they revealed is a further console step, §4b below.
 
 ### What this gives you
 
 Anyone you send the URL to signs in with Google and is through — no account
 admin, nothing to hand out, no secret that can leak. You also get an access log
 of who opened it, which a shared code could never give you.
+
+---
+
+## 4b. The IAP OAuth client — console only  ·  ◀ DO THIS
+
+**Where this stands.** IAP is enabled on the `api` service, its service agent
+holds `roles/run.invoker`, and access is granted to `allAuthenticatedUsers`.
+All three were set from the CLI and are done. Requesting the URL now returns
+**502** rather than the 404 it gave before, which means IAP is intercepting the
+request but cannot complete a sign-in.
+
+**Why.** IAP normally uses a Google-managed OAuth client, but only for projects
+inside an Organization. This project is on a personal account, so there is no
+Organization and IAP needs an OAuth client of your own. gcloud says so when
+enabling it:
+
+> Deploying services with IAP enabled in a project outside of an Organization
+> may require initial setup via the Cloud Console. Please use the Cloud Run UI
+> to enable IAP for the first time in the project.
+
+There is no CLI path: the `gcloud iap oauth-clients` commands were shut down
+permanently in March 2026.
+
+### Do this
+
+Open the service's Security tab:
+
+<https://console.cloud.google.com/run/detail/us-east1/api/security?project=film-compliance-agent>
+
+Under **Identity-Aware Proxy**, follow the prompts. If it walks you through
+creating the OAuth client, you are done. If it asks for a client ID and secret
+you do not have, make one first:
+
+1. <https://console.cloud.google.com/apis/credentials?project=film-compliance-agent>
+   → **+ Create credentials** → **OAuth client ID** → **Web application**.
+2. Create it and copy the **client ID** and **client secret**.
+3. Reopen the client and add an **Authorized redirect URI**, substituting the
+   client ID you were just given:
+
+   ```
+   https://iap.googleapis.com/v1/oauth/clientIds/YOUR_CLIENT_ID:handleRedirect
+   ```
+
+4. Return to the Cloud Run Security tab and give IAP that client ID and secret.
+
+**Do not paste the client secret into chat or into any file in this
+repository.** The console is the only place it needs to exist.
+
+### How you know it worked
+
+Open <https://api-827776020662.us-east1.run.app/privacy> in a browser. You
+should get a Google sign-in screen, and after signing in with any Google
+account, the privacy page. A 502 means IAP still has no usable OAuth client.
 
 ---
 
