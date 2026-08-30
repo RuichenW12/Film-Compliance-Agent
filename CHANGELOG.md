@@ -22,6 +22,29 @@ Conventions:
 
 ## 2026-08-29
 
+### A — the illustrated walkthrough is in the repository
+
+`docs/walkthrough.html` — twelve sections covering the architecture, the
+repository map, how a project gets classified, the lifecycle, the policy loop,
+scope, current status, and a worked end-to-end run, with hand-authored SVG
+diagrams.
+
+It existed only as a published artifact and one file in a session-scoped temp
+directory. Nine of its twelve sections have no equivalent anywhere else in the
+repository, so that directory being wiped would have lost them.
+
+Committed **whole**, not trimmed. Its last three sections do overlap
+`manual-test-guide.md`, and two copies of the same nine scenarios can drift —
+which is the exact failure the guide rewrite above was fixing. Handled by
+naming one of them canonical rather than by deleting content: `docs/README.md`
+now says the Markdown guide is the one kept current against a live API, and
+that the HTML follows it when they disagree.
+
+The file is kept as a **fragment** — no `<!doctype>`, `<html>`, `<head>` or
+`<body>`, because the artifact publisher wraps it. Adding a doctype would break
+republishing to the same URL, and browsers render it from disk either way. The
+URL is recorded in `docs/README.md`.
+
 ### A — the manual test guide describes the product that exists
 
 `docs/manual-test-guide.md` had drifted far enough to be misleading rather than
