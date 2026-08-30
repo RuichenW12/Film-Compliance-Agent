@@ -1,8 +1,8 @@
 # Documentation
 
-This directory is reserved for durable project documentation.
+This directory contains durable project documentation.
 
-Planned document groups include:
+Document groups include:
 
 - architecture and workflow explanations;
 - accepted design specifications and implementation plans;

@@ -2,7 +2,7 @@
 
 This directory contains the product-facing and internal HTTP API boundary.
 
-Planned product-workstream responsibilities include:
+Product-workstream responsibilities include:
 
 - project intake and classification endpoints;
 - roadmap, material, review, gate, and form endpoints;
@@ -38,6 +38,8 @@ Product workstream (A):
 - `routers/assets.py` also serves `extract-facts` and the project fact list.
 
 - `routers/review.py` — C1-a pre-check, the project finding list, and finding actions ([D-019](../docs/decisions.md#d-019)).
+
+- `routers/reviews.py` — the upload-first ReviewFacade boundary: create or restore a review session, retry intake, confirm, reanalyze, and download the original source or generated review artifacts.
 
 - `routers/forms.py` — gate passage, form preview, field confirmation, and freeze ([D-022](../docs/decisions.md#d-022)).
 

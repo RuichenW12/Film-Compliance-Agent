@@ -27,7 +27,7 @@ Sign in with any Google account. No allow-list, no shared password.
 |---|---|
 | GCP project | `film-compliance-agent` · number `827776020662` |
 | Region | `us-east1` (Firestore's location is **permanent**) |
-| Firestore | `(default)`, Native mode |
+| Firestore | `(default)`, Native mode; provisioned but not used by the current recording API |
 | Image registry | `us-east1-docker.pkg.dev/film-compliance-agent/app` |
 
 Two Cloud Run services, both scaling to zero:
@@ -52,7 +52,7 @@ Set on the service, not in the image. Nothing here is secret.
 | `GOOGLE_CLOUD_PROJECT` | `film-compliance-agent` |
 | `REGION` | `us-east1` |
 | `VERTEX_MODEL_GEMINI` | `gemini-2.5-flash` |
-| `STORE_BACKEND` | `firestore` |
+| `STORE_BACKEND` | `memory` |
 
 **`web`**
 
@@ -73,7 +73,7 @@ must never enter this repository.
 browser ──▶ IAP ──▶ web (Next.js)
                      │  server-side, with an identity token
                      ▼
-                    IAP ──▶ api (FastAPI) ──▶ Firestore
+                    IAP ──▶ api (FastAPI) ──▶ process-local stores
                                            └▶ Vertex AI
 ```
 
@@ -137,13 +137,14 @@ Cloud Run supplies `PORT` and does not promise 8080 or 3000. A container
 listening on a fixed port is marked unhealthy and never receives traffic. Both
 Dockerfiles read it.
 
-### Uploads are capped at 700 KB
+### The recording API is intentionally ephemeral
 
-`FirestoreBlobStore` puts bytes base64 into a Firestore document, which is
-capped near 1 MiB. It refuses anything larger with a message naming Cloud
-Storage as the real answer. **This is a stopgap, not a design.** Scripts and
-synopses are kilobytes; a finished film is not, so the GCS adapter has to land
-before video upload means anything.
+The current API uses `STORE_BACKEND=memory`. The upload route accepts screenplay
+files up to 5 MiB, but their bytes, normalized text, review sessions, and
+generated artifacts live only in the API process. Scale-to-zero, restart, or
+redeploy can remove them. A Firestore database and adapter exist, but the new
+ReviewSession aggregate has not been accepted as durably persisted there, so
+the recording deployment makes no persistence claim.
 
 ### Console status is not evidence
 
@@ -219,10 +220,12 @@ Three backends behind the fourteen ports in `core/repositories.py`, chosen by
 |---|---|---|
 | `memory` | tests, a throwaway run | nothing |
 | `sqlite` | a local demo | a restart, not a container |
-| `firestore` | **anything deployed** | everything |
+| `firestore` | durable cloud validation after the flow is accepted | configured Firestore data |
 
 An unknown value raises rather than falling back — silently running in memory
 when someone asked for durability is the surprise that error exists to prevent.
+The present production choice is deliberately `memory` so the upload-first demo
+can be recorded without claiming that the new aggregate is Firestore-complete.
 
 **A change to any store must pass `tests/test_store_conformance.py` against all
 three.** That file is what makes the ports real; a port with one implementation
@@ -286,14 +289,16 @@ python scripts/e2e_check.py --base http://localhost:8080
 ```
 
 Against the deployed API this needs credentials the script does not carry, so
-the practical check is a browser: open the web URL, sign in, run a
-classification. If that works, the whole chain works — browser, IAP, proxy,
-API, Firestore, Vertex.
+the practical check is a browser: open the web URL, sign in, upload a script,
+confirm the editable details, and reach Review results. That verifies the
+browser, IAP, proxy, API, and configured Vertex path for that request. It does
+not verify durable persistence or the separate policy-refresh cloud loop.
 
-The nine scenarios in [`manual-test-guide.md`](manual-test-guide.md) apply
-unchanged to the deployed app. Expectations are identical; the point of running
-them there is to confirm nothing behaves differently once state lives in
-Firestore.
+The deterministic upload-first browser suite is the repeatable local
+acceptance path. The older scenarios in
+[`manual-test-guide.md`](manual-test-guide.md) exercise the retained multi-page
+workflow; they are useful regression checks but are not the current recording
+script.
 
 ---
 
@@ -323,7 +328,8 @@ Honest list. None of it is blocking a demo.
 
 | | Consequence today |
 |---|---|
-| **Cloud Storage for uploads** | anything over 700 KB is refused; no finished-film upload |
+| **Durable ReviewSession persistence** | scale-to-zero, restart, or API redeploy can remove current demo sessions and downloads |
+| **Cloud Storage for uploads** | screenplay upload is capped at 5 MiB; no finished-film upload |
 | **Pub/Sub jobs and a push worker** | the API runs jobs inline; a long review could hit the request timeout |
 | **Cloud Scheduler for the policy refresh** | the policy loop does not run on its own in the cloud |
 | **Snapshot seeding into Firestore** | the API still reads the seed YAML from disk at startup |

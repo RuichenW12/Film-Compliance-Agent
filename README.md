@@ -2,9 +2,24 @@
 
 Film Compliance Agent is a workflow for helping micro-drama creators and licensed institutions prepare compliance reviews and filing materials. The product path combines deterministic gates, evidence-linked AI review, human confirmation, and versioned policy snapshots.
 
-> Repository status, workstream A (product): shared contracts, the workflow core (state machine, D3 gate, D1a/D1b/D1c classification chain), the intake and classification API, and the web shell are implemented and unit-tested against the static seed snapshot. Not yet built: material collection, script review (C1-a), form freeze, institution console, and cloud deployment.
+> Current product status (2026-08-30): the upload-first creator review, editable confirmation gate, Policy Snapshot classification, scene review, reanalysis, material collection, form freeze, institution console, downloadable review package, and supporting APIs are implemented and tested. The English product demo is deployed to Cloud Run behind Google IAP at <https://web-827776020662.us-east1.run.app> and uses Vertex Gemini when configured.
 >
-> Repository status, workstream B (policy loop): Gates 1–3 provide the deterministic local policy demo. Gate 4 adds real HTTP, GCS, Firestore, Gemini, and Pub/Sub adapters behind the same policy-loop interfaces. The real NRTA source smoke passes locally; the full-cloud smoke is currently `SKIP` without named project configuration and credentials. This is not a deployed-cloud PASS.
+> Deployment boundary: the current recording deployment runs the API with `STORE_BACKEND=memory`; review sessions can disappear after scale-to-zero, restart, or redeploy. The existing Firestore database and adapters are not being claimed as persistence validation for the new ReviewSession flow.
+>
+> Policy-loop status: Gates 1–3 provide the deterministic local policy demo. Gate 4 adds real HTTP, GCS, Firestore, Gemini, and Pub/Sub adapters behind the same policy-loop interfaces. A deployed product path is not evidence that the complete policy refresh and publication chain has passed its named-project cloud smoke.
+
+## Current creator demo
+
+The main demo deliberately stops after preparing a creator-owned review package:
+
+1. **Upload.** Start with a Markdown, UTF-8 text, or DOCX screenplay. `I only have an idea` remains available as a manual-entry path.
+2. **Confirm details.** Deterministic parsing preserves source structure and an extracted title when present. The configured LLM reads the normalized screenplay and suggests editable tags, a synopsis, episode planning, and an investment band. Nothing proceeds until the creator confirms or edits these values.
+3. **Review results.** The confirmed project is classified against the pinned Policy Snapshot and its evidence references. Scene review combines governed deterministic signals with a semantic LLM pass; an LLM hit is retained only when its quoted evidence resolves back to the uploaded screenplay. Findings remain human-review inputs, not legal conclusions or approvals.
+4. **Download.** The package contains `project-review-form.pdf`, `risk-summary.pdf`, `annotated-script.md`, and the unchanged original source.
+
+Completed reviews can revisit any previously reached step, edit the confirmed values, and run a new analysis generation against the same pinned source. A zero-finding screen means that no scene-level findings are currently retained under that Policy Snapshot; it is not a clean-pass decision.
+
+The institution, filing, collection, dashboard, and policy-administration pages remain available by direct route, but they are outside the interactive recording path.
 
 ## Workstreams
 
@@ -17,20 +32,29 @@ The workstreams meet through shared contracts in [`schemas/`](schemas/README.md)
 
 ## Local spin-up
 
-The test suite and the API run with no credentials, no emulator, and no network: the snapshot comes from the YAML seed, storage is in-memory, and the LLM backend reports itself unavailable rather than guessing.
+The test suite and fixture-bounded browser demo run with no credentials, emulator, or network. The local demo adapter recognizes only the checked-in synthetic fixtures and fails closed for unknown documents; it is not a substitute for Vertex validation.
 
 ```bash
-pip install -e ".[test]"         # 1. install
-python -m pytest                 # 2. verify  (all green, no cloud access needed)
-uvicorn api.main:app --port 8080 # 3. run     (http://localhost:8080/health)
+python -m pip install -e ".[test]"  # 1. install
+python -m pytest                    # 2. verify
+
+# 3. run the upload-first demo API from the repository root
+DEMO_LLM_BACKEND=local python -m uvicorn scripts.review_demo_server:app --port 8080
 ```
 
-With the API running, `python scripts/e2e_check.py` walks the golden path against the live service and prints, step by step, what works today and which task delivers each step that does not.
-
-The web shell runs separately:
+In a second terminal, start the web app:
 
 ```bash
-cd web && npm install && npm run dev   # http://localhost:3000
+npm --prefix web install
+npm --prefix web run dev             # http://localhost:3000
+```
+
+`DEMO_LLM_BACKEND` accepts `local`, `vertex`, or `auto`. `vertex` fails explicitly when Vertex is unavailable; `auto` prefers configured Vertex and otherwise uses the fixture-bounded adapter. The regular multi-page API still runs with `python -m uvicorn api.main:app --port 8080`.
+
+The deterministic browser acceptance starts both demo servers itself:
+
+```bash
+E2E_PYTHON="$PWD/.venv/bin/python" npm --prefix web run test:e2e
 ```
 
 Emulator-backed runs (Firestore on 8791, Pub/Sub on 8792) use `docker compose up`. Copy `.env.example` to `.env` first.
@@ -104,9 +128,11 @@ Whoever makes the change writes the entry, in the same pull request.
 - **Missing model backend is reported, not faked.** With no Vertex configuration the semantic stages emit a pending flag instead of an implied clean result.
 - **Only a human publishes policy.** AI drafts a proposal; the administration UI is the single publish path.
 
-## Implemented local milestone
+## Implemented milestones
 
-The product workstream loads a validated seed snapshot and runs the full intake → classification path on top of it. The policy workstream runs a deterministic fixture refresh, reviews the resulting proposal, publishes a new snapshot, and emits a validated `policy.updated` event, all through a local API and UI. See [`api/`](api/README.md), [`web/`](web/README.md), and [`tests/`](tests/README.md) for commands and verification boundaries.
+The product workstream loads a validated seed snapshot and runs both the upload-first review facade and the broader intake → classification → collection → form → institution path on top of it. The creator demo is deployed through a same-origin Next.js proxy to a private FastAPI service, with IAP in front of both services. See [`docs/deployment.md`](docs/deployment.md) for topology, build, rollback, and persistence boundaries.
+
+The policy workstream runs a deterministic fixture refresh, reviews the resulting proposal, publishes a new snapshot, and emits a validated `policy.updated` event through the local API and UI. See [`api/`](api/README.md), [`web/`](web/README.md), and [`tests/`](tests/README.md) for commands and verification boundaries. Product deployment and policy-loop cloud validation remain separate claims.
 
 - Gate 5-a snapshot bridge: the unified API injects the policy repository into
   the existing product `SnapshotService`, so an admin-published inline snapshot
@@ -135,4 +161,4 @@ Run the source-only and credential-gated checks with:
 
 `PASS` means every check required by that selected mode ran successfully. `FAIL` means a required stage ran and failed. `SKIP` means prerequisites were absent, so the command is not evidence of success. Gate 4 is implementation-complete only after automated checks, the real-source smoke, packaging, and review are clean. Gate 4 is passed only after the named-project cloud smoke reports GCS, Firestore, Gemini, and Pub/Sub all as `PASS`.
 
-Gate 4 does not deploy infrastructure and does not add Maxine-owned project, notification, timeline, or `recalc-tier` persistence. Those integration boundaries remain Gate 5 work.
+Gate 4 adapters do not provision infrastructure by themselves. The current Cloud Run product deployment is assembled separately and does not prove that the complete policy refresh, publication, and event-delivery chain has passed its cloud smoke.

@@ -4,9 +4,11 @@ Files for walking the flow locally. **Synthetic** — made up for testing, not
 real project material and not evidence about anything. No real company, licence
 number or registration number appears in any of them.
 
-## Synopses — paste into the wizard
+## Legacy workflow synopses — paste into `/wizard`
 
-These are pasted into the **What happens** box, not uploaded. Each file ends
+These fixtures exercise the retained multi-page workflow, not the current
+upload-first recording path. They are pasted into the **What happens** box,
+not uploaded. Each file ends
 with a `用途` note explaining what it is for; paste the story text above it, not
 the note.
 
@@ -19,7 +21,7 @@ the note.
 
 All four verified against a live run on 2026-08-29.
 
-## Files — upload on the collection page
+## Legacy workflow files — upload on `/collection`
 
 | File | Upload as kind | Use it for |
 |---|---|---|
