@@ -23,7 +23,9 @@ from schemas.enums import (
     AmountBracket,
     FactStatus,
     FindingSeverity,
+    ClaimedFormType,
     NotificationKind,
+    ProductionStage,
     ProjectState,
     SourceRefType,
     Tier,
@@ -38,6 +40,7 @@ from schemas.project import (
     Roadmap,
     TracksEnabled,
 )
+from schemas.reviews import ConfirmedReviewDetails, ReviewMode
 from schemas.snapshot import SnapshotService
 from schemas.workflow import (
     InstitutionReview,
@@ -180,6 +183,69 @@ class WorkflowService:
             self._stores.projects.save(project)
             self._record_event(project_id, Actor.CREATOR, "intent.updated", {})
         return project, intent.missing_fields()
+
+    def apply_review_confirmation(
+        self,
+        project_id: str,
+        mode: ReviewMode,
+        details: ConfirmedReviewDetails,
+    ) -> Project:
+        """Persist creator-confirmed review details as the only intake truth."""
+
+        project = self.get_project(project_id)
+        stage = (
+            ProductionStage.SCRIPT_READY
+            if mode is ReviewMode.SCRIPT
+            else ProductionStage.IDEA
+        )
+        intent = IntentProfile(
+            form_type_claimed=ClaimedFormType.MICRO_DRAMA,
+            genre_keywords=details.tags,
+            synopsis=details.synopsis,
+            episode_count=details.episode_count,
+            episode_minutes=details.episode_minutes,
+            amount_bracket=details.amount_bracket,
+            is_ai_generated=True,
+            production_stage=stage,
+            source="user_confirmed_review",
+        )
+        project = project.model_copy(
+            update={
+                "title_working": details.title,
+                "intent_profile": intent,
+                "updated_at": self._clock.now(),
+            }
+        )
+        if project.state is ProjectState.DRAFT:
+            project = self._transition(
+                project,
+                ProjectState.INTAKE_DONE,
+                Actor.CREATOR,
+                "intent.submitted",
+            )
+        else:
+            self._stores.projects.save(project)
+
+        answer_id = f"review_confirmation:{project_id}"
+        source_ref = SourceRef(
+            type=SourceRefType.USER_ANSWER,
+            answer_id=answer_id,
+        )
+        for key, value in (
+            ("title", details.title),
+            ("episode_count", details.episode_count),
+            ("episode_minutes", details.episode_minutes),
+            ("amount_bracket", details.amount_bracket.value),
+        ):
+            self._upsert_fact(project_id, key, value, source_ref)
+
+        self._record_event(
+            project_id,
+            Actor.CREATOR,
+            "review.details_confirmed",
+            {"mode": mode.value, "answer_id": answer_id},
+        )
+        return project
 
     def submit_channels(self, project_id: str, patch: dict) -> Project:
         """S2. Enabling the US track is a channel fact, not an LLM decision."""

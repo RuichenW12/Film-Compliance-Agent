@@ -24,6 +24,7 @@ from schemas.common import EvidenceRef
 from schemas.enums import FindingSeverity
 
 from .classify.subject_rules import SubjectRule
+from .errors import UpstreamLLMError
 from .llm import LLMClient, LLMRequest
 
 SCRIPT_REVIEW_PROMPT_ID = "c1a_script_review"
@@ -202,7 +203,10 @@ def review_script(
         return result
 
     result.backend = llm.name
-    _semantic_pass(document, scenes, rules, llm, result, seen)
+    try:
+        _semantic_pass(document, scenes, rules, llm, result, seen)
+    except UpstreamLLMError:
+        result.pending_flags.append(PENDING_FLAG)
     return result
 
 
