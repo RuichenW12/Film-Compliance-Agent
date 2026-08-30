@@ -143,7 +143,11 @@ export function ReviewFlow({ initialReviewId }: { initialReviewId?: string }) {
     window.history.replaceState(null, "", `${url.pathname}${url.search}`);
   }
 
-  async function run(action: () => Promise<ReviewView>, pending: typeof busy) {
+  async function run(
+    action: () => Promise<ReviewView>,
+    pending: typeof busy,
+    recoverReviewId?: string
+  ) {
     if (mutationInFlight.current) return;
     mutationInFlight.current = true;
     setBusy(pending);
@@ -152,6 +156,9 @@ export function ReviewFlow({ initialReviewId }: { initialReviewId?: string }) {
       remember(await action());
     } catch (caught) {
       setError(messageFor(caught));
+      if (recoverReviewId) {
+        try { remember(await getReview(recoverReviewId)); } catch {}
+      }
     } finally {
       mutationInFlight.current = false;
       setBusy(null);
@@ -234,7 +241,7 @@ export function ReviewFlow({ initialReviewId }: { initialReviewId?: string }) {
         autoFocus={focusContent}
         busy={busy !== null}
         onConfirm={confirm}
-        onRetry={() => run(() => retryReviewIntake(review.review_id), "retry")}
+        onRetry={() => run(() => retryReviewIntake(review.review_id), "retry", review.review_id)}
       />
     );
   } else if (selectedStep === 3 && review?.state === "COMPLETE") {

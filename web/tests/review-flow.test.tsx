@@ -363,6 +363,31 @@ describe("upload-first review flow", () => {
     await waitFor(() => expect(screen.getByLabelText("Project title")).toBeEnabled());
   });
 
+  it("refetches server truth after retry fails and renders a failed session", async () => {
+    const partialView: ReviewView = { ...CONFIRM_VIEW, intake_status: "partial" };
+    const failedView: ReviewView = {
+      ...partialView,
+      state: "FAILED",
+      failure_message: "Extraction failed after retry.",
+    };
+    vi.mocked(getReview)
+      .mockResolvedValueOnce(partialView)
+      .mockResolvedValueOnce(failedView);
+    vi.mocked(retryReviewIntake).mockRejectedValue(new Error("Retry request failed."));
+    const user = userEvent.setup();
+    render(<ReviewFlow initialReviewId="review_001" />);
+
+    await user.click(await screen.findByRole("button", { name: "Retry extraction" }));
+
+    expect(await screen.findByRole("heading", { name: "Review could not be completed." })).toBeInTheDocument();
+    expect(screen.getByText("Extraction failed after retry.")).toBeInTheDocument();
+    expect(screen.getByRole("alert")).toHaveTextContent("Retry request failed.");
+    expect(retryReviewIntake).toHaveBeenCalledTimes(1);
+    expect(retryReviewIntake).toHaveBeenCalledWith("review_001");
+    expect(getReview).toHaveBeenCalledTimes(2);
+    expect(getReview).toHaveBeenNthCalledWith(2, "review_001");
+  });
+
   it("starts a new session and resets future tab access when a replacement file is uploaded", async () => {
     vi.mocked(getReview).mockResolvedValue(COMPLETE_VIEW);
     vi.mocked(createScriptReview).mockResolvedValue({
