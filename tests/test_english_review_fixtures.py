@@ -186,3 +186,10 @@ def test_english_fixtures_preserve_reviewed_semantic_anchors() -> None:
         "You came to collect Teacher Mei's belongings, not rewrite the play."
         in seventy
     )
+
+    assert seventy.count("Wind from Backstage") == 7
+    assert "The Wind Comes from Backstage" not in seventy
+
+    assert thirty.lower().count("frequently used contact card") == 4
+    assert "Common contact card" not in thirty
+    assert "emergency contact card" not in thirty

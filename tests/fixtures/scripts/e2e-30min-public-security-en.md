@@ -145,7 +145,7 @@ Aunt Luo confirms that her family is safe. Su Guoliang and Su Qing return to the
 | `PROP-003` | Recording invitation card | Scene 1: Unopened, pressed under the parts tray | Scene 2: Opened by Su Qing; Scene 13: Back written as a recording outline; Scene 14: Left beside the microphone |
 | `PROP-004` | Aunt Luo's black phone | Scene 7: Placed inside the handbag | Scene 8: Ongoing call; Scene 10: Speakerphone turned off; Scene 11: Actively placed on the table by Aunt Luo and call ended |
 | `PROP-005` | Su Qing's silver phone | Scene 2: Used to check the schedule | Scene 9: Dialing a familiar number; Scene 11: Receives a callback from Luo Xiaozhe; Scene 15: Saves a photo of the father-daughter contact card |
-| `PROP-006` | Common contact card | Scene 11: Blank card provided by Xu Ning | Scene 13: Filled out together by father and daughter; Scene 15: Pasted inside the radio's inner cover and saved as a photo |
+| `PROP-006` | Frequently used contact card | Scene 11: Blank card provided by Xu Ning | Scene 13: Filled out together by father and daughter; Scene 15: Pasted inside the radio's inner cover and saved as a photo |
 
 ### Emotional and Relationship Timeline
 
@@ -1343,7 +1343,7 @@ Su Guoliang doesn't talk back. He steps out from behind the door curtain and sta
 
 Su Qing holds up her silver phone, aiming it at the open inner cover of the radio.
 
-Pasted inside is a filled-out emergency contact card: Su Qing, her work partner, Luo Xiaozhe, and Xu Ning's duty phone number. The relationship is written next to each number, with no unfamiliar links or temporary numbers.
+Pasted inside is a filled-out frequently used contact card: Su Qing, her work partner, Luo Xiaozhe, and Xu Ning's duty phone number. The relationship is written next to each number, with no unfamiliar links or temporary numbers.
 
 Su Qing takes a photo and saves it.
 
@@ -1387,7 +1387,7 @@ Su Qing places the dark blue equipment case under the counter, without pasting a
 
 Father and daughter stand side by side outside the shop. Everyday music starts playing again from the wooden-cased radio.
 
-The green desk lamp shines on the open back cover, where the emergency contact card is firmly pasted inside.
+The green desk lamp shines on the open back cover, where the frequently used contact card is firmly pasted inside.
 
 **END**
 

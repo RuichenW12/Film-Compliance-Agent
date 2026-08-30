@@ -267,7 +267,7 @@ Gao Rui walks over.
 
 We're already in the final round of rehearsals. You came to collect Teacher Mei's belongings, not rewrite the play.
 
-Lin Xia sees the cover: *The Wind Comes from Backstage*. The playwright credit is covered by a yellow sticky note.
+Lin Xia sees the cover: *Wind from Backstage*. The playwright credit is covered by a yellow sticky note.
 
 She lifts the sticky note.
 
@@ -289,7 +289,7 @@ The stage clock isn't ticking, yet the rehearsal hall suddenly feels as if it ha
 
 A huge premiere poster covers the entire wall.
 
-*The Wind Comes from Backstage*.
+*Wind from Backstage*.
 
 **Playwright: Gao Rui. Original Concept: Mei Zhong.**
 
@@ -1787,7 +1787,7 @@ The gray cloth is taken down. The old poster is removed from the wall.
 
 The new poster slowly unfurls:
 
-**"The Wind Comes from Backstage"**
+**"Wind from Backstage"**
 
 **Playwrights: Mei Zhong, Lin Xia**
 
