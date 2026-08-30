@@ -14,6 +14,7 @@ import type {
 interface ConfirmStepProps {
   review: ReviewView;
   autoFocus?: boolean;
+  busy?: boolean;
   onConfirm: (details: ConfirmedReviewDetails) => Promise<void>;
   onRetry: () => Promise<void>;
 }
@@ -48,7 +49,7 @@ function SourceBadge({
 }
 
 
-export function ConfirmStep({ review, autoFocus = true, onConfirm, onRetry }: ConfirmStepProps) {
+export function ConfirmStep({ review, autoFocus = true, busy = false, onConfirm, onRetry }: ConfirmStepProps) {
   const candidates = review.candidates;
   const confirmed = review.confirmed;
   const [title, setTitle] = useState(confirmed?.title ?? textValue(candidates?.title));
@@ -91,7 +92,7 @@ export function ConfirmStep({ review, autoFocus = true, onConfirm, onRetry }: Co
       {extractionNeedsHelp ? (
         <div className={styles.warning} role="status">
           <strong>{review.intake_status === "partial" ? "Some suggestions are missing." : "Analysis unavailable."}</strong> Enter or edit the essential details manually.
-          <button type="button" onClick={() => void onRetry()}>Retry extraction</button>
+          <button type="button" onClick={() => void onRetry()} disabled={busy}>Retry extraction</button>
         </div>
       ) : review.mode === "idea" ? (
         <p className={styles.manualNotice}>Enter the essential details manually.</p>
@@ -109,6 +110,7 @@ export function ConfirmStep({ review, autoFocus = true, onConfirm, onRetry }: Co
 
       <form
         className={styles.confirmForm}
+        aria-busy={busy}
         onSubmit={(event) => {
           event.preventDefault();
           void onConfirm({
@@ -123,28 +125,28 @@ export function ConfirmStep({ review, autoFocus = true, onConfirm, onRetry }: Co
       >
         <label className={styles.fieldWide}>
           <span className={styles.fieldLabel}>Project title <SourceBadge candidate={candidates?.title} confirmed={Boolean(confirmed)} /></span>
-          <input ref={titleRef} aria-label="Project title" required maxLength={200} value={title} onChange={(event) => setTitle(event.target.value)} />
+          <input ref={titleRef} aria-label="Project title" required disabled={busy} maxLength={200} value={title} onChange={(event) => setTitle(event.target.value)} />
         </label>
         <label className={styles.fieldWide}>
           <span className={styles.fieldLabel}>Tags <SourceBadge candidate={candidates?.tags} confirmed={Boolean(confirmed)} /></span>
-          <input aria-label="Tags" required value={tags} onChange={(event) => setTags(event.target.value)} aria-describedby="tags-hint" />
+          <input aria-label="Tags" required disabled={busy} value={tags} onChange={(event) => setTags(event.target.value)} aria-describedby="tags-hint" />
           <small id="tags-hint">Separate up to eight tags with commas.</small>
         </label>
         <label className={styles.fieldWide}>
           <span className={styles.fieldLabel}>Synopsis <SourceBadge candidate={candidates?.synopsis} confirmed={Boolean(confirmed)} /></span>
-          <textarea aria-label="Synopsis" required rows={5} maxLength={4000} value={synopsis} onChange={(event) => setSynopsis(event.target.value)} />
+          <textarea aria-label="Synopsis" required disabled={busy} rows={5} maxLength={4000} value={synopsis} onChange={(event) => setSynopsis(event.target.value)} />
         </label>
         <label>
           <span className={styles.fieldLabel}>Episode count <SourceBadge candidate={candidates?.episode_count} confirmed={Boolean(confirmed)} /></span>
-          <input aria-label="Episode count" required type="number" min="1" max="500" value={episodeCount} onChange={(event) => setEpisodeCount(event.target.value)} />
+          <input aria-label="Episode count" required disabled={busy} type="number" min="1" max="500" value={episodeCount} onChange={(event) => setEpisodeCount(event.target.value)} />
         </label>
         <label>
           <span className={styles.fieldLabel}>Minutes per episode <SourceBadge candidate={candidates?.episode_minutes} confirmed={Boolean(confirmed)} /></span>
-          <input aria-label="Minutes per episode" required type="number" min="0.1" max="60" step="0.1" value={episodeMinutes} onChange={(event) => setEpisodeMinutes(event.target.value)} />
+          <input aria-label="Minutes per episode" required disabled={busy} type="number" min="0.1" max="60" step="0.1" value={episodeMinutes} onChange={(event) => setEpisodeMinutes(event.target.value)} />
         </label>
         <label className={styles.fieldWide}>
           <span className={styles.fieldLabel}>Investment band <SourceBadge candidate={candidates?.amount_bracket} confirmed={Boolean(confirmed)} /></span>
-          <select aria-label="Investment band" required value={amountBracket} onChange={(event) => setAmountBracket(event.target.value as AmountBracket | "")}>
+          <select aria-label="Investment band" required disabled={busy} value={amountBracket} onChange={(event) => setAmountBracket(event.target.value as AmountBracket | "")}>
             <option value="" disabled>Select an estimated investment band</option>
             {review.amount_options.map((option) => (
               <option key={option.value} value={option.value}>{option.label}</option>
@@ -157,7 +159,7 @@ export function ConfirmStep({ review, autoFocus = true, onConfirm, onRetry }: Co
             <strong>Nothing runs until you confirm.</strong>
             <span>You can edit every field above.</span>
           </div>
-          <button className={styles.primaryAction} type="submit">
+          <button className={styles.primaryAction} type="submit" disabled={busy}>
             {review.state === "COMPLETE" ? "Confirm changes & reanalyze" : "Confirm & analyze risks"}
           </button>
         </div>

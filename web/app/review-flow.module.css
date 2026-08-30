@@ -309,6 +309,11 @@
   font-weight: 800;
 }
 
+.warning button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
 .confirmPanel,
 .resultsPanel {
   max-width: 1040px;
@@ -465,6 +470,13 @@
 .confirmForm textarea {
   min-height: 130px;
   resize: vertical;
+}
+
+.confirmForm input:disabled,
+.confirmForm textarea:disabled,
+.confirmForm select:disabled {
+  cursor: not-allowed;
+  opacity: 0.68;
 }
 
 .confirmForm input:focus,

@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -10,6 +10,7 @@ import {
   createScriptReview,
   getReview,
   reanalyzeReview,
+  retryReviewIntake,
 } from "@/lib/reviews-api";
 
 
@@ -305,6 +306,63 @@ describe("upload-first review flow", () => {
     expect(await screen.findByLabelText("Project title")).toBeInTheDocument();
   });
 
+  it("guards confirmation against duplicate submissions before React can rerender", async () => {
+    vi.mocked(createScriptReview).mockResolvedValue(CONFIRM_VIEW);
+    let finish: ((view: ReviewView) => void) | undefined;
+    vi.mocked(confirmReview).mockImplementation(
+      () => new Promise((resolve) => { finish = resolve; })
+    );
+    const user = userEvent.setup();
+    render(<ReviewFlow />);
+    await user.upload(
+      screen.getByLabelText("Choose a script"),
+      new File(["# Demo"], "demo.md", { type: "text/markdown" })
+    );
+    await user.click(screen.getByRole("button", { name: "Extract project details" }));
+    const submit = await screen.findByRole("button", { name: "Confirm & analyze risks" });
+
+    act(() => {
+      submit.click();
+      submit.click();
+    });
+
+    expect(confirmReview).toHaveBeenCalledTimes(1);
+    expect(screen.getByText("Classifying project and reviewing scenes…")).toBeInTheDocument();
+    for (const tab of screen.getAllByRole("tab")) {
+      expect(tab).toBeDisabled();
+    }
+    await act(async () => { finish?.(COMPLETE_VIEW); });
+    expect(await screen.findByText("Class 1")).toBeInTheDocument();
+  });
+
+  it("disables retry, editable fields, and submit while one retry request is pending", async () => {
+    const partialView: ReviewView = { ...CONFIRM_VIEW, intake_status: "partial" };
+    vi.mocked(getReview).mockResolvedValue(partialView);
+    let finish: ((view: ReviewView) => void) | undefined;
+    vi.mocked(retryReviewIntake).mockImplementation(
+      () => new Promise((resolve) => { finish = resolve; })
+    );
+    const user = userEvent.setup();
+    render(<ReviewFlow initialReviewId="review_001" />);
+
+    const retry = await screen.findByRole("button", { name: "Retry extraction" });
+    await user.click(retry);
+    await user.click(retry);
+
+    expect(retryReviewIntake).toHaveBeenCalledTimes(1);
+    expect(retry).toBeDisabled();
+    expect(screen.getByLabelText("Project title")).toBeDisabled();
+    expect(screen.getByLabelText("Tags")).toBeDisabled();
+    expect(screen.getByLabelText("Synopsis")).toBeDisabled();
+    expect(screen.getByLabelText("Episode count")).toBeDisabled();
+    expect(screen.getByLabelText("Minutes per episode")).toBeDisabled();
+    expect(screen.getByLabelText("Investment band")).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Confirm & analyze risks" })).toBeDisabled();
+
+    await act(async () => { finish?.(CONFIRM_VIEW); });
+    await waitFor(() => expect(screen.getByLabelText("Project title")).toBeEnabled());
+  });
+
   it("starts a new session and resets future tab access when a replacement file is uploaded", async () => {
     vi.mocked(getReview).mockResolvedValue(COMPLETE_VIEW);
     vi.mocked(createScriptReview).mockResolvedValue({
@@ -468,5 +526,27 @@ describe("upload-first review flow", () => {
     await user.click(screen.getByRole("button", { name: "Start a new review" }));
     expect(screen.getByRole("heading", { name: "Upload a script. Skip the questionnaire." })).toBeInTheDocument();
     expect(window.location.search).toBe("");
+  });
+
+  it("shows the matching upload panel when a failed review revisits Upload", async () => {
+    vi.mocked(getReview).mockResolvedValue({
+      ...CONFIRM_VIEW,
+      state: "FAILED",
+      failure_message: "Review failed.",
+    });
+    const user = userEvent.setup();
+    render(<ReviewFlow initialReviewId="review_001" />);
+
+    expect(await screen.findByRole("heading", { name: "Review could not be completed." })).toBeInTheDocument();
+    const uploadTab = screen.getByRole("tab", { name: /Upload/ });
+    await user.click(uploadTab);
+
+    expect(uploadTab).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("heading", { name: "Upload a script. Skip the questionnaire." })).toBeInTheDocument();
+    expect(screen.getByText("e2e-30min-public-security.md")).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Review could not be completed." })).not.toBeInTheDocument();
+    expect(createScriptReview).not.toHaveBeenCalled();
+    expect(confirmReview).not.toHaveBeenCalled();
+    expect(reanalyzeReview).not.toHaveBeenCalled();
   });
 });

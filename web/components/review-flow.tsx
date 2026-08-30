@@ -90,6 +90,7 @@ function ProgressSteps({
 
 
 export function ReviewFlow({ initialReviewId }: { initialReviewId?: string }) {
+  const mutationInFlight = useRef(false);
   const [review, setReview] = useState<ReviewView | null>(null);
   const [busy, setBusy] = useState<"restore" | "upload" | "analyze" | "retry" | null>(initialReviewId ? "restore" : null);
   const [error, setError] = useState<string | null>(null);
@@ -143,6 +144,8 @@ export function ReviewFlow({ initialReviewId }: { initialReviewId?: string }) {
   }
 
   async function run(action: () => Promise<ReviewView>, pending: typeof busy) {
+    if (mutationInFlight.current) return;
+    mutationInFlight.current = true;
     setBusy(pending);
     setError(null);
     try {
@@ -150,12 +153,14 @@ export function ReviewFlow({ initialReviewId }: { initialReviewId?: string }) {
     } catch (caught) {
       setError(messageFor(caught));
     } finally {
+      mutationInFlight.current = false;
       setBusy(null);
     }
   }
 
   async function confirm(details: ConfirmedReviewDetails) {
-    if (!review) return;
+    if (!review || mutationInFlight.current) return;
+    mutationInFlight.current = true;
     setBusy("analyze");
     setError(null);
     try {
@@ -165,6 +170,7 @@ export function ReviewFlow({ initialReviewId }: { initialReviewId?: string }) {
       setError(messageFor(caught));
       try { remember(await getReview(review.review_id)); } catch {}
     } finally {
+      mutationInFlight.current = false;
       setBusy(null);
     }
   }
@@ -200,15 +206,6 @@ export function ReviewFlow({ initialReviewId }: { initialReviewId?: string }) {
         <p>Preparing the risk summary and review files from your confirmed details.</p>
       </section>
     );
-  } else if (review?.state === "FAILED") {
-    content = (
-      <section className={styles.processingPanel} aria-labelledby="failed-heading">
-        <span className={styles.processingMark} aria-hidden="true">!</span>
-        <h1 id="failed-heading">Review could not be completed.</h1>
-        <p>{review.failure_message ?? "Start a new review and upload the source again."}</p>
-        <button className={styles.primaryAction} type="button" onClick={startOver}>Start a new review</button>
-      </section>
-    );
   } else if (selectedStep === 1) {
     content = (
       <UploadStep
@@ -220,12 +217,22 @@ export function ReviewFlow({ initialReviewId }: { initialReviewId?: string }) {
         onIdea={() => run(createIdeaReview, "upload")}
       />
     );
+  } else if (review?.state === "FAILED") {
+    content = (
+      <section className={styles.processingPanel} aria-labelledby="failed-heading">
+        <span className={styles.processingMark} aria-hidden="true">!</span>
+        <h1 id="failed-heading">Review could not be completed.</h1>
+        <p>{review.failure_message ?? "Start a new review and upload the source again."}</p>
+        <button className={styles.primaryAction} type="button" onClick={startOver}>Start a new review</button>
+      </section>
+    );
   } else if (selectedStep === 2 && review) {
     content = (
       <ConfirmStep
         key={`${review.review_id}-${review.state}`}
         review={review}
         autoFocus={focusContent}
+        busy={busy !== null}
         onConfirm={confirm}
         onRetry={() => run(() => retryReviewIntake(review.review_id), "retry")}
       />
