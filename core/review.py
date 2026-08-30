@@ -40,7 +40,7 @@ _CN_DIGITS = {"一": 1, "二": 2, "三": 3, "四": 4, "五": 5, "六": 6, "七":
 _ONE_LINE = re.compile(rf"第\s*([{_CN}]+)\s*集.{{0,4}}?场景\s*([{_CN}]+)")
 _EPISODE = re.compile(rf"^#*\s*第\s*([{_CN}]+)\s*集")
 _ONE_LINE_EN = re.compile(
-    r"^###\s+Episode\s+(\d+)\s+Scene\s+(\d+)\s*:\s*\S.*$",
+    r"^###\s+Episode\s+(\d+)\s+Scene\s+(\d+)\s*:\s*(?:\S.*)?$",
     re.IGNORECASE,
 )
 _EPISODE_EN = re.compile(

@@ -125,6 +125,13 @@ def test_complete_english_headings_with_titles_are_supported():
     assert [(scene.episode, scene.scene) for scene in body] == [(2, 4)]
 
 
+def test_bare_english_scene_heading_with_trailing_colon_is_supported():
+    scenes = split_scenes("### Episode 1 Scene 1:\nBody")
+
+    body = [scene for scene in scenes if scene.quote == "Body"]
+    assert [(scene.episode, scene.scene) for scene in body] == [(1, 1)]
+
+
 # ------------------------------------------------------- what must not be reviewed
 
 
