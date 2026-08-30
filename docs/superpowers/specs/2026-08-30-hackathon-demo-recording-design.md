@@ -7,8 +7,8 @@
 **Target:** All Things Agentic Hackathon — Taskmaster
 
 **Production acceptance:** `gemini-3.5-flash` through Vertex AI `global`,
-Cloud Run revisions `web-c31228d` and `api-gemini35`, synthetic 30-minute
-fixture accepted end to end on 2026-08-30.
+Cloud Run revisions `web-c31228d` and `api-gemini35`, synthetic English
+30-minute fixture accepted end to end on 2026-08-31.
 
 ## 1. Goal
 
@@ -137,17 +137,17 @@ Aim for **3:45–3:55**.
 | Time | Screen and action | Purpose |
 |---|---|---|
 | 0:00–0:20 | Start on the production Upload page. | State the creator problem and product promise. |
-| 0:20–0:35 | Select `e2e-30min-public-security.md`; show the immutable-source note. | Establish the real input and trust boundary. |
+| 0:20–0:35 | Select `e2e-30min-public-security-en.md`; show the immutable-source note. | Establish the real English input and trust boundary. |
 | 0:35–1:05 | Click `Extract project details` and keep the real wait. | Show that extraction is live, not prefilled. |
-| 1:05–1:40 | Show title, source structure, tags, Synopsis, episode recommendation, and investment band. Edit one field. | Demonstrate model suggestions plus human confirmation. |
+| 1:05–1:40 | Show title, source structure, English tags and Synopsis, episode recommendation, and investment band. Add `Public Security (公安)` to Tags. | Demonstrate model suggestions plus a governed human confirmation. |
 | 1:40–2:10 | Click `Confirm & analyze risks`; switch once to the workflow slide while the request remains active. | Explain responsibilities during the real analysis wait. |
 | 2:10–3:10 | Return to Results. Show Class 1, co-review, one public-security scene, evidence, three derivative files, and original source checksum. | Deliver actionable, traceable output. |
 | 3:10–3:35 | Show the `.run` URL and Cloud Run revisions `web-c31228d` and `api-gemini35`. | Prove the demonstrated backend runs on Google Cloud. |
 | 3:35–3:55 | Return to the review package and close on the human-review boundary. | End with customer value. |
 
-Do not narrate a fixed adaptation recommendation. In the accepted 3.5 run the
-model proposed `15 × 2 min`; a later run may reasonably suggest a different
-episode plan. Record the final narration after selecting the final visual take.
+Do not narrate a fixed adaptation recommendation. Both English acceptance runs
+proposed `3 × 10 min`, but a later run may reasonably suggest a different plan.
+Record the final narration after selecting the final visual take.
 
 ## 7. English narration draft
 
@@ -160,11 +160,12 @@ episode plan. Record the final narration after selecting the final visual take.
 
 ### Extraction and confirmation
 
-> This is a synthetic thirty-minute micro-drama with fifteen scenes. Gemini 3.5
-> reads the normalized script and suggests editable tags, a full Synopsis, an
-> episodic adaptation, and an investment band. Extracted source structure and
-> model suggestions are labeled separately. I can change any value here, and
-> nothing becomes a classification input until the creator confirms it.
+> This is a synthetic English thirty-minute micro-drama with fifteen scenes.
+> Gemini 3.5 reads the normalized script and suggests editable tags, a full
+> Synopsis, an episodic adaptation, and an investment band. Extracted source
+> structure and model suggestions are labeled separately. I am confirming the
+> governed public-security subject here as Public Security, or 公安. Nothing
+> becomes a classification input until the creator confirms it.
 
 ### Analysis and architecture
 
@@ -208,24 +209,29 @@ episode plan. Record the final narration after selecting the final visual take.
 
 Use only:
 
-`tests/fixtures/scripts/e2e-30min-public-security.md`
+`tests/fixtures/scripts/e2e-30min-public-security-en.md`
 
 The production acceptance run on `api-gemini35` produced:
 
-- extracted title `先挂电话`;
+- extracted title `Hang Up First`;
 - source structure `1 episode · 30 min · 15 scenes`;
-- non-empty Gemini-generated tags and Synopsis;
-- an editable `15 × 2 min` recommendation and `Below CNY 300,000` band;
-- `Class 1`, `Co-review required`, and `Public security subject`;
-- nine locatable public-security findings in that run;
+- non-empty Gemini-generated English tags and English Synopsis;
+- an editable `3 × 10 min` recommendation and `Below CNY 300,000` band in both
+  acceptance runs;
+- one raw run at Class 1/co-review and one at Class 3/no co-review, showing that
+  English model wording alone is not a deterministic subject-routing input;
+- confirmed tag `Public Security (公安)`, followed by deterministic Class 1,
+  `Co-review required`, and `Public security subject`;
+- one locatable English public-security semantic finding per accepted run;
 - `project-review-form.pdf`, `risk-summary.pdf`, `annotated-script.md`, and the
   unchanged original source with checksum;
 - no browser warnings or errors.
 
-Model suggestions and semantic finding counts are not guaranteed to be byte-for-
-byte identical. The recording gate is: non-empty Synopsis, editable complete
-form, Class 1/co-review, at least five locatable public-security findings, no
-semantic-pending state, and all four download entries.
+Model suggestions and semantic quotes are not guaranteed to be byte-for-byte
+identical. The recording gate is: non-empty English Synopsis, exact confirmed
+tag `Public Security (公安)`, Class 1/co-review, at least one locatable English
+public-security finding, no semantic-pending state, and all four download
+entries.
 
 ## 10. Failure plan
 
@@ -233,9 +239,9 @@ semantic-pending state, and all four download entries.
 |---|---|
 | Extraction or analysis takes longer than rehearsed | Keep the take and shorten the spoken architecture explanation. Do not open a prepared result. |
 | Synopsis is empty or essential suggestions are missing | Stop. Confirm the API still uses `api-gemini35`, then rerun from a fresh upload. |
-| Classification is not Class 1/co-review | Stop and inspect the confirmed Synopsis/tags. Do not narrate the expected result over a different screen. |
+| Classification is not Class 1/co-review | Stop and verify that Tags contains exactly `Public Security (公安)`. Do not narrate the expected result over a different screen. |
 | Semantic analysis is unavailable or pending | Stop and diagnose; never present pending analysis as clean. |
-| Fewer than five locatable public-security findings appear | Reject the take and retain the result for diagnosis. |
+| No locatable English public-security finding appears | Reject the take and retain the result for diagnosis. |
 | One artifact fails | Stop after retaining the failure evidence; rerun only after the cause is understood. |
 | Session disappears | This is the documented memory boundary. Start a new upload; do not claim recovery. |
 | Sensitive information appears | Stop and do not publish. Rotate any exposed credential before continuing. |
@@ -247,6 +253,7 @@ Complete three rehearsals. The video is ready only when:
 - two consecutive rehearsals meet the accepted fixture gate;
 - the uninterrupted product run finishes within 3:55;
 - Gemini 3.5 extraction produces a non-empty Synopsis;
+- the governed bilingual tag is visible before confirmation;
 - Class 1, co-review, evidence-linked findings, and four download entries are
   readable at normal playback speed;
 - Cloud proof shows the production `.run` URL and current Web/API revisions;
