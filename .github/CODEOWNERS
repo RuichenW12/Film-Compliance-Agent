@@ -1,0 +1,5 @@
+# Require the repository owner to approve changes before they enter main.
+* @RuichenW12
+
+# Protect the ownership rule itself explicitly.
+/.github/CODEOWNERS @RuichenW12
